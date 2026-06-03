@@ -129,6 +129,13 @@ function buildCoreImageAttrs(block: Block): Record<string, unknown> {
   return attrs;
 }
 
+function buildCoreListAttrs(block: Block): Record<string, unknown> {
+  const attrs: Record<string, unknown> = {};
+  attrs.ordered = block.tagName === "ol";
+  attrs.values = block.html ?? "";
+  return attrs;
+}
+
 function buildCoreEmbedAttrs(block: Block): Record<string, unknown> {
   const attrs: Record<string, unknown> = {};
   if (block.url) attrs.url = block.url;
@@ -244,6 +251,12 @@ function renderCoreEmbedHtml(block: Block): string {
   return `<figure class="wp-block-embed is-type-${type} is-provider-${provider} wp-block-embed-${provider}"><div class="wp-block-embed__wrapper">${htmlAttrEncode(url)}</div></figure>`;
 }
 
+function renderCoreListHtml(block: Block): string {
+  const tag = block.tagName === "ol" ? "ol" : "ul";
+  const items = block.html ?? "";
+  return `<${tag}>${items}</${tag}>`;
+}
+
 function renderCoreHtmlHtml(block: Block): string {
   return block.html ?? "";
 }
@@ -295,6 +308,12 @@ function serializeSingleBlock(block: Block): SerializedBlock {
     case "core/embed":
       attrs = buildCoreEmbedAttrs(block);
       html = renderCoreEmbedHtml(block);
+      inner = [];
+      break;
+
+    case "core/list":
+      attrs = buildCoreListAttrs(block);
+      html = renderCoreListHtml(block);
       inner = [];
       break;
 

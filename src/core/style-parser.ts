@@ -253,12 +253,15 @@ export function parseStyleString(raw: string | undefined | null): ParsedStyles {
     }
 
     const property = decl.substring(0, colonIdx).trim();
-    const value = decl.substring(colonIdx + 1).trim();
+    let value = decl.substring(colonIdx + 1).trim();
 
     if (!property || !value) {
       warnings.push(`Empty property or value in: "${decl.trim()}"`);
       continue;
     }
+
+    // Normalize function argument spaces: minmax(0, 1fr) → minmax(0,1fr)
+    value = value.replace(/,\s+/g, ",");
 
     // Normalize property name
     const propLower = property.toLowerCase();

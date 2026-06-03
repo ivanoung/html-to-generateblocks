@@ -43,9 +43,10 @@ export function planBlocks(node: IRNode): PlanResult {
     case "image":
       return planImage(node, errors);
     case "list":
+      return planList(node, errors);
     case "quote":
     case "icon":
-      errors.push(`DEFERRED: IR type "${node.nodeType}" not implemented in Phase 1`);
+      errors.push(`DEFERRED: IR type "${node.nodeType}" not implemented in Phase 2`);
       return { blocks: [], errors };
     default:
       errors.push(`UNKNOWN: IR node type "${(node as any).nodeType}"`);
@@ -116,11 +117,12 @@ function planButtonLink(node: IRNode, errors: string[]): PlanResult {
   const { styles, css } = parseStyleString(rawStyle);
   const htmlAttributes = { ...node.attributes };
 
-  // Text content from the first span/paragraph child
-  const textContent = node.children
+  // Text content from children (span/paragraph) or direct textContent
+  const fromChildren = node.children
     .filter((c) => c.nodeType === "span" || c.nodeType === "paragraph")
     .map((c) => c.textContent ?? "")
     .join("");
+  const textContent = fromChildren || node.textContent || "";
 
   return {
     blocks: [{
@@ -180,6 +182,37 @@ function planImage(node: IRNode, errors: string[]): PlanResult {
     }],
     errors,
   };
+}
+
+// ── List → core/list ───────────────────────────────────────────
+
+function planList(node: IRNode, errors: string[]): PlanResult {
+  if (node.fallbackPolicy === "core") {
+    const ordered = node.attributes?.ordered === "true";
+    const items = node.children
+      .filter((c) => c.textContent)
+      .map((c) => `<li>${c.textContent ?? ""}</li>`)
+      .join("");
+
+    return {
+      blocks: [{
+        blockName: "core/list",
+        uniqueId: nextId("core"),
+        styles: {},
+        css: "",
+        innerBlocks: [],
+        idGenType: "core",
+        // Store list values as html for serializer
+        html: items,
+        // Pass ordered flag via tagName convention
+        tagName: ordered ? "ol" : "ul",
+      }],
+      errors,
+    };
+  }
+
+  errors.push(`List block requires fallbackPolicy "core"`);
+  return { blocks: [], errors };
 }
 
 // ── Helpers ────────────────────────────────────────────────────
