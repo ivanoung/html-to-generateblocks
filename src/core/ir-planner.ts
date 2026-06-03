@@ -157,7 +157,7 @@ function planButtonLink(node: IRNode, errors: string[]): PlanResult {
 
 function planImage(node: IRNode, errors: string[]): PlanResult {
   const rawStyle = styleIntentToString(node.styleIntent);
-  const { styles, css } = parseStyleString(rawStyle);
+  const { styles: baseStyles, css: baseCss } = parseStyleString(rawStyle);
   const alt = node.attributes?.alt ?? "";
   const src = node.attributes?.src ?? "";
   const caption = node.attributes?.caption;
@@ -170,8 +170,8 @@ function planImage(node: IRNode, errors: string[]): PlanResult {
         url: src,
         alt,
         caption,
-        styles,
-        css,
+        styles: baseStyles,
+        css: baseCss,
         innerBlocks: [],
         idGenType: "core",
       }],
@@ -179,10 +179,16 @@ function planImage(node: IRNode, errors: string[]): PlanResult {
     };
   }
 
+  const blockId = nextId("img");
+  const blockName = "generateblocks/media";
+  const { styles, css } = buildResponsive(
+    blockId, blockName, baseStyles, baseCss, node.responsiveIntent,
+  );
+
   return {
     blocks: [{
-      blockName: "generateblocks/media",
-      uniqueId: nextId("img"),
+      blockName,
+      uniqueId: blockId,
       tagName: "img",
       styles,
       css,
