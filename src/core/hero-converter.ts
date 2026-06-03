@@ -10,6 +10,7 @@ import type { Block, HardFail } from "./types.js";
 import type { HeroScore, HeroConverterOptions } from "./hero-scorer.js";
 export type { HeroConverterOptions } from "./hero-scorer.js";
 import { scoreHeroPattern, DEFAULT_OPTIONS } from "./hero-scorer.js";
+export { DEFAULT_OPTIONS } from "./hero-scorer.js";
 import { resetIds } from "./id-generator.js";
 import { planBlocks } from "./ir-planner.js";
 import { serializeBlocks, countBlocks } from "./serializer.js";

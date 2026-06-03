@@ -15,6 +15,9 @@ import {
   isIRFixture, type IRFixture,
 } from "../runner/run-fixture.js";
 import type { Fixture, FixtureReport, ReportStatus } from "../core/types.js";
+import { normalizeHeroHtml } from "../core/hero-intake.js";
+import { convertHero, DEFAULT_OPTIONS } from "../core/hero-converter.js";
+import type { HeroConverterOptions } from "../core/hero-converter.js";
 
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
 const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
@@ -299,9 +302,62 @@ function main(): void {
     return;
   }
 
+  // ── hero:convert ─────────────────────────────────────────
+  if (cmd === "hero:convert") {
+    const inputIdx = args.indexOf("--input");
+    const nameIdx = args.indexOf("--name");
+    const modeIdx = args.indexOf("--mode");
+    const scoreIdx = args.indexOf("--min-pattern-score");
+
+    if (inputIdx === -1 || nameIdx === -1) {
+      console.error("Usage: hero:convert --input <path> --name <name> [--mode auto|pattern|generic] [--min-pattern-score 0.75]");
+      process.exit(1);
+    }
+
+    const inputPath = args[inputIdx + 1];
+    const name = args[nameIdx + 1];
+    const mode = (modeIdx !== -1 ? args[modeIdx + 1] : "auto") as HeroConverterOptions["mode"];
+    const minScore = scoreIdx !== -1 ? parseFloat(args[scoreIdx + 1]) : 0.75;
+
+    const fullPath = resolve(process.cwd(), inputPath);
+    if (!existsSync(fullPath)) {
+      console.error(`Input file not found: ${fullPath}`);
+      process.exit(1);
+    }
+
+    console.log(`\nConverting hero: ${name}`);
+    console.log(`  Input: ${inputPath}`);
+    console.log(`  Mode: ${mode}, Min score: ${minScore}`);
+
+    const rawHtml = readFileSync(fullPath, "utf-8");
+    const { root, warnings } = normalizeHeroHtml(rawHtml);
+
+    for (const w of warnings) {
+      console.log(`  Normalizer: ${w}`);
+    }
+
+    const options: HeroConverterOptions = {
+      mode,
+      minPatternScore: minScore,
+    };
+
+    const result = convertHero(name, root, options);
+    writeHeroOutput(name, result.html, result.report);
+
+    console.log(`  Output: output/${name}.html`);
+    console.log(`  Report: output/${name}.report.json`);
+    console.log(`  Mode: ${result.report.mode}, Score: ${result.report.patternScore.toFixed(2)}`);
+    console.log(`  Blocks: ${result.report.blockCount}`);
+    if (result.report.hardFails.length > 0) {
+      console.log(`  Fails: ${result.report.hardFails.join(", ")}`);
+    }
+
+    return;
+  }
+
   // ── Unknown command ───────────────────────────────────────
   console.error(`Unknown command: ${cmd}`);
-  console.error("Available: fixtures:list, fixtures:run, fixtures:run-all, validate, report:update, regression");
+  console.error("Available: fixtures:list, fixtures:run, fixtures:run-all, validate, report:update, regression, hero:convert");
   process.exit(1);
 }
 
