@@ -129,6 +129,27 @@ function buildCoreImageAttrs(block: Block): Record<string, unknown> {
   return attrs;
 }
 
+function buildShapeAttrs(block: Block): Record<string, unknown> {
+  const attrs: Record<string, unknown> = {};
+  attrs.uniqueId = block.uniqueId;
+  attrs.html = block.html ?? "";
+  const stylesEmpty = !block.styles || Object.keys(block.styles).length === 0;
+  attrs.styles = stylesEmpty ? {} : block.styles;
+  attrs.css = block.css || "";
+  if (block.globalClasses?.length) attrs.globalClasses = block.globalClasses;
+  if (block.htmlAttributes && Object.keys(block.htmlAttributes).length > 0) {
+    attrs.htmlAttributes = block.htmlAttributes;
+  }
+  return attrs;
+}
+
+function buildCoreQuoteAttrs(block: Block): Record<string, unknown> {
+  const attrs: Record<string, unknown> = {};
+  attrs.value = block.content ?? "";
+  attrs.citation = block.htmlAttributes?.citation ?? "";
+  return attrs;
+}
+
 function buildCoreListAttrs(block: Block): Record<string, unknown> {
   const attrs: Record<string, unknown> = {};
   attrs.ordered = block.tagName === "ol";
@@ -251,6 +272,22 @@ function renderCoreEmbedHtml(block: Block): string {
   return `<figure class="wp-block-embed is-type-${type} is-provider-${provider} wp-block-embed-${provider}"><div class="wp-block-embed__wrapper">${htmlAttrEncode(url)}</div></figure>`;
 }
 
+function renderShapeHtml(block: Block): string {
+  const hasStyles = block.styles && Object.keys(block.styles).length > 0;
+  const classes = hasStyles
+    ? `gb-shape gb-shape-${block.uniqueId}`
+    : "gb-shape";
+  const svg = block.html ?? "";
+  return `<span class="${classes}">${svg}</span>`;
+}
+
+function renderCoreQuoteHtml(block: Block): string {
+  const value = block.content ?? "";
+  const citation = block.htmlAttributes?.citation ?? "";
+  const citeHtml = citation ? `<cite>${citation}</cite>` : "";
+  return `<blockquote class="wp-block-quote"><p>${value}</p>${citeHtml}</blockquote>`;
+}
+
 function renderCoreListHtml(block: Block): string {
   const tag = block.tagName === "ol" ? "ol" : "ul";
   const items = block.html ?? "";
@@ -314,6 +351,18 @@ function serializeSingleBlock(block: Block): SerializedBlock {
     case "core/list":
       attrs = buildCoreListAttrs(block);
       html = renderCoreListHtml(block);
+      inner = [];
+      break;
+
+    case "generateblocks/shape":
+      attrs = buildShapeAttrs(block);
+      html = renderShapeHtml(block);
+      inner = [];
+      break;
+
+    case "core/quote":
+      attrs = buildCoreQuoteAttrs(block);
+      html = renderCoreQuoteHtml(block);
       inner = [];
       break;
 

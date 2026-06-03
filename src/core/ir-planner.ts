@@ -6,7 +6,7 @@
 // Covers: section, container, heading, paragraph, span, button-link.
 // Other IR types stub with errors for later phases.
 
-import type { Block } from "./types.js";
+import type { Block, BlockStyles } from "./types.js";
 import type { IRNode } from "./ir-node.js";
 import { nextId } from "./id-generator.js";
 import { parseStyleString } from "./style-parser.js";
@@ -45,9 +45,9 @@ export function planBlocks(node: IRNode): PlanResult {
     case "list":
       return planList(node, errors);
     case "quote":
+      return planQuote(node, errors);
     case "icon":
-      errors.push(`DEFERRED: IR type "${node.nodeType}" not implemented in Phase 2`);
-      return { blocks: [], errors };
+      return planIcon(node, errors);
     default:
       errors.push(`UNKNOWN: IR node type "${(node as any).nodeType}"`);
       return { blocks: [], errors };
@@ -213,6 +213,91 @@ function planList(node: IRNode, errors: string[]): PlanResult {
 
   errors.push(`List block requires fallbackPolicy "core"`);
   return { blocks: [], errors };
+}
+
+// ── Quote → core/quote ─────────────────────────────────────────
+
+function planQuote(node: IRNode, errors: string[]): PlanResult {
+  if (node.fallbackPolicy === "core") {
+    const block: Block = {
+      blockName: "core/quote",
+      uniqueId: nextId("core"),
+      content: node.textContent ?? "",
+      styles: {},
+      css: "",
+      globalClasses: [],
+      innerBlocks: [],
+      idGenType: "core",
+      htmlAttributes: {},
+    };
+    // Store citation in htmlAttributes
+    if (node.attributes?.citation) {
+      block.htmlAttributes = { citation: node.attributes.citation };
+    }
+    return { blocks: [block], errors };
+  }
+
+  errors.push(`Quote block requires fallbackPolicy "core"`);
+  return { blocks: [], errors };
+}
+
+// ── Icon → generateblocks/shape ────────────────────────────────
+
+function planIcon(node: IRNode, errors: string[]): PlanResult {
+  const id = nextId("shape");
+
+  const rawStyle = styleIntentToString(node.styleIntent);
+  const { styles } = parseStyleString(rawStyle);
+
+  // Build SVG CSS: .gb-shape-{id} svg{...}
+  const svgCss = node.styleIntent
+    ? Object.entries(node.styleIntent)
+        .filter(([k]) => k.startsWith("svg:"))
+        .map(([k, v]) => `${k.slice(4)}:${v}`)
+        .sort()
+        .join(";")
+    : "";
+
+  // Base CSS from non-svg properties — already sorted
+  const baseCss = Object.entries(node.styleIntent || {})
+    .filter(([k]) => !k.startsWith("svg:"))
+    .map(([k, v]) => `${k}:${v}`)
+    .sort()
+    .join(";");
+
+  // SVG styling in styles.svg
+  const svgStyleObj: Record<string, string> = {};
+  if (node.styleIntent) {
+    for (const [k, v] of Object.entries(node.styleIntent)) {
+      if (k.startsWith("svg:")) {
+        svgStyleObj[k.slice(4)] = v;
+      }
+    }
+  }
+
+  const shapeStyles: BlockStyles = { ...styles };
+  if (Object.keys(svgStyleObj).length > 0) {
+    shapeStyles.svg = svgStyleObj;
+  }
+
+  // Construct full CSS with correct id
+  const fullCss = baseCss
+    ? `.gb-shape-${id}{${baseCss}}` + (svgCss ? `.gb-shape-${id} svg{${svgCss}}` : "")
+    : "";
+
+  return {
+    blocks: [{
+      blockName: "generateblocks/shape",
+      uniqueId: id,
+      html: node.html ?? node.attributes?.html ?? "",
+      styles: shapeStyles,
+      css: fullCss,
+      globalClasses: [],
+      innerBlocks: [],
+      idGenType: "shape",
+    }],
+    errors,
+  };
 }
 
 // ── Helpers ────────────────────────────────────────────────────

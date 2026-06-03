@@ -43,6 +43,8 @@ export interface IRNode {
   children: IRNode[];
   fallbackPolicy: FallbackPolicy;
   sourceMeta?: string;
+  /** Raw HTML payload (used for icon/shape SVG content). */
+  html?: string;
 }
 
 export function isValidIRType(t: string): t is IRNodeType {

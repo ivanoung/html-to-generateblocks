@@ -64,6 +64,7 @@ export type BlockName =
   | "image"
   | "core/embed"
   | "core/list"
+  | "core/quote"
   | "core/html";
 
 export interface BlockStyles {
