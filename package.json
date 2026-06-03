@@ -1,0 +1,16 @@
+{
+  "name": "gb-converter",
+  "version": "0.1.0",
+  "description": "GenerateBlocks Prototype — convert JSON fixture nodes to WordPress paste-ready block markup",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/cli/index.ts",
+    "dev": "tsx watch src/cli/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

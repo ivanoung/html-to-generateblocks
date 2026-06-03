@@ -1,0 +1,151 @@
+// ── Fixture schema ────────────────────────────────────────────
+
+export interface FixtureExpect {
+  shouldPass: boolean;
+  hardFailCount: number;
+  warningCodes: string[];
+}
+
+export interface Fixture {
+  name: string;
+  description: string;
+  input: FixtureNode;
+  expect: FixtureExpect;
+}
+
+// ── Input node types (from fixture JSON) ──────────────────────
+
+export interface ElementNode {
+  nodeType: "element";
+  tagName: string;
+  attributes: Record<string, string>;
+  style?: string;
+  children: FixtureNode[];
+}
+
+export interface TextNode {
+  nodeType: "text";
+  tagName: string;
+  text: string;
+  style?: string;
+}
+
+export interface ImageNode {
+  nodeType: "image";
+  src: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  caption?: string;
+  style?: string;
+}
+
+export interface EmbedNode {
+  nodeType: "embed";
+  provider: string;
+  url: string;
+}
+
+export interface HtmlNode {
+  nodeType: "html";
+  html: string;
+}
+
+export type FixtureNode = ElementNode | TextNode | ImageNode | EmbedNode | HtmlNode;
+
+// ── Intermediate block (after mapping, before serialization) ──
+
+export type BlockName =
+  | "generateblocks/element"
+  | "generateblocks/text"
+  | "generateblocks/media"
+  | "generateblocks/shape"
+  | "core/image"
+  | "image"
+  | "core/embed"
+  | "core/html";
+
+export interface BlockStyles {
+  [key: string]: unknown;
+  // camelCase CSS properties
+  // e.g. paddingTop, backgroundColor, fontSize
+  // responsive: "@media (max-width:1024px)": { ... }
+  // hover: ":hover": { ... }
+}
+
+export interface Block {
+  blockName: BlockName;
+  uniqueId: string;
+  tagName?: string;          // omitted for shape; used for most others
+  content?: string;          // text block only
+  styles: BlockStyles;
+  css: string;
+  globalClasses?: string[];
+  htmlAttributes?: Record<string, string>;
+  align?: string;            // element block only
+  mediaId?: number;          // media block only
+  linkHtmlAttributes?: Record<string, string>; // media block only
+  icon?: string;             // text block only
+  iconLocation?: string;     // text block only
+  iconOnly?: boolean;        // text block only
+  html?: string;             // shape block only
+  innerBlocks: Block[];
+
+  // core block fields
+  url?: string;              // core/image, core/embed
+  alt?: string;              // core/image
+  width?: number;            // core/image
+  height?: number;           // core/image
+  caption?: string;          // core/image
+  providerNameSlug?: string; // core/embed
+  responsive?: boolean;      // core/embed
+  type?: string;             // core/embed
+
+  // metadata for validation
+  idGenType?: string;        // which counter was used: "elem", "text", "img", "shape"
+}
+
+// ── Style pipeline intermediate ───────────────────────────────
+
+export interface StyleEntry {
+  property: string;   // kebab-case css property name
+  value: string;
+  camelCase: string;  // camelCase equivalent
+}
+
+// ── Validation ────────────────────────────────────────────────
+
+export interface HardFail {
+  code: string;
+  message: string;
+  blockId?: string;
+  blockName?: BlockName;
+}
+
+export interface Warning {
+  code: string;
+  message: string;
+  blockId?: string;
+}
+
+export interface ValidationResult {
+  hardFails: HardFail[];
+  warnings: Warning[];
+}
+
+// ── Output report ─────────────────────────────────────────────
+
+export interface ManualVerification {
+  wordpressPasted: boolean;
+  savedWithoutRecovery: boolean | null;
+  notes: string;
+}
+
+export interface FixtureReport {
+  fixture: string;
+  status: "pass" | "fail";
+  blockCount: number;
+  hardFails: HardFail[];
+  warnings: Warning[];
+  manualVerification: ManualVerification;
+}

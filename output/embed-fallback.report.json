@@ -1,0 +1,17 @@
+{
+  "fixture": "embed-fallback",
+  "status": "pass",
+  "blockCount": 1,
+  "hardFails": [],
+  "warnings": [
+    {
+      "code": "downgraded-to-core-block",
+      "message": "Node mapped to core/embed (youtube) instead of GB block"
+    }
+  ],
+  "manualVerification": {
+    "wordpressPasted": true,
+    "savedWithoutRecovery": true,
+    "notes": "Pasted, saved, reloaded — no Attempt Recovery. YouTube embed via core/embed block survived round-trip. Warning correctly recorded."
+  }
+}

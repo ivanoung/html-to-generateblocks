@@ -1,0 +1,17 @@
+{
+  "fixture": "captioned-image",
+  "status": "pass",
+  "blockCount": 1,
+  "hardFails": [],
+  "warnings": [
+    {
+      "code": "MAPPING_WARNING",
+      "message": "core/image received styles; only css string is applicable (inline style)"
+    }
+  ],
+  "manualVerification": {
+    "wordpressPasted": true,
+    "savedWithoutRecovery": true,
+    "notes": "Pasted, saved, reloaded — no Attempt Recovery. core/image block with caption preserved correctly. Using wp:image block delimiter with sizeSlug:full and linkDestination:none."
+  }
+}

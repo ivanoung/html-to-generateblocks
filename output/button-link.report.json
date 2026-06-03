@@ -1,0 +1,12 @@
+{
+  "fixture": "button-link",
+  "status": "pass",
+  "blockCount": 2,
+  "hardFails": [],
+  "warnings": [],
+  "manualVerification": {
+    "wordpressPasted": false,
+    "savedWithoutRecovery": null,
+    "notes": ""
+  }
+}

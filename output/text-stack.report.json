@@ -1,0 +1,12 @@
+{
+  "fixture": "text-stack",
+  "status": "pass",
+  "blockCount": 3,
+  "hardFails": [],
+  "warnings": [],
+  "manualVerification": {
+    "wordpressPasted": false,
+    "savedWithoutRecovery": null,
+    "notes": ""
+  }
+}
