@@ -14,6 +14,8 @@ import { mapNode } from "../core/mapper.js";
 import { planBlocks } from "../core/ir-planner.js";
 import { serializeBlocks, countBlocks } from "../core/serializer.js";
 import { validateBlocks } from "../core/validator.js";
+import { convertHero } from "../core/hero-converter.js";
+import type { HeroConverterOptions, HeroReport } from "../core/hero-converter.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
 
@@ -142,6 +144,16 @@ export function runIRFixture(fixture: IRFixture): RunResult {
 }
 
 // ── Output writing ────────────────────────────────────────────
+
+export function runHeroFixture(fixture: IRFixture, options?: HeroConverterOptions): { html: string; report: HeroReport } {
+  return convertHero(fixture.name, fixture.input, options);
+}
+
+export function writeHeroOutput(fixtureName: string, html: string, report: HeroReport): void {
+  mkdirSync(OUTPUT_DIR, { recursive: true });
+  writeFileSync(resolve(OUTPUT_DIR, `${fixtureName}.html`), html, "utf-8");
+  writeFileSync(resolve(OUTPUT_DIR, `${fixtureName}.report.json`), JSON.stringify(report, null, 2) + "\n", "utf-8");
+}
 
 export function writeOutput(fixtureName: string, html: string, report: FixtureReport): void {
   mkdirSync(OUTPUT_DIR, { recursive: true });

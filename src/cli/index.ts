@@ -11,7 +11,7 @@
 import { resolve, basename, extname } from "node:path";
 import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
 import {
-  runFixture, runIRFixture, loadFixture, writeOutput,
+  runFixture, runIRFixture, runHeroFixture, loadFixture, writeOutput, writeHeroOutput,
   isIRFixture, type IRFixture,
 } from "../runner/run-fixture.js";
 import type { Fixture, FixtureReport, ReportStatus } from "../core/types.js";
@@ -69,6 +69,31 @@ function processFixture(name: string, fixPath: string): FixtureReport {
   console.log(`\nProcessing: ${name}`);
 
   const raw = loadFixture(fixPath);
+
+  // Hero fixtures use the hero converter pipeline
+  if ((raw as any).kind === "hero") {
+    const heroOptions = (raw as any).heroOptions;
+    const { html, report: heroReport } = runHeroFixture(raw as IRFixture, heroOptions);
+    writeHeroOutput(name, html, heroReport);
+    console.log(`  Output: output/${name}.html`);
+    console.log(`  Report: output/${name}.report.json`);
+    console.log(`  Mode: ${heroReport.mode}, Score: ${heroReport.patternScore.toFixed(2)}`);
+
+    // Return a compatible FixtureReport for display
+    const status: ReportStatus = heroReport.mode === "rejected"
+      ? "rejected_unsupported"
+      : heroReport.hardFails.length > 0 ? "validator_fail" : "validator_pass";
+
+    return {
+      fixture: name,
+      status,
+      blockCount: heroReport.blockCount,
+      hardFails: heroReport.hardFails.map(f => ({ code: f, message: f })),
+      warnings: [],
+      manualVerification: { wordpressPasted: false, savedWithoutRecovery: null, notes: "" },
+    };
+  }
+
   let result: { report: FixtureReport; html: string };
 
   if (isIRFixture(raw as any)) {
