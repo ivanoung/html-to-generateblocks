@@ -125,6 +125,82 @@ function isHoverRule(prop: string): boolean {
   return prop.includes(":hover");
 }
 
+/** Expand shorthand CSS properties to their granular equivalents for GB styles. */
+function expandShorthands(entries: StyleEntry[]): StyleEntry[] {
+  const result: StyleEntry[] = [];
+  for (const entry of entries) {
+    const expanded = expandShorthand(entry);
+    result.push(...expanded);
+  }
+  return result;
+}
+
+function expandShorthand(entry: StyleEntry): StyleEntry[] {
+  const v = entry.value.trim();
+  const parts = v.split(/\s+/);
+
+  switch (entry.property) {
+    case "padding":
+      return expandBox("padding", parts, entry);
+    case "margin":
+      return expandBox("margin", parts, entry);
+    case "border-radius":
+      return expandRadius(parts, entry);
+    default:
+      return [entry];
+  }
+}
+
+const BOX_SIDES = ["top", "right", "bottom", "left"];
+
+function expandBox(prop: string, parts: string[], orig: StyleEntry): StyleEntry[] {
+  let values: string[];
+  if (parts.length === 1) {
+    values = [parts[0], parts[0], parts[0], parts[0]];
+  } else if (parts.length === 2) {
+    values = [parts[0], parts[1], parts[0], parts[1]];
+  } else if (parts.length === 3) {
+    values = [parts[0], parts[1], parts[2], parts[1]];
+  } else if (parts.length === 4) {
+    values = parts;
+  } else {
+    return [orig];
+  }
+
+  return BOX_SIDES.map((side, i) => {
+    const kebab = `${prop}-${side}`;
+    return { property: kebab, value: values[i], camelCase: toCamelCase(kebab) };
+  });
+}
+
+const RADIUS_CORNERS = [
+  ["top-left", "TopLeft"],
+  ["top-right", "TopRight"],
+  ["bottom-right", "BottomRight"],
+  ["bottom-left", "BottomLeft"],
+];
+
+function expandRadius(parts: string[], orig: StyleEntry): StyleEntry[] {
+  let values: string[];
+  if (parts.length === 1) {
+    values = [parts[0], parts[0], parts[0], parts[0]];
+  } else if (parts.length === 2) {
+    values = [parts[0], parts[1], parts[0], parts[1]];
+  } else if (parts.length === 3) {
+    values = [parts[0], parts[1], parts[2], parts[1]];
+  } else if (parts.length === 4) {
+    values = parts;
+  } else {
+    return [orig];
+  }
+
+  return RADIUS_CORNERS.map(([kebabSuffix, camelSuffix], i) => ({
+    property: `border-${kebabSuffix}-radius`,
+    value: values[i],
+    camelCase: `border${camelSuffix}Radius`,
+  }));
+}
+
 /** Check if a CSS background value is a simple color (not a gradient, image, or multi-value). */
 function isSimpleColor(value: string): boolean {
   const v = value.trim();
@@ -215,28 +291,30 @@ export function parseStyleString(raw: string | undefined | null): ParsedStyles {
     });
   }
 
-  // 2. Build styles object (only properties with GB equivalents)
+  // 2. Expand shorthand properties for styles (GB uses granular keys like
+  //    paddingTop/paddingBottom). CSS keeps the shorthand form for compactness.
+  const expanded = expandShorthands(entries);
+
+  // 3. Build styles object from expanded/granular entries
   const styles: BlockStyles = {};
-  const cssEntries: string[] = [];
   let partialMappingWarning = false;
 
-  for (const entry of entries) {
+  for (const entry of expanded) {
     if (hasStylesEquivalent(entry.property)) {
       styles[entry.camelCase] = entry.value;
     } else {
       partialMappingWarning = true;
     }
-
-    // All properties go to css (except forbidden ones already filtered)
-    cssEntries.push(`${entry.property}:${entry.value}`);
   }
 
   if (partialMappingWarning) {
     warnings.push("Some inline style properties had no GB styles equivalent; placed in css only");
   }
 
-  // 3. Build the css string: property:value pairs, alphabetically sorted, single line
-  cssEntries.sort();
+  // 4. Build CSS string from ORIGINAL entries (shorthand form is canonical in CSS)
+  const cssEntries = entries
+    .map((e) => `${e.property}:${e.value}`)
+    .sort();
   const css = cssEntries.join(";") + (cssEntries.length > 0 ? ";" : "");
 
   return { styles, css, warnings };

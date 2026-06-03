@@ -1,17 +1,19 @@
 {
   "fixture": "captioned-image",
-  "status": "pass",
+  "status": "validator_fail",
   "blockCount": 1,
-  "hardFails": [],
-  "warnings": [
+  "hardFails": [
     {
-      "code": "MAPPING_WARNING",
-      "message": "core/image received styles; only css string is applicable (inline style)"
+      "code": "MISSING_IMAGE_SRC",
+      "message": "Media block img001 missing src in htmlAttributes",
+      "blockId": "img001",
+      "blockName": "generateblocks/media"
     }
   ],
+  "warnings": [],
   "manualVerification": {
-    "wordpressPasted": true,
-    "savedWithoutRecovery": true,
-    "notes": "Pasted, saved, reloaded — no Attempt Recovery. core/image block with caption preserved correctly. Using wp:image block delimiter with sizeSlug:full and linkDestination:none."
+    "wordpressPasted": false,
+    "savedWithoutRecovery": null,
+    "notes": ""
   }
 }

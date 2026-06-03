@@ -4,41 +4,7 @@
 // Canonical key ordering, 4 JSON escapes, block delimiters,
 // rendered HTML with correct class patterns.
 
-import type { Block, BlockName } from "./types.js";
-
-// ── JSON escaping ─────────────────────────────────────────────
-
-/**
- * Apply the four WordPress-safe substitutions to a JSON string value.
- * These must be applied to EVERY string value inside block attributes.
- */
-function wpEscapeJson(str: string): string {
-  return str
-    .replace(/--/g, "\\u002d\\u002d")
-    .replace(/&/g, "\\u0026")
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e");
-}
-
-/**
- * Recursively escape all string values in any JSON-serializable value.
- */
-function escapeAllStrings(val: unknown): unknown {
-  if (typeof val === "string") {
-    return wpEscapeJson(val);
-  }
-  if (Array.isArray(val)) {
-    return val.map(escapeAllStrings);
-  }
-  if (val !== null && typeof val === "object") {
-    const result: Record<string, unknown> = {};
-    for (const [key, v] of Object.entries(val)) {
-      result[key] = escapeAllStrings(v);
-    }
-    return result;
-  }
-  return val;
-}
+import type { Block } from "./types.js";
 
 // ── CSS formatting ────────────────────────────────────────────
 
@@ -226,9 +192,11 @@ function renderTextHtml(block: Block): string {
     ? `gb-text gb-text-${block.uniqueId}`
     : "gb-text";
 
-  // By default we render as gb-text gb-text-{uniqueId}
+  // htmlAttributes on text blocks (used for <a> links: href, target, rel)
+  const attrs = renderHtmlAttributes(block.htmlAttributes);
+
   const content = block.content ?? "";
-  return `<${tag} class="${classes}">${content}</${tag}>`;
+  return `<${tag} class="${classes}"${attrs}>${content}</${tag}>`;
 }
 
 function renderMediaHtml(block: Block): string {

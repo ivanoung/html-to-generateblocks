@@ -1,6 +1,6 @@
 {
   "fixture": "embed-fallback",
-  "status": "pass",
+  "status": "validator_pass",
   "blockCount": 1,
   "hardFails": [],
   "warnings": [
@@ -10,8 +10,8 @@
     }
   ],
   "manualVerification": {
-    "wordpressPasted": true,
-    "savedWithoutRecovery": true,
-    "notes": "Pasted, saved, reloaded — no Attempt Recovery. YouTube embed via core/embed block survived round-trip. Warning correctly recorded."
+    "wordpressPasted": false,
+    "savedWithoutRecovery": null,
+    "notes": ""
   }
 }

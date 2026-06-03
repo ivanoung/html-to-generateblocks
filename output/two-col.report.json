@@ -1,12 +1,12 @@
 {
   "fixture": "two-col",
-  "status": "pass",
+  "status": "wordpress_verified_pass",
   "blockCount": 8,
   "hardFails": [],
   "warnings": [],
   "manualVerification": {
     "wordpressPasted": true,
     "savedWithoutRecovery": true,
-    "notes": "Pasted, saved, reloaded — no Attempt Recovery. Section → container → two column divs survived. Note: not responsive — flex:1 columns don't stack on mobile. Fixture design improvement for later."
+    "notes": "Re-verified with granular padding/margin/border-radius styles."
   }
 }

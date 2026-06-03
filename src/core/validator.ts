@@ -354,17 +354,10 @@ function checkCssRestrictions(
 function checkLinkPatterns(block: Block, hardFails: HardFail[]): void {
   const id = block.uniqueId || "(no id)";
 
-  // Text block <a> with href in htmlAttributes → WRONG pattern
-  if (block.blockName === "generateblocks/text" && block.tagName === "a") {
-    if (block.htmlAttributes && block.htmlAttributes.href) {
-      hardFails.push({
-        code: "TEXT_LINK_HREF",
-        message: `Text block ${id} with tagName "a" has href in htmlAttributes — use element<a>+text<span> pattern instead`,
-        blockId: id,
-        blockName: block.blockName,
-      });
-    }
-  }
+  // Text block <a> with href in htmlAttributes is the CORRECT pattern
+  // (verified in WordPress M1/M2 testing — text<a> + htmlAttributes.href
+  // survives round-trip when using granular style keys).
+  // No check needed here — the old element<a>+text<span> pattern is obsolete.
 
   // Captioned image as GB media — check in captioned image check
 }

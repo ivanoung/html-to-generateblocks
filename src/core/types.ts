@@ -135,6 +135,14 @@ export interface ValidationResult {
 
 // ── Output report ─────────────────────────────────────────────
 
+export type ReportStatus =
+  | "generated"
+  | "validator_pass"
+  | "validator_fail"
+  | "wordpress_verified_pass"
+  | "wordpress_verified_fail"
+  | "rejected_unsupported";
+
 export interface ManualVerification {
   wordpressPasted: boolean;
   savedWithoutRecovery: boolean | null;
@@ -143,7 +151,7 @@ export interface ManualVerification {
 
 export interface FixtureReport {
   fixture: string;
-  status: "pass" | "fail";
+  status: ReportStatus;
   blockCount: number;
   hardFails: HardFail[];
   warnings: Warning[];

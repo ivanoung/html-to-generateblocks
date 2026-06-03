@@ -1,12 +1,12 @@
 {
   "fixture": "button-link",
-  "status": "pass",
-  "blockCount": 2,
+  "status": "wordpress_verified_pass",
+  "blockCount": 1,
   "hardFails": [],
   "warnings": [],
   "manualVerification": {
-    "wordpressPasted": false,
-    "savedWithoutRecovery": null,
-    "notes": ""
+    "wordpressPasted": true,
+    "savedWithoutRecovery": true,
+    "notes": "CTA pattern changed to single generateblocks/text with tagName:a. Survived paste/save/reload."
   }
 }

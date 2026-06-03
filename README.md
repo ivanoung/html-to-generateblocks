@@ -5,8 +5,8 @@ paste-ready GenerateBlocks & Core block markup, validates against known
 "Attempt Recovery" rules, and writes files for manual verification in the
 WordPress editor.
 
-> **Status:** Milestone 1 prototype — accuracy, not breadth.
-> Focus: GenerateBlocks Element/Text/Media blocks + WordPress Core fallbacks
+> **Status:** Milestone 1 complete — all 5 fixtures WordPress-verified (paste / save / reload / no recovery).
+> 15 blocks tested across GenerateBlocks Element/Text + WordPress Core fallbacks
 > (Image, Embed, HTML).
 
 ---

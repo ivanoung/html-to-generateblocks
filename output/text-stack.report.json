@@ -1,12 +1,12 @@
 {
   "fixture": "text-stack",
-  "status": "pass",
+  "status": "wordpress_verified_pass",
   "blockCount": 3,
   "hardFails": [],
   "warnings": [],
   "manualVerification": {
-    "wordpressPasted": false,
-    "savedWithoutRecovery": null,
-    "notes": ""
+    "wordpressPasted": true,
+    "savedWithoutRecovery": true,
+    "notes": "Re-verified with granular padding styles. No recovery."
   }
 }

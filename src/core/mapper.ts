@@ -122,52 +122,40 @@ function mapElementNode(
 
 // ── CTA link pattern ──────────────────────────────────────────
 //
-// element <a> with text children → outer element<a> + inner text<span> child blocks
+// element <a> with text children → generateblocks/text with tagName:"a"
+// The correct WordPress pattern is a single text block with href in htmlAttributes.
 
 function mapCtaLink(
   node: import("./types.js").ElementNode,
   warnings: string[]
 ): MappingResult {
-  // Parse style for the outer element
+  // Parse style for the outer element — applies to the text<a> block
   const { styles, css, warnings: styleWarnings } = parseStyleString(node.style);
   warnings.push(...styleWarnings);
 
-  // Build htmlAttributes from element attributes
+  // Build htmlAttributes from element attributes (href, target, rel)
   const htmlAttributes: Record<string, string> = { ...node.attributes };
 
-  // Map text children to inner text blocks
-  const innerBlocks: Block[] = [];
-  for (const child of node.children) {
-    if (child.nodeType === "text") {
-      const { styles: childStyles, css: childCss } = parseStyleString(child.style);
-      const textBlock: Block = {
-        blockName: "generateblocks/text",
-        uniqueId: nextId("text"),
-        tagName: child.tagName.toLowerCase(),
-        content: child.text,
-        styles: childStyles,
-        css: childCss,
-        globalClasses: [],
-        innerBlocks: [],
-        idGenType: "text",
-      };
-      innerBlocks.push(textBlock);
-    }
-  }
+  // Text content comes from the first text child (or concatenated text)
+  const textContent = node.children
+    .filter((c) => c.nodeType === "text")
+    .map((c) => (c as import("./types.js").TextNode).text)
+    .join("");
 
-  const elementBlock: Block = {
-    blockName: "generateblocks/element",
-    uniqueId: nextId("elem"),
+  const block: Block = {
+    blockName: "generateblocks/text",
+    uniqueId: nextId("text"),
     tagName: "a",
+    content: textContent,
     styles,
     css,
     globalClasses: [],
     htmlAttributes: Object.keys(htmlAttributes).length > 0 ? htmlAttributes : undefined,
-    innerBlocks,
-    idGenType: "elem",
+    innerBlocks: [],
+    idGenType: "text",
   };
 
-  return { blocks: [elementBlock], warnings };
+  return { blocks: [block], warnings };
 }
 
 // ── Text node handling ────────────────────────────────────────

@@ -1,50 +1,73 @@
 // ── Runner ─────────────────────────────────────────────────────
 //
-// Orchestrates the full pipeline for a single fixture:
-//   load → map → serialize → validate → write output files
+// Orchestrates the full pipeline for a single fixture.
+// Supports two modes:
+//   M1 (FixtureNode via mapNode) — regression-safe, all M1 fixtures
+//   M2 (IRNode via planBlocks) — new phase 1+ fixtures
 
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import type { Fixture, FixtureReport } from "../core/types.js";
+import { resolve } from "node:path";
+import type { Fixture, FixtureReport, ReportStatus, HardFail } from "../core/types.js";
+import type { IRNode } from "../core/ir-node.js";
 import { resetIds } from "../core/id-generator.js";
 import { mapNode } from "../core/mapper.js";
+import { planBlocks } from "../core/ir-planner.js";
 import { serializeBlocks, countBlocks } from "../core/serializer.js";
 import { validateBlocks } from "../core/validator.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
 
 export interface RunResult {
-  fixture: Fixture;
+  fixture: Fixture | IRFixture;
   report: FixtureReport;
   html: string;
 }
 
+export interface IRFixture {
+  name: string;
+  description: string;
+  input: IRNode;
+  expect: {
+    shouldPass: boolean;
+    hardFailCount: number;
+    warningCodes: string[];
+  };
+}
+
+// ── Fixture loading ───────────────────────────────────────────
+
 /**
- * Load a fixture JSON file and process it through the pipeline.
+ * Load a fixture JSON file. Detects M1 vs M2 format by checking
+ * whether the top-level `input` uses FixtureNode (has `nodeType`)
+ * or IRNode (has `nodeType` with IR type values).
  */
-export function loadFixture(fixturePath: string): Fixture {
+export function loadFixture(fixturePath: string): Fixture | IRFixture {
   const raw = readFileSync(fixturePath, "utf-8");
-  return JSON.parse(raw) as Fixture;
+  return JSON.parse(raw);
 }
 
 /**
- * Run the full pipeline for a single fixture.
+ * Detect whether a parsed fixture is M1 (FixtureNode) or M2 (IRNode) format.
+ * M1 fixtures have `input.nodeType` with values like "element", "text", "image".
+ * M2 fixtures have `input.nodeType` with values like "section", "container", etc.
  */
+export function isIRFixture(f: Fixture | IRFixture): boolean {
+  const input = (f as any).input;
+  if (!input || !input.nodeType) return false;
+  const irTypes = ["section", "container", "heading", "paragraph",
+    "button-link", "span", "image", "list", "quote", "icon"];
+  return irTypes.includes(input.nodeType);
+}
+
+// ── M1 runner (preserved) ─────────────────────────────────────
+
 export function runFixture(fixture: Fixture): RunResult {
-  // 1. Reset IDs per fixture run
   resetIds();
-
-  // 2. Map
   const { blocks, warnings: mappingWarnings } = mapNode(fixture.input);
-
-  // 3. Serialize
   const html = serializeBlocks(blocks);
   const blockCount = countBlocks(blocks);
-
-  // 4. Validate
   const { hardFails, warnings: validationWarnings } = validateBlocks(blocks, html);
 
-  // Merge mapping and validation warnings
   const allWarnings = [
     ...mappingWarnings.map((w) => typeof w === "string"
       ? { code: "MAPPING_WARNING", message: w }
@@ -53,37 +76,75 @@ export function runFixture(fixture: Fixture): RunResult {
     ...validationWarnings,
   ];
 
-  // 5. Determine status
   const shouldPass = fixture.expect.shouldPass;
   const hasHardFails = hardFails.length > 0;
-  const status: "pass" | "fail" = (shouldPass && hasHardFails) ? "fail" : "pass";
+  const status: ReportStatus = (shouldPass && hasHardFails) ? "validator_fail" : "validator_pass";
 
-  // 6. Build report
   const report: FixtureReport = {
     fixture: fixture.name,
     status,
     blockCount,
     hardFails,
     warnings: allWarnings,
-    manualVerification: {
-      wordpressPasted: false,
-      savedWithoutRecovery: null,
-      notes: "",
-    },
+    manualVerification: { wordpressPasted: false, savedWithoutRecovery: null, notes: "" },
   };
 
   return { fixture, report, html };
 }
 
-/**
- * Write output files to the output/ directory.
- */
+// ── M2 runner (IR-based) ──────────────────────────────────────
+
+export function runIRFixture(fixture: IRFixture): RunResult {
+  resetIds();
+
+  const { blocks, errors: planningErrors } = planBlocks(fixture.input);
+
+  // Reject policy: no blocks produced → emit explicit failure
+  if (planningErrors.length > 0 && blocks.length === 0) {
+    const hardFails: HardFail[] = planningErrors.map(e => ({
+      code: "PLANNING_REJECTED",
+      message: e,
+    }));
+
+    const report: FixtureReport = {
+      fixture: fixture.name,
+      status: "rejected_unsupported",
+      blockCount: 0,
+      hardFails,
+      warnings: [],
+      manualVerification: { wordpressPasted: false, savedWithoutRecovery: null, notes: "" },
+    };
+
+    return { fixture, report, html: "" };
+  }
+
+  const html = serializeBlocks(blocks);
+  const blockCount = countBlocks(blocks);
+  const { hardFails, warnings: validationWarnings } = validateBlocks(blocks, html);
+
+  const warnings = [
+    ...planningErrors.map(e => ({ code: "PLANNING_WARNING", message: e })),
+    ...validationWarnings,
+  ];
+
+  const status: ReportStatus = hardFails.length > 0 ? "validator_fail" : "validator_pass";
+
+  const report: FixtureReport = {
+    fixture: fixture.name,
+    status,
+    blockCount,
+    hardFails,
+    warnings,
+    manualVerification: { wordpressPasted: false, savedWithoutRecovery: null, notes: "" },
+  };
+
+  return { fixture, report, html };
+}
+
+// ── Output writing ────────────────────────────────────────────
+
 export function writeOutput(fixtureName: string, html: string, report: FixtureReport): void {
   mkdirSync(OUTPUT_DIR, { recursive: true });
-
-  const htmlPath = resolve(OUTPUT_DIR, `${fixtureName}.html`);
-  const reportPath = resolve(OUTPUT_DIR, `${fixtureName}.report.json`);
-
-  writeFileSync(htmlPath, html, "utf-8");
-  writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n", "utf-8");
+  writeFileSync(resolve(OUTPUT_DIR, `${fixtureName}.html`), html, "utf-8");
+  writeFileSync(resolve(OUTPUT_DIR, `${fixtureName}.report.json`), JSON.stringify(report, null, 2) + "\n", "utf-8");
 }
