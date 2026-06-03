@@ -45,6 +45,8 @@ export interface IRNode {
   sourceMeta?: string;
   /** Raw HTML payload (used for icon/shape SVG content). */
   html?: string;
+  /** Responsive style overrides keyed by breakpoint (1024, 768). */
+  responsiveIntent?: Record<string, Record<string, string>>;
 }
 
 export function isValidIRType(t: string): t is IRNodeType {

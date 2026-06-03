@@ -15,6 +15,12 @@ import type { Block } from "./types.js";
  */
 function formatCss(block: Block, rawCss: string): string {
   if (!rawCss || rawCss.trim() === "") return "";
+
+  // If CSS already starts with a selector or @-rule, pass through unchanged
+  if (rawCss.trim().startsWith(".") || rawCss.trim().startsWith("@")) {
+    return rawCss;
+  }
+
   const id = block.uniqueId;
   let selector: string;
 

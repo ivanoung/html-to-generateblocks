@@ -59,8 +59,14 @@ export function planBlocks(node: IRNode): PlanResult {
 function planContainer(node: IRNode, errors: string[]): PlanResult {
   const tag = node.tagName ?? "div";
   const rawStyle = styleIntentToString(node.styleIntent);
-  const { styles, css } = parseStyleString(rawStyle);
+  const { styles: baseStyles, css: baseCss } = parseStyleString(rawStyle);
   const htmlAttributes = { ...node.attributes };
+  const blockId = nextId("elem");
+  const blockName = "generateblocks/element";
+
+  const { styles, css } = buildResponsive(
+    blockId, blockName, baseStyles, baseCss, node.responsiveIntent,
+  );
 
   const innerBlocks: Block[] = [];
   for (const child of node.children) {
@@ -71,8 +77,8 @@ function planContainer(node: IRNode, errors: string[]): PlanResult {
 
   return {
     blocks: [{
-      blockName: "generateblocks/element",
-      uniqueId: nextId("elem"),
+      blockName,
+      uniqueId: blockId,
       tagName: tag,
       styles,
       css,
@@ -92,12 +98,18 @@ function planText(node: IRNode, errors: string[]): PlanResult {
     node.tagName ||
     (node.nodeType === "heading" ? "h2" : "p");
   const rawStyle = styleIntentToString(node.styleIntent);
-  const { styles, css } = parseStyleString(rawStyle);
+  const { styles: baseStyles, css: baseCss } = parseStyleString(rawStyle);
+  const blockId = nextId("text");
+  const blockName = "generateblocks/text";
+
+  const { styles, css } = buildResponsive(
+    blockId, blockName, baseStyles, baseCss, node.responsiveIntent,
+  );
 
   return {
     blocks: [{
-      blockName: "generateblocks/text",
-      uniqueId: nextId("text"),
+      blockName,
+      uniqueId: blockId,
       tagName: tag,
       content: node.textContent,
       styles,
@@ -308,4 +320,48 @@ function styleIntentToString(si?: Record<string, string>): string {
   return Object.entries(si)
     .map(([k, v]) => `${k}:${v}`)
     .join(";");
+}
+
+/** Build responsive styles and CSS from base + responsiveIntent. */
+function buildResponsive(
+  blockId: string,
+  blockName: string,
+  baseStyles: Record<string, unknown>,
+  baseCss: string,
+  responsiveIntent?: Record<string, Record<string, string>>,
+): { styles: Record<string, unknown>; css: string } {
+  const styles: Record<string, unknown> = { ...baseStyles };
+
+  if (!responsiveIntent || Object.keys(responsiveIntent).length === 0) {
+    return { styles, css: baseCss };
+  }
+
+  const prefix = blockName.replace("generateblocks/", "gb-");
+  // Build full CSS with selector: .gb-element-{id}{base}@media(...){selector{override}}
+  let fullCss = `.${prefix}-${blockId}{${baseCss}}`;
+
+  for (const [bp, overrides] of Object.entries(responsiveIntent)) {
+    const mq = `@media (max-width:${bp}px)`;
+
+    const overrideStyles: Record<string, string> = {};
+    const overrideCss: string[] = [];
+
+    for (const [k, v] of Object.entries(overrides)) {
+      const camel = toCamelCase(k);
+      overrideStyles[camel] = v;
+      overrideCss.push(`${k}:${v}`);
+    }
+
+    styles[mq] = overrideStyles;
+    if (overrideCss.length > 0) {
+      fullCss += `@media(max-width:${bp}px){.${prefix}-${blockId}{${overrideCss.sort().join(";")}}}`;
+    }
+  }
+
+  return { styles, css: fullCss };
+}
+
+/** Convert kebab-case to camelCase. */
+function toCamelCase(kebab: string): string {
+  return kebab.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 }
