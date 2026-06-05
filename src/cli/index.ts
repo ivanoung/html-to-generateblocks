@@ -8,8 +8,8 @@
 //   report:update <name>       Update manual verification in report
 //   regression                 Check M1 fixtures against snapshots
 
-import { resolve, basename, extname } from "node:path";
-import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
+import { resolve, basename, extname, relative, join, dirname } from "node:path";
+import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import {
   runFixture, runIRFixture, runHeroFixture, loadFixture, writeOutput, writeHeroOutput,
   isIRFixture, type IRFixture,
@@ -21,6 +21,40 @@ import type { HeroConverterOptions } from "../core/hero-converter.js";
 
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
 const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
+
+interface InputFile {
+  fullPath: string;
+  outRel: string;
+  baseName: string;
+}
+
+function collectInputFiles(inputPath: string): InputFile[] {
+  const fullPath = resolve(process.cwd(), inputPath);
+  if (!existsSync(fullPath)) return [];
+  if (statSync(fullPath).isDirectory()) {
+    const files: InputFile[] = [];
+    walkDir(fullPath, inputPath, files);
+    return files.sort((a, b) => a.outRel.localeCompare(b.outRel));
+  }
+  if (fullPath.endsWith(".html")) {
+    const outRel = inputPath.replace(/^inputs\//, "").replace(/\/[^/]+\.html$/, "");
+    return [{ fullPath, outRel, baseName: basename(fullPath, ".html") }];
+  }
+  return [];
+}
+
+function walkDir(dir: string, relDir: string, files: InputFile[]): void {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    const rel = join(relDir, entry);
+    if (statSync(full).isDirectory()) {
+      walkDir(full, rel, files);
+    } else if (entry.endsWith(".html") && !entry.includes("Zone.Identifier")) {
+      const outRel = dirname(rel.replace(/^inputs\//, ""));
+      files.push({ fullPath: full, outRel, baseName: basename(entry, ".html") });
+    }
+  }
+}
 
 // ── Fixture listing ───────────────────────────────────────────
 
@@ -304,54 +338,56 @@ function main(): void {
 
   // ── hero:convert ─────────────────────────────────────────
   if (cmd === "hero:convert") {
-    const inputIdx = args.indexOf("--input");
-    const nameIdx = args.indexOf("--name");
+    const inputPath = args[1];
     const modeIdx = args.indexOf("--mode");
     const scoreIdx = args.indexOf("--min-pattern-score");
 
-    if (inputIdx === -1 || nameIdx === -1) {
-      console.error("Usage: hero:convert --input <path> --name <name> [--mode auto|pattern|generic] [--min-pattern-score 0.75]");
+    if (!inputPath) {
+      console.error("Usage: hero:convert <path> [--mode auto|pattern|generic] [--min-pattern-score 0.75]");
+      console.error("  <path>    Input file or directory (e.g. inputs/mino-2206/hero.html)");
+      console.error("            Directories are recursively scanned for .html files");
       process.exit(1);
     }
 
-    const inputPath = args[inputIdx + 1];
-    const name = args[nameIdx + 1];
     const mode = (modeIdx !== -1 ? args[modeIdx + 1] : "auto") as HeroConverterOptions["mode"];
     const minScore = scoreIdx !== -1 ? parseFloat(args[scoreIdx + 1]) : 0.75;
 
-    const fullPath = resolve(process.cwd(), inputPath);
-    if (!existsSync(fullPath)) {
-      console.error(`Input file not found: ${fullPath}`);
+    // Collect input files
+    const files = collectInputFiles(inputPath);
+    if (files.length === 0) {
+      console.error(`No .html files found in: ${inputPath}`);
       process.exit(1);
     }
 
-    console.log(`\nConverting hero: ${name}`);
-    console.log(`  Input: ${inputPath}`);
-    console.log(`  Mode: ${mode}, Min score: ${minScore}`);
+    const options: HeroConverterOptions = { mode, minPatternScore: minScore };
 
-    const rawHtml = readFileSync(fullPath, "utf-8");
-    const { root, warnings } = normalizeHeroHtml(rawHtml);
+    console.log(`\nConverting ${files.length} hero section(s)...`);
+    console.log(`  Mode: ${mode}, Min score: ${minScore}\n`);
 
-    for (const w of warnings) {
-      console.log(`  Normalizer: ${w}`);
+    let total = 0;
+    let passed = 0;
+    let rejected = 0;
+
+    for (const { fullPath, outRel, baseName } of files) {
+      console.log(`  ${outRel}/${baseName}.html ← ${fullPath}`);
+      const rawHtml = readFileSync(fullPath, "utf-8");
+      const { root, warnings } = normalizeHeroHtml(rawHtml);
+      const result = convertHero(baseName, root, options);
+
+      // Write to mirrored output folder
+      const outDir = resolve(process.cwd(), "output", outRel);
+      mkdirSync(outDir, { recursive: true });
+      writeFileSync(resolve(outDir, `${baseName}.html`), result.html, "utf-8");
+      writeFileSync(resolve(outDir, `${baseName}.report.json`),
+        JSON.stringify(result.report, null, 2) + "\n", "utf-8");
+
+      console.log(`    → output/${outRel}/${baseName}.html (${result.report.mode}, ${result.report.blockCount} blocks, score ${result.report.patternScore.toFixed(2)})`);
+      total++;
+      if (result.report.mode === "rejected") rejected++;
+      else passed++;
     }
 
-    const options: HeroConverterOptions = {
-      mode,
-      minPatternScore: minScore,
-    };
-
-    const result = convertHero(name, root, options);
-    writeHeroOutput(name, result.html, result.report);
-
-    console.log(`  Output: output/${name}.html`);
-    console.log(`  Report: output/${name}.report.json`);
-    console.log(`  Mode: ${result.report.mode}, Score: ${result.report.patternScore.toFixed(2)}`);
-    console.log(`  Blocks: ${result.report.blockCount}`);
-    if (result.report.hardFails.length > 0) {
-      console.log(`  Fails: ${result.report.hardFails.join(", ")}`);
-    }
-
+    console.log(`\n  Done: ${total} files (${passed} converted, ${rejected} rejected)\n`);
     return;
   }
 
