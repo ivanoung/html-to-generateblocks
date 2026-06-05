@@ -118,19 +118,14 @@ function elementToIR(
   }
 
   if (mapping.useCoreHtml) {
-    // Wrap raw HTML in a core/html block
+    // Wrap raw HTML directly — no intermediate container
     const html = $.html($el);
+    const wrapperNodeType = mapping.coreHtmlNodeType || "container";
     return {
-      nodeType: mapping.coreHtmlNodeType || "container",
-      layoutIntent: mapping.layoutIntent,
+      nodeType: wrapperNodeType,
       fallbackPolicy: "core",
-      children: [{
-        nodeType: "container",
-        fallbackPolicy: "core",
-        children: [],
-        html,
-        sourceMeta: `embed:${el.role}`,
-      }],
+      children: [],
+      html,
       sourceMeta: `embed:${el.role}`,
     };
   }
@@ -380,7 +375,11 @@ function processTwoColumn(
       const colStyle = $leftDom.attr("style") || "";
       const colParsed = parseStyleString(colStyle);
       const si: Record<string, string> = {};
-      for (const [k, v] of Object.entries(colParsed.styles)) si[k] = String(v);
+      for (const [k, v] of Object.entries(colParsed.styles)) {
+        // Strip grid-column (GB places columns via grid template, not span)
+        if (k === "gridColumn") continue;
+        si[k] = String(v);
+      }
       if (Object.keys(si).length > 0) leftCol.styleIntent = si;
     }
     for (const item of leftSelectors) {
@@ -418,7 +417,10 @@ function processTwoColumn(
       const colStyle = $rightDom.attr("style") || "";
       const colParsed = parseStyleString(colStyle);
       const si: Record<string, string> = {};
-      for (const [k, v] of Object.entries(colParsed.styles)) si[k] = String(v);
+      for (const [k, v] of Object.entries(colParsed.styles)) {
+        if (k === "gridColumn") continue;
+        si[k] = String(v);
+      }
       if (Object.keys(si).length > 0) rightCol.styleIntent = si;
     }
     for (const item of rightItems) {
