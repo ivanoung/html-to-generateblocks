@@ -1,7 +1,7 @@
 # HTML → GenerateBlocks Conversion Pipeline
 
-**Date:** 2026-06-04
-**Status:** Design — pending review
+**Date:** 2026-06-04 (revised 2026-06-04)
+**Status:** Design — approved, moving to implementation plan
 
 ---
 
@@ -9,9 +9,40 @@
 
 Extend the existing gb-converter prototype from "hand-crafted JSON fixtures → GB blocks" to a full **HTML-to-GB pipeline**. The key insight: the existing IR layer and serializer are already solid. The gap is everything *before* the IR.
 
-Target input: HTML pages from aura.build (Tailwind CDN + inline `<style>` blocks + `<script>` config). Output: WordPress paste-ready GenerateBlocks + Core block markup.
+Target input: HTML pages from aura.build (Tailwind CDN + inline `<style>` blocks + `<script>` config). Primary output: WordPress paste-ready GenerateBlocks + Core block markup as a `.html` file.
 
-Architecture: **LLM for semantic classification + Node.js for deterministic, repeatable conversion.** The LLM never touches GB internals — it only classifies sections and labels elements with semantic roles.
+Architecture: **Coding agent for semantic classification + Node.js for deterministic, repeatable conversion.** The coding agent (pi) classifies sections and labels elements with semantic roles — no external LLM API dependency. Node.js handles all mechanical work: parsing, style resolution, IR mapping, serialization, and validation.
+
+### Interface Model
+
+The converter is a Node.js toolkit invoked by the coding agent. You (the developer) interact with the agent, not the CLI directly:
+
+```
+Developer: "Convert this page to GB blocks"
+    │
+    ▼
+Coding Agent (pi):
+    ├── Phase 2: Runs structural parse via CLI (or calls functions directly)
+    ├── Phase 3: Performs classification — the agent IS the LLM.
+    │           Produces manifest JSON. Developer reviews inline.
+    ├── Phase 1: Runs style resolution via CLI
+    ├── Phase 4: Runs HTML→IR conversion via CLI
+    └── Phase 5: Runs serializer/validator via CLI
+    │
+    ▼
+Output: paste-ready .html file + manifest.json + report.json
+```
+
+### Modularity
+
+Each phase has defined inputs/outputs and can be invoked independently for different use cases:
+
+| Use case | Phases used |
+|---|---|
+| New site: convert aura.build page → GB blocks | Full pipeline (2→3→1→4→5) |
+| Existing site: add pages matching current design | Phase 3 + 4 (skip style resolution, use existing tokens) |
+| Existing site: extract design tokens from pages | Phase 1 + 2 (extract colors, fonts, spacing patterns) |
+| Existing site: audit and clean up design tokens | Phase 1 + analysis |
 
 ---
 
@@ -29,15 +60,15 @@ Phase 2: Structural Parse (Node.js)
     └── Output: SectionSnippet[] + PageMeta
     │
     ▼
-Phase 3: LLM Manifest (per section, raw HTML with classes)
-    ├── Classify section kind
-    ├── Label elements with roles + CSS selectors
-    ├── Node.js validates selectors + retries (max 3)
-    ├── Human review (optional, async)
+Phase 3: Manifest Classification (Coding Agent)
+    ├── Agent classifies section kind
+    ├── Agent labels elements with roles + CSS selectors
+    ├── Agent self-verifies selectors against HTML
+    ├── Developer reviews manifest (optional, async)
     └── Output: SectionManifest per section
     │
     ▼
-Phase 1: Style Resolution (per section, Tailwind CLI + style parser)
+Phase 1: Style Resolution (Node.js, Tailwind CLI + style parser)
     ├── Extract tailwind.config from <script>
     ├── Run Tailwind CLI → class → declarations map
     ├── Parse <style> blocks → class → declarations map
@@ -120,107 +151,45 @@ interface PageMeta {
 
 ---
 
-## Phase 3: LLM Manifest Generation
+## Phase 3: Manifest Classification (Coding Agent)
 
 ### Input
 One `SectionSnippet` (raw HTML with CSS classes intact, no nav/footer/scripts).
 
-### LLM Prompt
+### Agent Workflow
+
+The coding agent (pi) performs classification and labeling — no external LLM API. The agent reads the section HTML and produces the manifest through reasoning:
+
+1. **Read the section HTML** — examine DOM structure, class names, text content, and layout.
+2. **Classify the section kind** — match against known patterns (hero, card-grid, testimonial-grid, etc.). If unsure, use `generic`.
+3. **Identify elements** — for each meaningful element, determine its semantic role and write the EXACT CSS selector from the HTML. Copy the class string verbatim. Prefer `id` attributes when available.
+4. **Group related elements** — elements that form visual rows or containers together are grouped.
+5. **Detect repeating patterns** — use templates with `repeat: "siblings"` for card grids, stat rows, etc.
+6. **Flag decoration and embeds** — decorative elements marked for stripping; complex elements marked as embed.
+7. **Self-verify selectors** — the agent checks that each selector appears in the HTML source text before finalizing.
+8. **Output manifest JSON** — written to `output/<page>-manifest.json`.
+
+### Node.js Validation
+
+The manifest produced by the agent is validated by Node.js before proceeding:
 
 ```
-You are an HTML section classifier. Analyze the section HTML and output a
-section manifest. Follow these rules exactly:
-
-1. Identify the section KIND: hero | card-grid | stats-row | testimonial-grid |
-   data-rows | checklist | feature-grid | contact-form | logo-marquee |
-   text-block | generic
-
-2. For each meaningful element, determine its ROLE and write the EXACT CSS
-   selector from the HTML. Copy the class string verbatim — do not simplify.
-   If the element has an id, use it. If neither class nor id exists, use the
-   tag name with :nth-of-type(). Never invent selectors.
-
-3. Group elements that form a visual row/container together using "groups".
-
-4. Use "templates" with "repeat": "siblings" for repeating patterns.
-   Use "exceptions" for items that break the pattern.
-
-5. Mark purely decorative elements (background SVGs, animation wrappers) as
-   "decoration" with "action": "strip".
-
-6. Mark elements too complex to convert as "embed".
-
-7. After writing the manifest, add a "coverage" field: estimate what percentage
-   of the section's meaningful elements you captured (0-100).
-
-8. Output ONLY raw JSON — no markdown fences, no explanation.
-   Format:
-{
-  "sectionId": "<id attribute of section element>",
-  "kind": "...",
-  "layout": "single-column" | "two-column" | "grid" | "flex-row" | "form",
-  "elements": [
-    { "selector": "<exact CSS selector>", "role": "<role>" }
-  ],
-  "groups": [
-    {
-      "selector": "<selector for group container>",
-      "role": "<group role>",
-      "elements": [ ... ]
-    }
-  ],
-  "templates": [
-    {
-      "selector": "<selector of first instance>",
-      "role": "<element role>",
-      "elements": [ ... ],
-      "repeat": "siblings"
-    }
-  ],
-  "exceptions": [
-    { "selector": "...", "role": "...", "elements": [ ... ] }
-  ],
-  "notes": {
-    "decorationEls": ["<selector>"],
-    "unsupportedFeatures": ["<description>"],
-    "warnings": ["<description>"]
-  },
-  "coverage": 85
-}
-```
-
-### Available Roles
-
-**Element roles:** `section-label`, `heading`, `eyebrow`, `body`, `cta-button`, `cta-link`, `image`, `icon`, `iconify`, `avatar`, `avatar-stack`, `star-rating`, `social-proof`, `card`, `card-heading`, `card-body`, `card-footer`, `card-step-label`, `checklist-item`, `testimonial`, `testimonial-quote`, `testimonial-name`, `testimonial-title`, `testimonial-company`, `form-field`, `form-radio-group`, `form-textarea`, `form-submit`, `embed`, `decoration`
-
-**Group roles:** `cta-row`, `checklist`, `card-grid`, `feature-card-grid`, `testimonial-grid`, `social-proof-group`, `avatar-row`, `star-row`
-
-### Node.js Validation + Retry Loop
-
-```
-Parse LLM output:
-  ├── Strip markdown fences (```json ... ```) if present
-  ├── JSON parse error → retry: "Output was not valid JSON. Output ONLY raw JSON."
+Parse agent output:
   ├── Schema validation (required fields: sectionId, kind, elements, coverage)
   ├── Selector check: querySelector() on each selector against section HTML
-  │   ├── 0 matches → collect all misses → retry with the missed selectors PLUS
-  │   a list of ALL id attributes and unique class tokens found in the section HTML.
-  │   Instruction: "These selectors did not match: [...]. Available ids: [...]. Available unique class tokens: [...].
-  │   Replace each missed selector with one from the available list. If no suitable selector exists, use the
-  │   element's tag name with :nth-of-type()."
+  │   ├── 0 matches → collect all misses → report back to agent for correction
   │   ├── >1 matches → log warning, use first match
   │   └── All matched → OK
-  ├── Coverage check:
-  │   ├── coverage ≥ 70% → accept
-  │   └── coverage < 70% → accept but flag for human review
-  └── Max 3 retries total per section
+  └── Coverage check:
+      ├── coverage ≥ 70% → accept
+      └── coverage < 70% → accept but flag for developer review
 ```
 
-### Human Review (optional, async)
+### Developer Review (optional, async)
 
-Manifest saved to `output/<page>-manifest.json`. An override file at `output/<page>-manifest-overrides.json` can fix:
+Manifest saved to `output/<page>-manifest.json`. The developer can review and provide corrections conversationally. An override file at `output/<page>-manifest-overrides.json` supports:
 - Wrong section kind: `{ "sectionId": "hero", "kind": "generic" }`
-- Wrong selectors: `{ "sectionId": "hero", "elements": [{ "selector": "h1", "role": "heading" }] }` (replaces all elements for that section)
+- Wrong selectors: `{ "sectionId": "hero", "elements": [{ "selector": "h1", "role": "heading" }] }`
 - Add missing elements: use `_add` key
 
 Overrides are merged automatically before Phase 4.
@@ -573,7 +542,7 @@ src/
 │   └── run-fixture.ts          # Existing (unchanged)
 ├── converter/                   # NEW
 │   ├── structure-parser.ts      # Phase 2: section boundary detection
-│   ├── llm-manifest.ts          # Phase 3: LLM prompt + response parsing + retry
+│   ├── manifest-validator.ts    # Phase 3: manifest schema + selector validation
 │   ├── style-resolver.ts        # Phase 1: Tailwind CLI wrapper + style merging
 │   ├── html-to-ir.ts            # Phase 4: HTML DOM + manifest → IRNode[]
 │   ├── role-mapper.ts           # Phase 4: role → IR mapping table
@@ -590,15 +559,19 @@ src/
 
 | Package | Purpose |
 |---|---|
-| `cheerio` or `jsdom` | Lightweight HTML parsing for Phase 4 |
+| `cheerio` or `jsdom` | Lightweight HTML parsing for Phase 2 and 4 |
 | `tailwindcss` + `@tailwindcss/cli` | Phase 1 style resolution |
 | `css` (npm) | CSS parser for `<style>` blocks |
-| LLM API client | Phase 3 manifest generation (provider-agnostic interface) |
+
+No external LLM API dependency — the coding agent handles Phase 3 classification.
 
 ---
 
 ## Non-Goals (explicitly excluded from this milestone)
 
+- **Phase 0: Site Setup** — extracting design tokens (colors, fonts, spacing) from source pages and priming a WordPress site with global styles, color palettes, and shared CSS snippets. This is a follow-on milestone.
+- **MCP direct injection** — outputting block_spec JSON for direct WordPress injection via Novamira MCP. The primary output remains paste-ready `.html` files. MCP integration is an optional future enhancement.
+- **Aura.build structural annotations** — leveraging `data-gb-*` attributes if aura.build adds them. The current pipeline works with raw HTML. Annotations are a future optimization.
 - Converting `<nav>` navigation menus or `<footer>` elements
 - Handling JavaScript-driven content (SPAs, React rendered)
 - Converting `<form>` elements to native GB form support (GB has none)
