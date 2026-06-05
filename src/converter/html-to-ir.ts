@@ -8,7 +8,7 @@ import type { IRNode, LayoutIntent } from "../core/ir-node.js";
 import type {
   SectionManifest, ManifestElement, ManifestGroup, ManifestTemplate,
 } from "../types/manifest.js";
-import { parseStyleString, type ParsedStyles } from "../core/style-parser.js";
+import { parseStyleString } from "../core/style-parser.js";
 import {
   ELEMENT_ROLE_MAP, GROUP_LAYOUT_MAP, sectionLayoutToIntent,
 } from "./role-mapper.js";
@@ -17,6 +17,51 @@ export interface HtmlToIRResult {
   nodes: IRNode[];
   warnings: string[];
 }
+
+// ── Style extraction helper ───────────────────────────────────
+
+function extractAllStyles(
+  $el: cheerio.Cheerio<any>,
+): { styleIntent: Record<string, string>; responsiveIntent?: Record<string, Record<string, string>> } {
+  const styleAttr = $el.attr("style") || "";
+  const parsed = parseStyleString(styleAttr);
+  const styleIntent: Record<string, string> = {};
+
+  // Extract GB panel properties (camelCase already handled by parseStyleString)
+  for (const [key, value] of Object.entries(parsed.styles)) {
+    styleIntent[key] = String(value);
+  }
+
+  // Also extract CSS-only properties from the raw CSS string
+  if (parsed.css) {
+    for (const decl of parsed.css.split(";")) {
+      const colonIdx = decl.indexOf(":");
+      if (colonIdx === -1) continue;
+      const prop = decl.substring(0, colonIdx).trim();
+      const val = decl.substring(colonIdx + 1).trim();
+      if (prop && val) {
+        const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        // Don't overwrite GB panel values with CSS duplicates (they're identical)
+        if (!styleIntent[camel]) {
+          styleIntent[camel] = val;
+        }
+      }
+    }
+  }
+
+  // Extract responsive overrides from data attribute
+  let responsiveIntent: Record<string, Record<string, string>> | undefined;
+  const respAttr = $el.attr("data-gb-resp");
+  if (respAttr) {
+    try {
+      responsiveIntent = JSON.parse(respAttr);
+    } catch { /* ignore malformed */ }
+  }
+
+  return { styleIntent, responsiveIntent };
+}
+
+// ── Main converter ─────────────────────────────────────────────
 
 export function htmlToIR(
   manifest: SectionManifest,
@@ -27,33 +72,11 @@ export function htmlToIR(
 
   const sectionLayout: LayoutIntent = sectionLayoutToIntent(manifest.layout);
 
-  // Extract section root styles (backgrounds, borders, padding)
+  // Extract section root styles via shared helper
   const $sectionRoot = $(`#${manifest.sectionId}`);
-  let sectionStyleIntent: Record<string, string> = {};
-  if ($sectionRoot.length > 0) {
-    const sectionStyleAttr = $sectionRoot.attr("style") || "";
-    const sectionParsed = parseStyleString(sectionStyleAttr);
-    // Extract ALL resolved styles (including CSS-only ones like background-image)
-    for (const [key, value] of Object.entries(sectionParsed.styles)) {
-      sectionStyleIntent[key] = String(value);
-    }
-    // Also parse CSS-only properties from the raw CSS string
-    if (sectionParsed.css) {
-      for (const decl of sectionParsed.css.split(";")) {
-        const colonIdx = decl.indexOf(":");
-        if (colonIdx === -1) continue;
-        const prop = decl.substring(0, colonIdx).trim();
-        const val = decl.substring(colonIdx + 1).trim();
-        if (prop && val) {
-          // Convert kebab to camelCase for styleIntent key
-          const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-          if (!sectionStyleIntent[camel]) {
-            sectionStyleIntent[camel] = val;
-          }
-        }
-      }
-    }
-  }
+  const { styleIntent: sectionStyleIntent } = $sectionRoot.length > 0
+    ? extractAllStyles($sectionRoot)
+    : { styleIntent: {} as Record<string, string> };
 
   // Create section wrapper — for two-column, override grid to 2-col ratio
   const sectionNode: IRNode = {
@@ -133,7 +156,6 @@ function elementToIR(
 
   const tagName = $el.prop("tagName")?.toLowerCase() || undefined;
   const textContent = $el.text().trim() || undefined;
-  const styleAttr = $el.attr("style") || "";
 
   const attributes: Record<string, string> = {};
   const href = $el.attr("href");
@@ -146,20 +168,7 @@ function elementToIR(
   if (alt) attributes.alt = alt;
   if (id) attributes.id = id;
 
-  const parsed: ParsedStyles = parseStyleString(styleAttr);
-  const styleIntent: Record<string, string> = {};
-  for (const [key, value] of Object.entries(parsed.styles)) {
-    styleIntent[key] = String(value);
-  }
-
-  // Read responsive overrides from data attribute (set by Phase 1 style resolver)
-  let responsiveIntent: Record<string, Record<string, string>> | undefined;
-  const respAttr = $el.attr("data-gb-resp");
-  if (respAttr) {
-    try {
-      responsiveIntent = JSON.parse(respAttr);
-    } catch { /* ignore malformed */ }
-  }
+  const { styleIntent, responsiveIntent } = extractAllStyles($el);
 
   return {
     nodeType: mapping.nodeType,
@@ -187,13 +196,7 @@ function groupToIR(
   }
 
   const layoutIntent = GROUP_LAYOUT_MAP[group.role];
-  const styleAttr = $container.first().attr("style") || "";
-  const parsed = parseStyleString(styleAttr);
-  const styleIntent: Record<string, string> = {};
-  for (const [key, value] of Object.entries(parsed.styles)) {
-    styleIntent[key] = String(value);
-  }
-  // Keep layout styles (display, flex-direction, etc.) — GB layoutIntent is metadata only
+  const { styleIntent } = extractAllStyles($container.first());
 
   const children: IRNode[] = [];
   for (const el of group.elements) {
@@ -258,12 +261,7 @@ function templateToIR(
       sourceMeta: tmpl.selector,
     };
 
-    const styleAttr = $child.attr("style") || "";
-    const parsed = parseStyleString(styleAttr);
-    const styleIntent: Record<string, string> = {};
-    for (const [key, value] of Object.entries(parsed.styles)) {
-      styleIntent[key] = String(value);
-    }
+    const { styleIntent } = extractAllStyles($child);
     cardNode.styleIntent = Object.keys(styleIntent).length > 0 ? styleIntent : undefined;
 
     for (const el of tmpl.elements) {
@@ -364,16 +362,10 @@ function processTwoColumn(
       children: [],
       sourceMeta: "column-left",
     };
-    // Extract column wrapper styles from DOM
+    // Use DOM element's resolved styles directly (strip grid-column: GB grid handles placement)
     if ($leftDom.length > 0) {
-      const colStyle = $leftDom.attr("style") || "";
-      const colParsed = parseStyleString(colStyle);
-      const si: Record<string, string> = {};
-      for (const [k, v] of Object.entries(colParsed.styles)) {
-        // Strip grid-column (GB places columns via grid template, not span)
-        if (k === "gridColumn") continue;
-        si[k] = String(v);
-      }
+      const { styleIntent: si } = extractAllStyles($leftDom);
+      delete si.gridColumn;
       if (Object.keys(si).length > 0) leftCol.styleIntent = si;
     }
     for (const item of leftSelectors) {
@@ -406,15 +398,10 @@ function processTwoColumn(
       children: [],
       sourceMeta: "column-right",
     };
-    // Extract column wrapper styles from DOM
+    // Use DOM element's resolved styles directly
     if ($rightDom.length > 0) {
-      const colStyle = $rightDom.attr("style") || "";
-      const colParsed = parseStyleString(colStyle);
-      const si: Record<string, string> = {};
-      for (const [k, v] of Object.entries(colParsed.styles)) {
-        if (k === "gridColumn") continue;
-        si[k] = String(v);
-      }
+      const { styleIntent: si } = extractAllStyles($rightDom);
+      delete si.gridColumn;
       if (Object.keys(si).length > 0) rightCol.styleIntent = si;
     }
     for (const item of rightItems) {
