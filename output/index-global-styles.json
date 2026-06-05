@@ -12,11 +12,6 @@
       "slug": "clip-hex",
       "name": "Clip Hex",
       "styles": {}
-    },
-    {
-      "slug": "no-scrollbar",
-      "name": "No Scrollbar",
-      "styles": {}
     }
   ]
 }

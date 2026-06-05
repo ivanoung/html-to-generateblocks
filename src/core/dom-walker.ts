@@ -435,14 +435,17 @@ export function walkDom(
   const opts: WalkerOptions = { classNameToProperties, collector, warnings };
   const blocks: Block[] = [];
 
-  // Walk top-level children
-  $("div > *").each((_, el) => {
-    const tag = (el as any).name?.toLowerCase() || "";
-    if (tag === "nav" || tag === "footer" || tag === "script" || tag === "style") return;
+  // Walk top-level children of the wrapper div only
+  const $wrapper = $("body > div, div").first();
+  if ($wrapper.length > 0) {
+    $wrapper.children().each((_, el) => {
+      const tag = (el as any).name?.toLowerCase() || "";
+      if (tag === "nav" || tag === "footer" || tag === "script" || tag === "style") return;
 
-    const $el = $(el);
-    blocks.push(...walkElement($el, $, opts));
-  });
+      const $el = $(el);
+      blocks.push(...walkElement($el, $, opts));
+    });
+  }
 
   return { blocks, warnings };
 }
