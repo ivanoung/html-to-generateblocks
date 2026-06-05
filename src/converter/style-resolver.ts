@@ -179,6 +179,29 @@ function parseTailwindOutput(css: string): Record<string, Record<string, string>
 }
 
 /**
+ * Resolve Tailwind CSS variable references in a style value.
+ * - "rgb(30 41 59/var(--tw-text-opacity,1))" → "rgb(30 41 59/1)"
+ * - "var(--tw-ring-offset-shadow,0 0 #0000)" → "0 0 #0000"
+ * - "var(--tw-shadow)" → stripped (no fallback available)
+ */
+function resolveCssVariables(value: string): string {
+  // Pass 1: replace var(--tw-*,<fallback>) with fallback
+  let resolved = value.replace(
+    /var\(--tw-[a-z-]+,\s*([^)]+)\)/g,
+    (_, fallback) => fallback.trim(),
+  );
+  // Pass 2: strip var(--tw-*) with no fallback
+  resolved = resolved.replace(
+    /,\s*var\(--tw-[a-z-]+\)/g,
+    "",
+  ).replace(
+    /var\(--tw-[a-z-]+\)/g,
+    "",
+  );
+  return resolved;
+}
+
+/**
  * Apply resolved class → declarations map to HTML elements.
  * Adds inline styles alongside existing class attributes (does NOT strip classes).
  * This preserves CSS selectors for manifest-based element lookup in Phase 4.
@@ -224,9 +247,9 @@ function applyClassMap(
       }
     }
 
-    // Build inline style string
+    // Build inline style string, sanitizing Tailwind CSS variables
     const styleParts = Object.entries(baseStyles).map(
-      ([k, v]) => `${k}:${v}`,
+      ([k, v]) => `${k}:${resolveCssVariables(v)}`,
     );
 
     if (styleParts.length === 0) {
