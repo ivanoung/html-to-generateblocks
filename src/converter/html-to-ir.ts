@@ -55,7 +55,7 @@ export function htmlToIR(
     }
   }
 
-  // Create section wrapper
+  // Create section wrapper — for two-column, override grid to 2-col ratio
   const sectionNode: IRNode = {
     nodeType: "section",
     tagName: "section",
@@ -65,6 +65,10 @@ export function htmlToIR(
     children: [],
     sourceMeta: manifest.sectionId,
   };
+  // For two-column layout, convert 12-col grid to proportional 2-col
+  if (manifest.layout === "two-column" && manifest.columnSplit && sectionNode.styleIntent?.gridTemplateColumns) {
+    sectionNode.styleIntent.gridTemplateColumns = "minmax(0,7fr) minmax(0,5fr)";
+  }
 
   // Process elements — handle two-column layout if columnSplit is specified
   if (manifest.layout === "two-column" && manifest.columnSplit) {
@@ -354,6 +358,13 @@ function processTwoColumn(
     }
   }
 
+  // Find the DOM elements that form the column wrappers
+  // Left column: the sibling before the split element
+  // Right column: the split element itself
+  const $parent = $splitEl.parent();
+  const $leftDom = $parent.children().eq($parent.children().index($splitEl) - 1);
+  const $rightDom = $splitEl;
+
   // Create left column container
   if (leftSelectors.length > 0) {
     const leftCol: IRNode = {
@@ -364,6 +375,14 @@ function processTwoColumn(
       children: [],
       sourceMeta: "column-left",
     };
+    // Extract column wrapper styles from DOM
+    if ($leftDom.length > 0) {
+      const colStyle = $leftDom.attr("style") || "";
+      const colParsed = parseStyleString(colStyle);
+      const si: Record<string, string> = {};
+      for (const [k, v] of Object.entries(colParsed.styles)) si[k] = String(v);
+      if (Object.keys(si).length > 0) leftCol.styleIntent = si;
+    }
     for (const item of leftSelectors) {
       if (item.isGroup) {
         const group = manifest.groups!.find(g => g.selector === item.sel);
@@ -394,6 +413,14 @@ function processTwoColumn(
       children: [],
       sourceMeta: "column-right",
     };
+    // Extract column wrapper styles from DOM
+    if ($rightDom.length > 0) {
+      const colStyle = $rightDom.attr("style") || "";
+      const colParsed = parseStyleString(colStyle);
+      const si: Record<string, string> = {};
+      for (const [k, v] of Object.entries(colParsed.styles)) si[k] = String(v);
+      if (Object.keys(si).length > 0) rightCol.styleIntent = si;
+    }
     for (const item of rightItems) {
       if (item.isGroup) {
         const group = manifest.groups!.find(g => g.selector === item.sel);
