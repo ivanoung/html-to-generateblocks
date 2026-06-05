@@ -13,7 +13,7 @@
 | 4 | **`iconify-icon` web components** — These render via client-side JS and have no text content. Core/html wrapping needs the SVG string, which requires headless browser extraction. | Icons in feature cards and marquee lost | Either: (a) extract SVG via headless browser, or (b) mark iconify elements as `decoration` (strip) and replace with emoji/unicode icons |
 | 5 | **SVG star ratings** — Five `<svg>` elements for stars + text → `core/html`. Better approach: convert to a single container with text content. | Star ratings become raw SVG blobs | Add a `star-rating-text` role that extracts just the "from 20 reviews" text and discards star SVGs |
 | 6 | ~~**Section background styles**~~ — **FIXED** | ~~Sections look unstyled~~ | Fixed 3 issues: (1) DOM-based style merge in resolver preserves existing inline styles, (2) `styleIntentToString` converts camelCase→kebab for `parseStyleString`, (3) `html-to-ir` extracts ALL CSS properties including `background-image` and `background-size`. |
-| 7 | **Responsive breakpoint inversion not implemented** — `lg:pt-48` resolved as base style, but non-responsive equivalent (mobile `pt-32`) isn't captured. | Desktop-first values applied at all breakpoints | After resolution, compare resolved class declarations to detect responsive overrides and build `responsiveIntent` |
+| 7 | ~~**Responsive breakpoint inversion not implemented**~~ — **FIXED** | ~~Desktop-first values at all breakpoints~~ | `applyClassMap` now inverts Tailwind's mobile-first breakpoints to GB's desktop-first cascade. Multi-level (3+) breakpoints handled correctly. `data-gb-resp` attribute carries overrides to Phase 4 → `IRNode.responsiveIntent` → `@media(max-width:...)` in GB output. |
 
 ## Non-critical (can defer)
 

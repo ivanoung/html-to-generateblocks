@@ -29,7 +29,7 @@ export const ELEMENT_ROLE_MAP: Record<ElementRole, RoleMapping> = {
   "iconify": { nodeType: "container", fallbackPolicy: "core", useCoreHtml: true },
   "avatar": { nodeType: "image", fallbackPolicy: "core" },
   "avatar-stack": { nodeType: "container", layoutIntent: "row", fallbackPolicy: "generateblocks" },
-  "star-rating": { nodeType: "container", fallbackPolicy: "core", useCoreHtml: true, coreHtmlNodeType: "container" },
+  "star-rating": { nodeType: "paragraph", fallbackPolicy: "generateblocks" },
   "social-proof": { nodeType: "container", layoutIntent: "row", fallbackPolicy: "generateblocks" },
   "card": { nodeType: "container", layoutIntent: "stack", fallbackPolicy: "generateblocks" },
   "card-heading": { nodeType: "heading", fallbackPolicy: "generateblocks" },
