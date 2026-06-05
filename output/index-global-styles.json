@@ -1,0 +1,22 @@
+{
+  "page": "index",
+  "classes": [
+    {
+      "slug": "blueprint-bg-dark",
+      "name": "Blueprint Bg Dark",
+      "styles": {
+        "backgroundSize": "40px 40px"
+      }
+    },
+    {
+      "slug": "clip-hex",
+      "name": "Clip Hex",
+      "styles": {}
+    },
+    {
+      "slug": "no-scrollbar",
+      "name": "No Scrollbar",
+      "styles": {}
+    }
+  ]
+}
