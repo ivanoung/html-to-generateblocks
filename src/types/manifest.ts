@@ -62,6 +62,8 @@ export interface SectionManifest {
   sectionId: string;
   kind: SectionKind;
   layout: "single-column" | "two-column" | "grid" | "flex-row" | "form";
+  /** Selector of the element that splits column 1 from column 2 (two-column layouts only). */
+  columnSplit?: string;
   elements: ManifestElement[];
   groups?: ManifestGroup[];
   templates?: ManifestTemplate[];

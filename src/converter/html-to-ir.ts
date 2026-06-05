@@ -66,30 +66,12 @@ export function htmlToIR(
     sourceMeta: manifest.sectionId,
   };
 
-  // Process flat elements
-  for (const el of manifest.elements) {
-    if (el.role === "decoration") continue;
-
-    const $el = $(el.selector);
-    if ($el.length === 0) {
-      warnings.push(`Element not found: "${el.selector}"`);
-      continue;
-    }
-
-    const irNode = elementToIR($, $el.first(), el, warnings);
-    if (irNode) {
-      sectionNode.children.push(irNode);
-    }
-  }
-
-  // Process groups
-  if (manifest.groups) {
-    for (const group of manifest.groups) {
-      const groupNode = groupToIR($, group, warnings);
-      if (groupNode) {
-        sectionNode.children.push(groupNode);
-      }
-    }
+  // Process elements — handle two-column layout if columnSplit is specified
+  if (manifest.layout === "two-column" && manifest.columnSplit) {
+    processTwoColumn($, manifest, sectionNode, warnings);
+  } else {
+    processFlatElements($, manifest, sectionNode, warnings);
+    processGroups($, manifest, sectionNode, warnings);
   }
 
   // Process templates
@@ -306,4 +288,167 @@ function templateToIR(
   });
 
   return nodes;
+}
+
+// ── Two-column layout ─────────────────────────────────────────
+
+function processTwoColumn(
+  $: cheerio.CheerioAPI,
+  manifest: SectionManifest,
+  sectionNode: IRNode,
+  warnings: string[],
+): void {
+  const $split = $(manifest.columnSplit!);
+  if ($split.length === 0) {
+    warnings.push(`Column split element not found: "${manifest.columnSplit}" — falling back to flat layout`);
+    processFlatElements($, manifest, sectionNode, warnings);
+    processGroups($, manifest, sectionNode, warnings);
+    return;
+  }
+
+  // Determine which selectors belong to left vs right column
+  // Left: elements before the split element in DOM order
+  // Right: split element + elements after it
+  const allSelectors: { sel: string; role: string; isGroup: boolean }[] = [];
+  for (const el of manifest.elements) {
+    allSelectors.push({ sel: el.selector, role: el.role, isGroup: false });
+  }
+  if (manifest.groups) {
+    for (const g of manifest.groups) {
+      allSelectors.push({ sel: g.selector, role: g.role, isGroup: true });
+    }
+  }
+
+  // Find the split element's position among the collected selectors
+  // We do this by checking which selector matches an element before/after the split
+  const leftSelectors: typeof allSelectors = [];
+  const rightSelectors: typeof allSelectors = [];
+  const $splitEl = $split.first();
+
+  for (const item of allSelectors) {
+    const $match = $(item.sel).first();
+    if ($match.length === 0) continue;
+    // Compare DOM positions using cheerio's index
+    if (item.sel === manifest.columnSplit || $splitEl.is($match)) {
+      rightSelectors.push(item);
+    } else {
+      // Determine if element comes before or after the split
+      const $parent = $splitEl.parent();
+      const splitIdx = $parent.children().index($splitEl);
+      const matchIdx = $parent.children().index($match);
+      if (matchIdx < splitIdx) {
+        leftSelectors.push(item);
+      } else {
+        rightSelectors.push(item);
+      }
+    }
+  }
+
+  // Also collect exceptions that are embeds (they go to right column typically)
+  const rightEmbedSelectors: ManifestElement[] = [];
+  if (manifest.exceptions) {
+    for (const exc of manifest.exceptions) {
+      if (exc.role === "embed" && exc.selector === manifest.columnSplit) {
+        rightEmbedSelectors.push(exc);
+      }
+    }
+  }
+
+  // Create left column container
+  if (leftSelectors.length > 0) {
+    const leftCol: IRNode = {
+      nodeType: "container",
+      tagName: "div",
+      fallbackPolicy: "generateblocks",
+      layoutIntent: "stack",
+      children: [],
+      sourceMeta: "column-left",
+    };
+    for (const item of leftSelectors) {
+      if (item.isGroup) {
+        const group = manifest.groups!.find(g => g.selector === item.sel);
+        if (group) {
+          const gn = groupToIR($, group, warnings);
+          if (gn) leftCol.children.push(gn);
+        }
+      } else {
+        const el = manifest.elements.find(e => e.selector === item.sel);
+        if (el) {
+          const $el = $(el.selector).first();
+          const irn = elementToIR($, $el, el, warnings);
+          if (irn) leftCol.children.push(irn);
+        }
+      }
+    }
+    sectionNode.children.push(leftCol);
+  }
+
+  // Create right column container
+  const rightItems = [...rightSelectors, ...rightEmbedSelectors.map(r => ({ sel: r.selector, role: r.role, isGroup: false }))];
+  if (rightItems.length > 0) {
+    const rightCol: IRNode = {
+      nodeType: "container",
+      tagName: "div",
+      fallbackPolicy: "generateblocks",
+      layoutIntent: "stack",
+      children: [],
+      sourceMeta: "column-right",
+    };
+    for (const item of rightItems) {
+      if (item.isGroup) {
+        const group = manifest.groups!.find(g => g.selector === item.sel);
+        if (group) {
+          const gn = groupToIR($, group, warnings);
+          if (gn) rightCol.children.push(gn);
+        }
+      } else {
+        // Check if it's an embed (exception)
+        const emb = manifest.exceptions?.find(e => e.selector === item.sel);
+        if (emb) {
+          const $el = $(emb.selector).first();
+          const irn = elementToIR($, $el, emb, warnings);
+          if (irn) rightCol.children.push(irn);
+        } else {
+          const el = manifest.elements.find(e => e.selector === item.sel);
+          if (el) {
+            const $el = $(el.selector).first();
+            const irn = elementToIR($, $el, el, warnings);
+            if (irn) rightCol.children.push(irn);
+          }
+        }
+      }
+    }
+    sectionNode.children.push(rightCol);
+  }
+}
+
+function processFlatElements(
+  $: cheerio.CheerioAPI,
+  manifest: SectionManifest,
+  sectionNode: IRNode,
+  warnings: string[],
+): void {
+  for (const el of manifest.elements) {
+    if (el.role === "decoration") continue;
+    const $el = $(el.selector);
+    if ($el.length === 0) {
+      warnings.push(`Element not found: "${el.selector}"`);
+      continue;
+    }
+    const irNode = elementToIR($, $el.first(), el, warnings);
+    if (irNode) sectionNode.children.push(irNode);
+  }
+}
+
+function processGroups(
+  $: cheerio.CheerioAPI,
+  manifest: SectionManifest,
+  sectionNode: IRNode,
+  warnings: string[],
+): void {
+  if (!manifest.groups) return;
+  for (const group of manifest.groups) {
+    const groupNode = groupToIR($, group, warnings);
+    if (groupNode) sectionNode.children.push(groupNode);
+  }
 }
