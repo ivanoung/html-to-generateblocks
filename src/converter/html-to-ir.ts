@@ -27,12 +27,41 @@ export function htmlToIR(
 
   const sectionLayout: LayoutIntent = sectionLayoutToIntent(manifest.layout);
 
+  // Extract section root styles (backgrounds, borders, padding)
+  const $sectionRoot = $(`#${manifest.sectionId}`);
+  let sectionStyleIntent: Record<string, string> = {};
+  if ($sectionRoot.length > 0) {
+    const sectionStyleAttr = $sectionRoot.attr("style") || "";
+    const sectionParsed = parseStyleString(sectionStyleAttr);
+    // Extract ALL resolved styles (including CSS-only ones like background-image)
+    for (const [key, value] of Object.entries(sectionParsed.styles)) {
+      sectionStyleIntent[key] = String(value);
+    }
+    // Also parse CSS-only properties from the raw CSS string
+    if (sectionParsed.css) {
+      for (const decl of sectionParsed.css.split(";")) {
+        const colonIdx = decl.indexOf(":");
+        if (colonIdx === -1) continue;
+        const prop = decl.substring(0, colonIdx).trim();
+        const val = decl.substring(colonIdx + 1).trim();
+        if (prop && val) {
+          // Convert kebab to camelCase for styleIntent key
+          const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+          if (!sectionStyleIntent[camel]) {
+            sectionStyleIntent[camel] = val;
+          }
+        }
+      }
+    }
+  }
+
   // Create section wrapper
   const sectionNode: IRNode = {
     nodeType: "section",
     tagName: "section",
     layoutIntent: sectionLayout,
     fallbackPolicy: "generateblocks",
+    styleIntent: Object.keys(sectionStyleIntent).length > 0 ? sectionStyleIntent : undefined,
     children: [],
     sourceMeta: manifest.sectionId,
   };

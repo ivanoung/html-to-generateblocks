@@ -353,8 +353,13 @@ function planIcon(node: IRNode, errors: string[]): PlanResult {
 function styleIntentToString(si?: Record<string, string>): string {
   if (!si || Object.keys(si).length === 0) return "";
   return Object.entries(si)
-    .map(([k, v]) => `${k}:${v}`)
+    .map(([k, v]) => `${camelToKebab(k)}:${v}`)
     .join(";");
+}
+
+/** Convert camelCase to kebab-case. */
+function camelToKebab(camel: string): string {
+  return camel.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
 }
 
 /** Build responsive styles and CSS from base + responsiveIntent. */

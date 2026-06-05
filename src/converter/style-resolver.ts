@@ -8,6 +8,7 @@ import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync } from "node:fs";
+import * as cheerio from "cheerio";
 import { createHash } from "node:crypto";
 
 /** Breakpoints used by Tailwind for responsive inversion. */
@@ -211,52 +212,47 @@ function applyClassMap(
   classMap: Record<string, Record<string, string>>,
   warnings: string[],
 ): string {
-  const classRegex = /class="([^"]*)"/g;
+  const $ = cheerio.load(`<div>${html}</div>`);
 
-  return html.replace(classRegex, (_full: string, classStr: string) => {
+  $("[class]").each((_, el) => {
+    const $el = $(el);
+    const classStr = $el.attr("class") || "";
     const classes = classStr.split(/\s+/).filter(Boolean);
     const baseStyles: Record<string, string> = {};
 
     for (const cls of classes) {
-      // Check for responsive prefix
       const respMatch = cls.match(/^(sm|md|lg|xl):(.+)$/);
       if (respMatch) {
         const coreClass = respMatch[2];
         if (classMap[coreClass]) {
           Object.assign(baseStyles, classMap[coreClass]);
-        } else {
-          if (cls.includes("hover:")) {
-            warnings.push(`Unsupported pseudo-class: "${cls}" — hover partially supported`);
-          }
+        } else if (cls.includes("hover:")) {
+          warnings.push(`Unsupported pseudo-class: "${cls}"`);
         }
         continue;
       }
-
-      // Handle hover prefixes
       if (cls.startsWith("hover:")) {
         const coreClass = cls.slice(6);
-        if (classMap[coreClass]) {
-          Object.assign(baseStyles, classMap[coreClass]);
-        }
+        if (classMap[coreClass]) Object.assign(baseStyles, classMap[coreClass]);
         continue;
       }
-
-      // Non-responsive class
       if (classMap[cls]) {
         Object.assign(baseStyles, classMap[cls]);
       }
     }
 
-    // Build inline style string, sanitizing Tailwind CSS variables
-    const styleParts = Object.entries(baseStyles).map(
-      ([k, v]) => `${k}:${resolveCssVariables(v)}`,
-    );
+    if (Object.keys(baseStyles).length === 0) return;
 
-    if (styleParts.length === 0) {
-      return _full; // Keep original class attribute unchanged
-    }
-
-    // Keep BOTH class and style
-    return `${_full} style="${styleParts.join(";")}"`;
+    // Merge with existing style attribute (preserves inline styles set in source HTML)
+    const existingStyle = $el.attr("style") || "";
+    const newStyles = Object.entries(baseStyles)
+      .map(([k, v]) => `${k}:${resolveCssVariables(v)}`)
+      .join(";");
+    const merged = existingStyle ? `${existingStyle};${newStyles}` : newStyles;
+    $el.attr("style", merged);
   });
+
+  // Return inner HTML, unwrapping our temporary <div>
+  const result = $.html($("body > div").first()) || html;
+  return result.replace(/^<div>/, "").replace(/<\/div>$/, "");
 }
