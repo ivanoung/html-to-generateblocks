@@ -1,0 +1,439 @@
+// ── DOM Walker ─────────────────────────────────────────────
+//
+// Depth-first DOM traversal that preserves source HTML structure.
+// For each element:
+//   1. Check for core-html wrapper → produce core/html block
+//   2. Classify children (inline-only, block-only, mixed, empty)
+//   3. Map tag → block type
+//   4. Extract styles, htmlAttributes, globalClasses
+//   5. Recurse into block-level children
+
+import * as cheerio from "cheerio";
+import type { Block, BlockStyles } from "./types.js";
+import { nextId } from "./id-generator.js";
+import { parseStyleString } from "./style-parser.js";
+import type { GlobalStylesCollector } from "./global-styles-collector.js";
+
+// ── Tag classification ────────────────────────────────────
+
+/** Tags that stay as raw HTML in parent's content, never become blocks. */
+const INLINE_TAGS = new Set([
+  "a", "abbr", "b", "br", "cite", "code", "data", "del", "dfn",
+  "em", "i", "iconify-icon", "ins", "kbd", "mark", "q", "s",
+  "samp", "small", "span", "strong", "sub", "sup", "time", "u", "var", "wbr",
+]);
+
+/** Container tags that produce generateblocks/element when they have block children. */
+const CONTAINER_TAGS = new Set([
+  "div", "section", "article", "aside", "header", "main",
+  "ul", "ol", "li", "dl", "dt", "dd", "figure",
+]);
+
+/** Tags that produce generateblocks/text. */
+const TEXT_TAGS = new Set([
+  "h1", "h2", "h3", "h4", "h5", "h6", "p", "blockquote", "pre",
+]);
+
+/** Tags that always produce core/html (preserved verbatim). */
+const CORE_HTML_TAGS = new Set([
+  "iframe", "video", "audio", "canvas", "picture", "table",
+]);
+
+interface WalkerOptions {
+  classNameToProperties: Map<string, BlockStyles>;
+  collector: GlobalStylesCollector;
+  warnings: string[];
+}
+
+// ── Core walker ────────────────────────────────────────────
+
+export function walkElement(
+  $el: cheerio.Cheerio<any>,
+  $: cheerio.CheerioAPI,
+  opts: WalkerOptions,
+): Block[] {
+  // 1. Core-html wrapper → produce single core/html block, no recursion
+  if ($el.attr("data-gb-wrap") === "core-html") {
+    return [makeCoreHtmlBlock($el, $)];
+  }
+
+  // 2. Classify children
+  const childNodes = $el.contents().toArray();
+  let hasMeaningfulText = false;
+  let hasBlockChildren = false;
+
+  for (const node of childNodes) {
+    if (node.type === "text") {
+      const text = ($(node).text() || "").trim();
+      if (text.length > 0) {
+        hasMeaningfulText = true;
+      }
+    } else if (node.type === "tag") {
+      const tagName = (node as any).name?.toLowerCase() || "";
+      const $child = $(node);
+
+      if ($child.attr("data-gb-wrap") === "core-html") {
+        hasBlockChildren = true;
+      } else if (!INLINE_TAGS.has(tagName)) {
+        hasBlockChildren = true;
+      }
+    }
+  }
+
+  // 3. Check for mixed content (text + block children)
+  if (hasBlockChildren && hasMeaningfulText) {
+    // Verify: at least one text node AND at least one block child
+    const textNodeCount = childNodes.filter((n) => {
+      if (n.type !== "text") return false;
+      return ($(n).text() || "").trim().length > 0;
+    }).length;
+
+    if (textNodeCount > 0) {
+      opts.warnings.push(
+        `Mixed content element <${$el.prop("tagName")}> → core/html fallback`,
+      );
+      return [makeCoreHtmlBlock($el, $)];
+    }
+  }
+
+  // 4. All inline/text → text block
+  if (!hasBlockChildren && (hasMeaningfulText || hasInlineChildren($el))) {
+    return [makeTextBlock($el, $, opts)];
+  }
+
+  // 5. Determine block type from tag
+  const tag = ($el.prop("tagName") || "").toLowerCase();
+  const block = makeBlockByTag($el, $, tag, opts);
+
+  if (!block) {
+    // Unrecognized → core/html
+    opts.warnings.push(`Unrecognized tag <${tag}> → core/html`);
+    return [makeCoreHtmlBlock($el, $)];
+  }
+
+  // 6. Recurse into block-level children (skip inline)
+  if (block.innerBlocks !== undefined && hasBlockChildren) {
+    $el.children().each((_, child) => {
+      if (child.type !== "tag") return;
+      const childTag = (child as any).name?.toLowerCase() || "";
+      const $child = $(child);
+
+      if ($child.attr("data-gb-wrap") === "core-html") {
+        block.innerBlocks!.push(...walkElement($child, $, opts));
+        return;
+      }
+
+      if (!INLINE_TAGS.has(childTag)) {
+        block.innerBlocks!.push(...walkElement($child, $, opts));
+      }
+    });
+  }
+
+  // 7. Warn about class-only styling
+  if (
+    Object.keys(block.styles || {}).length === 0 &&
+    (!block.css || block.css === "")
+  ) {
+    const classAttr = ($el.attr("class") || "").trim();
+    if (classAttr.length > 0) {
+      opts.warnings.push(
+        `CLASS_ONLY_STYLING: <${tag} class="${classAttr}"> — element has class-only styling, may appear unstyled`,
+      );
+    }
+  }
+
+  return [block];
+}
+
+// ── Block factories ────────────────────────────────────────
+
+function makeCoreHtmlBlock(
+  $el: cheerio.Cheerio<any>,
+  $: cheerio.CheerioAPI,
+): Block {
+  return {
+    blockName: "core/html",
+    uniqueId: nextId("core"),
+    styles: {},
+    css: "",
+    innerBlocks: [],
+    html: $.html($el),
+  };
+}
+
+function makeTextBlock(
+  $el: cheerio.Cheerio<any>,
+  $: cheerio.CheerioAPI,
+  opts: WalkerOptions,
+): Block {
+  const tag = ($el.prop("tagName") || "div").toLowerCase();
+  const styleAttr = $el.attr("style") || "";
+  const { styles, css, warnings: styleWarnings } = parseStyleString(styleAttr);
+  opts.warnings.push(...styleWarnings);
+
+  const htmlAttributes = extractHtmlAttributes($el);
+  const globalClasses = extractGlobalClasses($el, opts);
+
+  // Content is innerHTML (preserves inline formatting)
+  const content = $el.html() || $el.text() || "";
+
+  return {
+    blockName: "generateblocks/text",
+    uniqueId: nextId("text"),
+    tagName: tag,
+    content,
+    styles,
+    css,
+    globalClasses: globalClasses.length > 0 ? globalClasses : undefined,
+    htmlAttributes:
+      Object.keys(htmlAttributes).length > 0 ? htmlAttributes : undefined,
+    innerBlocks: [],
+  };
+}
+
+function makeElementBlock(
+  $el: cheerio.Cheerio<any>,
+  $: cheerio.CheerioAPI,
+  tag: string,
+  opts: WalkerOptions,
+): Block {
+  const styleAttr = $el.attr("style") || "";
+  const { styles, css, warnings: styleWarnings } = parseStyleString(styleAttr);
+  opts.warnings.push(...styleWarnings);
+
+  const htmlAttributes = extractHtmlAttributes($el);
+  const globalClasses = extractGlobalClasses($el, opts);
+
+  return {
+    blockName: "generateblocks/element",
+    uniqueId: nextId("elem"),
+    tagName: tag,
+    styles,
+    css,
+    globalClasses: globalClasses.length > 0 ? globalClasses : undefined,
+    htmlAttributes:
+      Object.keys(htmlAttributes).length > 0 ? htmlAttributes : undefined,
+    innerBlocks: [],
+  };
+}
+
+function makeMediaBlock(
+  $el: cheerio.Cheerio<any>,
+  $: cheerio.CheerioAPI,
+  opts: WalkerOptions,
+): Block {
+  const styleAttr = $el.attr("style") || "";
+  const { styles, css, warnings: styleWarnings } = parseStyleString(styleAttr);
+  opts.warnings.push(...styleWarnings);
+
+  const src = $el.attr("src") || "";
+  const alt = $el.attr("alt") || "";
+
+  const htmlAttributes: Record<string, string> = { src, alt };
+  const width = $el.attr("width");
+  const height = $el.attr("height");
+  if (width) htmlAttributes.width = width;
+  if (height) htmlAttributes.height = height;
+
+  return {
+    blockName: "generateblocks/media",
+    uniqueId: nextId("img"),
+    tagName: "img",
+    styles,
+    css,
+    htmlAttributes,
+    mediaId: 0,
+    innerBlocks: [],
+  };
+}
+
+function makeCoreImageBlock(
+  $el: cheerio.Cheerio<any>,
+  $: cheerio.CheerioAPI,
+): Block {
+  const $img = $el.find("img").first();
+  const src = $img.attr("src") || "";
+  const alt = $img.attr("alt") || "";
+  const caption = $el.find("figcaption").first().text().trim() || undefined;
+
+  return {
+    blockName: "core/image",
+    uniqueId: nextId("core"),
+    url: src,
+    alt,
+    caption,
+    tagName: "figure",
+    styles: {},
+    css: "",
+    innerBlocks: [],
+  };
+}
+
+function makeShapeBlock(
+  $el: cheerio.Cheerio<any>,
+  $: cheerio.CheerioAPI,
+  opts: WalkerOptions,
+): Block {
+  const styleAttr = $el.attr("style") || "";
+  const { styles, css, warnings: styleWarnings } = parseStyleString(styleAttr);
+  opts.warnings.push(...styleWarnings);
+
+  return {
+    blockName: "generateblocks/shape",
+    uniqueId: nextId("shape"),
+    html: $.html($el),
+    styles,
+    css,
+    innerBlocks: [],
+  };
+}
+
+// ── Tag → block type router ────────────────────────────────
+
+function makeBlockByTag(
+  $el: cheerio.Cheerio<any>,
+  $: cheerio.CheerioAPI,
+  tag: string,
+  opts: WalkerOptions,
+): Block | null {
+  if (tag === "svg") {
+    return makeShapeBlock($el, $, opts);
+  }
+
+  if (tag === "img") {
+    const parentTag = ($el.parent().prop("tagName") || "").toLowerCase();
+    if (
+      parentTag === "figure" &&
+      $el.parent().find("figcaption").length > 0
+    ) {
+      return null; // captioned — parent figure handles it
+    }
+    return makeMediaBlock($el, $, opts);
+  }
+
+  if (tag === "figure") {
+    const hasCaption = $el.find("figcaption").length > 0;
+    const hasImg = $el.find("img").length > 0;
+    if (hasCaption && hasImg) {
+      return makeCoreImageBlock($el, $);
+    }
+    return makeElementBlock($el, $, tag, opts);
+  }
+
+  if (CORE_HTML_TAGS.has(tag)) {
+    return makeCoreHtmlBlock($el, $);
+  }
+
+  if (tag === "button") {
+    return makeTextBlock($el, $, opts);
+  }
+
+  if (TEXT_TAGS.has(tag)) {
+    return makeTextBlock($el, $, opts);
+  }
+
+  if (CONTAINER_TAGS.has(tag)) {
+    return makeElementBlock($el, $, tag, opts);
+  }
+
+  return null; // unrecognized
+}
+
+// ── Helpers ────────────────────────────────────────────────
+
+function hasInlineChildren($el: cheerio.Cheerio<any>): boolean {
+  const children = $el.children().toArray();
+  return children.some((child) => {
+    if (child.type !== "tag") return false;
+    const tag = (child as any).name?.toLowerCase() || "";
+    return INLINE_TAGS.has(tag);
+  });
+}
+
+function extractHtmlAttributes(
+  $el: cheerio.Cheerio<any>,
+): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  const allowedAttrs = new Set([
+    "id",
+    "href",
+    "src",
+    "alt",
+    "target",
+    "rel",
+    "type",
+    "name",
+    "role",
+    "aria-label",
+    "aria-labelledby",
+    "aria-expanded",
+    "aria-haspopup",
+    "aria-hidden",
+    "aria-current",
+  ]);
+
+  const elAttrs = ($el as any)[0]?.attribs || {};
+  Object.keys(elAttrs).forEach((key) => {
+    if (key === "style") return;
+    if (key === "class") return;
+    if (key === "data-gb-wrap") return;
+
+    if (allowedAttrs.has(key) || key.startsWith("aria-") || key.startsWith("data-")) {
+      attrs[key] = elAttrs[key];
+    }
+  });
+
+  return attrs;
+}
+
+function extractGlobalClasses(
+  $el: cheerio.Cheerio<any>,
+  opts: WalkerOptions,
+): string[] {
+  const classAttr = ($el.attr("class") || "").trim();
+  if (!classAttr) return [];
+
+  const classNames = classAttr.split(/\s+/).filter((c) => c.length > 0);
+  const result: string[] = [];
+
+  classNames.forEach((className) => {
+    if (opts.classNameToProperties.has(className)) {
+      const isReusable = opts.collector.recordUsage(className);
+      if (isReusable) {
+        result.push(className);
+      }
+    }
+  });
+
+  return result;
+}
+
+// ── Entry point ────────────────────────────────────────────
+
+export interface WalkResult {
+  blocks: Block[];
+  warnings: string[];
+}
+
+export function walkDom(
+  html: string,
+  classNameToProperties: Map<string, BlockStyles>,
+  collector: GlobalStylesCollector,
+): WalkResult {
+  const warnings: string[] = [];
+  const $ = cheerio.load(`<div>${html}</div>`);
+
+  const opts: WalkerOptions = { classNameToProperties, collector, warnings };
+  const blocks: Block[] = [];
+
+  // Walk top-level children
+  $("body > *, div > *").each((_, el) => {
+    const tag = (el as any).name?.toLowerCase() || "";
+    if (tag === "nav" || tag === "footer" || tag === "script" || tag === "style") return;
+
+    const $el = $(el);
+    blocks.push(...walkElement($el, $, opts));
+  });
+
+  return { blocks, warnings };
+}
