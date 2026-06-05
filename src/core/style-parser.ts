@@ -97,6 +97,12 @@ const STYLES_PROPERTIES = new Set([
   // object-fit (for media)
   "object-fit",
   "object-position",
+
+  // background (from GB bgOptions panel)
+  "background-size",
+  "background-position",
+  "background-repeat",
+  "background-attachment",
 ]);
 
 // ── Conversion helpers ────────────────────────────────────────
