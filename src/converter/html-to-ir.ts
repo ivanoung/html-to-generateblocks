@@ -170,12 +170,22 @@ function elementToIR(
     styleIntent[key] = String(value);
   }
 
+  // Read responsive overrides from data attribute (set by Phase 1 style resolver)
+  let responsiveIntent: Record<string, Record<string, string>> | undefined;
+  const respAttr = $el.attr("data-gb-resp");
+  if (respAttr) {
+    try {
+      responsiveIntent = JSON.parse(respAttr);
+    } catch { /* ignore malformed */ }
+  }
+
   return {
     nodeType: mapping.nodeType,
     tagName: tagName || (mapping.nodeType === "heading" ? "h2" : undefined),
     textContent,
     attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
     styleIntent: Object.keys(styleIntent).length > 0 ? styleIntent : undefined,
+    responsiveIntent,
     layoutIntent: mapping.layoutIntent,
     fallbackPolicy: mapping.fallbackPolicy,
     children: [],

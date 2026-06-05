@@ -213,19 +213,28 @@ function applyClassMap(
   warnings: string[],
 ): string {
   const $ = cheerio.load(`<div>${html}</div>`);
+  // Breakpoint widths for inversion (Tailwind min-width → GB max-width)
+  const BP_ORDER = ["xl", "lg", "md", "sm"]; // largest first
+  const BP_MAX: Record<string, number> = { xl: 1279, lg: 1023, md: 767, sm: 639 };
 
   $("[class]").each((_, el) => {
     const $el = $(el);
     const classStr = $el.attr("class") || "";
     const classes = classStr.split(/\s+/).filter(Boolean);
     const baseStyles: Record<string, string> = {};
+    // Per-breakpoint declarations (before inversion)
+    const bpStyles: Record<string, Record<string, string>> = {};
 
     for (const cls of classes) {
       const respMatch = cls.match(/^(sm|md|lg|xl):(.+)$/);
       if (respMatch) {
+        const bp = respMatch[1];
         const coreClass = respMatch[2];
-        if (classMap[coreClass]) {
-          Object.assign(baseStyles, classMap[coreClass]);
+        // Try core class first, then escaped full class (Tailwind may purge standalone)
+        const decls = classMap[coreClass] || classMap[cls.replace(/:/g, "\\:")];
+        if (decls) {
+          if (!bpStyles[bp]) bpStyles[bp] = {};
+          Object.assign(bpStyles[bp], decls);
         } else if (cls.includes("hover:")) {
           warnings.push(`Unsupported pseudo-class: "${cls}"`);
         }
@@ -241,15 +250,56 @@ function applyClassMap(
       }
     }
 
-    if (Object.keys(baseStyles).length === 0) return;
+    // Invert responsive declarations: desktop-first
+    // The largest breakpoint's value becomes base; smaller ones cascade as overrides
+    const invertedBase: Record<string, string> = { ...baseStyles };
+    const invertedResp: Record<string, Record<string, string>> = {};
 
-    // Merge with existing style attribute (preserves inline styles set in source HTML)
+    // Collect all responsive values per property, ordered largest→smallest
+    const propOverrides: Record<string, { bp: string; val: string }[]> = {};
+    for (const bp of BP_ORDER) {
+      const decls = bpStyles[bp];
+      if (!decls) continue;
+      for (const [prop, val] of Object.entries(decls)) {
+        if (!propOverrides[prop]) propOverrides[prop] = [];
+        propOverrides[prop].push({ bp, val });
+      }
+    }
+
+    // For each property: largest bp → base, smaller bps → cascading overrides
+    for (const [prop, overrides] of Object.entries(propOverrides)) {
+      // Largest bp value becomes final base
+      invertedBase[prop] = overrides[0].val;
+      // Each smaller bp's value becomes override at the PREVIOUS (larger) bp's max-width
+      for (let i = 1; i < overrides.length; i++) {
+        const prevBp = overrides[i - 1].bp;
+        const maxBp = String(BP_MAX[prevBp]);
+        if (!invertedResp[maxBp]) invertedResp[maxBp] = {};
+        invertedResp[maxBp][prop] = overrides[i].val;
+      }
+      // Original base value becomes override at the SMALLEST responsive bp's max-width
+      if (baseStyles[prop] !== undefined) {
+        const smallest = overrides[overrides.length - 1];
+        const maxBp = String(BP_MAX[smallest.bp]);
+        if (!invertedResp[maxBp]) invertedResp[maxBp] = {};
+        invertedResp[maxBp][prop] = baseStyles[prop];
+      }
+    }
+
+    if (Object.keys(invertedBase).length === 0) return;
+
+    // Merge with existing style attribute
     const existingStyle = $el.attr("style") || "";
-    const newStyles = Object.entries(baseStyles)
+    const newStyles = Object.entries(invertedBase)
       .map(([k, v]) => `${k}:${resolveCssVariables(v)}`)
       .join(";");
     const merged = existingStyle ? `${existingStyle};${newStyles}` : newStyles;
     $el.attr("style", merged);
+
+    // Store responsive overrides as data attribute for Phase 4
+    if (Object.keys(invertedResp).length > 0) {
+      $el.attr("data-gb-resp", JSON.stringify(invertedResp));
+    }
   });
 
   // Return inner HTML, unwrapping our temporary <div>
