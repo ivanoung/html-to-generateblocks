@@ -87,7 +87,8 @@ export function htmlToIR(
   }
 
   // Process exceptions as standalone elements (embeds, wide cards, etc.)
-  if (manifest.exceptions) {
+  // Skip for two-column layouts — already handled by processTwoColumn
+  if (manifest.exceptions && !(manifest.layout === "two-column" && manifest.columnSplit)) {
     for (const exc of manifest.exceptions) {
       if (exc.role === "decoration") continue;
       const $el = $(exc.selector);
@@ -192,12 +193,7 @@ function groupToIR(
   for (const [key, value] of Object.entries(parsed.styles)) {
     styleIntent[key] = String(value);
   }
-  // Remove layout-specific styles that GB manages via layoutIntent
-  delete styleIntent.display;
-  delete styleIntent.flexDirection;
-  delete styleIntent.flexWrap;
-  delete styleIntent.alignItems;
-  delete styleIntent.justifyContent;
+  // Keep layout styles (display, flex-direction, etc.) — GB layoutIntent is metadata only
 
   const children: IRNode[] = [];
   for (const el of group.elements) {
@@ -268,8 +264,6 @@ function templateToIR(
     for (const [key, value] of Object.entries(parsed.styles)) {
       styleIntent[key] = String(value);
     }
-    delete styleIntent.display;
-    delete styleIntent.flexDirection;
     cardNode.styleIntent = Object.keys(styleIntent).length > 0 ? styleIntent : undefined;
 
     for (const el of tmpl.elements) {
