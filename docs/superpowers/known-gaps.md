@@ -24,3 +24,21 @@
 | 10 | `@keyframes` animations — marquee animation stripped |
 | 11 | `hover-shadow-md` — complex box-shadow with rgba not mapped |
 | 12 | `blueprint-bg` — background-image patterns not mapped because they use CSS classes, not inline styles |
+
+---
+
+## Proposed: Self-Verification Loop (future)
+
+**Problem:** Every conversion requires manual WordPress paste-and-verify, creating a slow human-in-the-loop feedback cycle.
+
+**Proposed design:**
+1. Headless browser captures screenshot of source page (e.g., `https://minofound.com/`)
+2. Script extracts CSS from GB block output → builds standalone renderable HTML
+3. Headless browser captures screenshot of rendered GB output
+4. Agent compares screenshots visually, identifies issues, fixes, re-renders, re-compares — autonomously
+5. WordPress paste only as final confirmation gate
+
+**Key components:**
+- `npx tsx src/cli/index.ts render <output.html>` — extracts GB block CSS, wraps in standalone HTML, renders via headless browser
+- Same browser engine for both source capture and output render (consistency)
+- Agent-driven comparison and fix loop
