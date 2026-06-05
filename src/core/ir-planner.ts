@@ -57,6 +57,11 @@ export function planBlocks(node: IRNode): PlanResult {
 // ── Container (section/container → generateblocks/element) ─────
 
 function planContainer(node: IRNode, errors: string[]): PlanResult {
+  // Route core/html embeds: containers with fallbackPolicy "core" and html payload
+  if (node.fallbackPolicy === "core" && node.html) {
+    return planCoreHtml(node, errors);
+  }
+
   const tag = node.tagName ?? "div";
   const rawStyle = styleIntentToString(node.styleIntent);
   const { styles: baseStyles, css: baseCss } = parseStyleString(rawStyle);
@@ -86,6 +91,30 @@ function planContainer(node: IRNode, errors: string[]): PlanResult {
       htmlAttributes: Object.keys(htmlAttributes).length > 0 ? htmlAttributes : undefined,
       innerBlocks,
       idGenType: "elem",
+    }],
+    errors,
+  };
+}
+
+// ── Core/HTML embed ───────────────────────────────────────────
+
+function planCoreHtml(node: IRNode, errors: string[]): PlanResult {
+  // Collect HTML from self and direct children with html payloads
+  const htmlFragments: string[] = [];
+  if (node.html) htmlFragments.push(node.html);
+  for (const child of node.children) {
+    if (child.html) htmlFragments.push(child.html);
+  }
+
+  return {
+    blocks: [{
+      blockName: "core/html",
+      uniqueId: nextId("core"),
+      html: htmlFragments.join("\n"),
+      styles: {},
+      css: "",
+      innerBlocks: [],
+      idGenType: "core",
     }],
     errors,
   };

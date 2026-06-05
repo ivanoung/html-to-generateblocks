@@ -71,6 +71,22 @@ export function htmlToIR(
     }
   }
 
+  // Process exceptions as standalone elements (embeds, wide cards, etc.)
+  if (manifest.exceptions) {
+    for (const exc of manifest.exceptions) {
+      if (exc.role === "decoration") continue;
+      const $el = $(exc.selector);
+      if ($el.length === 0) {
+        warnings.push(`Exception element not found: "${exc.selector}"`);
+        continue;
+      }
+      const irNode = elementToIR($, $el.first(), exc, warnings);
+      if (irNode) {
+        sectionNode.children.push(irNode);
+      }
+    }
+  }
+
   return { nodes: [sectionNode], warnings };
 }
 

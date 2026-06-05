@@ -498,8 +498,13 @@ function validateBlockStructure(
     });
   }
 
-  // Check for stray HTML comments
-  const strayComments = html.match(/<!--(?!\s*wp:|\s*\/wp:)[\s\S]*?-->/g);
+  // Check for stray HTML comments (skip content inside core/html blocks)
+  // Remove core/html block content before checking
+  const htmlWithoutCoreHtml = html.replace(
+    /<!-- wp:core\/html[^>]*-->[\s\S]*?<!-- \/wp:core\/html -->/g,
+    "",
+  );
+  const strayComments = htmlWithoutCoreHtml.match(/<!--(?!\s*wp:|\s*\/wp:)[\s\S]*?-->/g);
   if (strayComments) {
     hardFails.push({
       code: "STRAY_HTML_COMMENTS",
