@@ -1,16 +1,14 @@
 {
   "fixture": "captioned-image",
-  "status": "validator_fail",
+  "status": "validator_pass",
   "blockCount": 1,
-  "hardFails": [
+  "hardFails": [],
+  "warnings": [
     {
-      "code": "MISSING_IMAGE_SRC",
-      "message": "Media block img001 missing src in htmlAttributes",
-      "blockId": "img001",
-      "blockName": "generateblocks/media"
+      "code": "MAPPING_WARNING",
+      "message": "core/image received styles; only css string is applicable (inline style)"
     }
   ],
-  "warnings": [],
   "manualVerification": {
     "wordpressPasted": false,
     "savedWithoutRecovery": null,
