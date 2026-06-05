@@ -12,14 +12,11 @@
 import { resolve, basename, extname } from "node:path";
 import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
 import {
-  runFixture, runIRFixture, runHeroFixture, loadFixture, writeOutput, writeHeroOutput,
-  isIRFixture, runFidelityFixture, isFidelityFixture,
-  type IRFixture, type FidelityFixture,
+  runFixture, loadFixture, writeOutput,
+  runFidelityFixture, isFidelityFixture,
+  type FidelityFixture,
 } from "../runner/run-fixture.js";
 import type { Fixture, FixtureReport, ReportStatus } from "../core/types.js";
-import { normalizeHeroHtml } from "../core/hero-intake.js";
-import { convertHero, DEFAULT_OPTIONS } from "../core/hero-converter.js";
-import type { HeroConverterOptions } from "../core/hero-converter.js";
 import { convert } from "../core/orchestrator.js";
 
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
@@ -84,36 +81,9 @@ function processFixture(name: string, fixPath: string): FixtureReport {
     return result.report;
   }
 
-  // Hero fixtures use the hero converter pipeline
-  if ((raw as any).kind === "hero") {
-    const heroOptions = (raw as any).heroOptions;
-    const { html, report: heroReport } = runHeroFixture(raw as IRFixture, heroOptions);
-    writeHeroOutput(name, html, heroReport);
-    console.log(`  Output: output/${name}.html`);
-    console.log(`  Report: output/${name}.report.json`);
-    console.log(`  Mode: ${heroReport.mode}, Score: ${heroReport.patternScore.toFixed(2)}`);
-
-    const status: ReportStatus = heroReport.mode === "rejected"
-      ? "rejected_unsupported"
-      : heroReport.hardFails.length > 0 ? "validator_fail" : "validator_pass";
-
-    return {
-      fixture: name,
-      status,
-      blockCount: heroReport.blockCount,
-      hardFails: heroReport.hardFails.map(f => ({ code: f, message: f })),
-      warnings: [],
-      manualVerification: { wordpressPasted: false, savedWithoutRecovery: null, notes: "" },
-    };
-  }
-
   let result: { report: FixtureReport; html: string };
 
-  if (isIRFixture(raw as any)) {
-    result = runIRFixture(raw as IRFixture);
-  } else {
-    result = runFixture(raw as Fixture);
-  }
+  result = runFixture(raw as Fixture);
 
   writeOutput(name, result.html, result.report);
   console.log(`  Output: output/${name}.html`);
