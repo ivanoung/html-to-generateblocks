@@ -11,12 +11,14 @@ import { GlobalStylesCollector } from "./global-styles-collector.js";
 import { serializeBlocks, countBlocks } from "./serializer.js";
 import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
+import { compileTailwindCss } from "./tailwind-resolver.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
 
 export interface ConversionInput {
   rawHtml: string;
   pageName: string;
+  resolveCss?: boolean;
 }
 
 export interface ConversionOutput {
@@ -25,6 +27,7 @@ export interface ConversionOutput {
   report: Record<string, unknown>;
   globalStyles: Record<string, unknown>;
   customCss: string;
+  tailwindCss: string;
 }
 
 export function convert(input: ConversionInput): ConversionOutput {
@@ -117,11 +120,32 @@ export function convert(input: ConversionInput): ConversionOutput {
     );
   }
 
+  // Tailwind CSS (if requested and config found)
+  let tailwindCss = "";
+  if (input.resolveCss && prepResult.tailwindConfig) {
+    const twResult = compileTailwindCss(
+      prepResult.tailwindConfig,
+      input.rawHtml,
+      process.cwd(),
+    );
+    if (twResult.css) {
+      tailwindCss = twResult.css;
+      writeFileSync(
+        resolve(OUTPUT_DIR, `${input.pageName}-tailwind.css`),
+        tailwindCss,
+        "utf-8",
+      );
+    } else if (twResult.error) {
+      console.error(`Tailwind CSS compilation error: ${twResult.error}`);
+    }
+  }
+
   return {
     pageName: input.pageName,
     blockHtml: html,
     report,
     globalStyles: globalStylesManifest as unknown as Record<string, unknown>,
     customCss: prepResult.customCss,
+    tailwindCss,
   };
 }

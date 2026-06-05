@@ -300,7 +300,7 @@ function main(): void {
     const rawHtml = readFileSync(fullPath, "utf-8");
     const pageName = basename(fullPath, extname(fullPath));
 
-    const output = convert({ rawHtml, pageName });
+    const output = convert({ rawHtml, pageName, resolveCss: args.includes("--resolve-css") });
 
     console.log(`\nConverted: ${pageName}`);
     console.log(`  Output: output/${pageName}.html`);
@@ -321,6 +321,9 @@ function main(): void {
     if (output.customCss) {
       const lines = output.customCss.split("\n").filter(l => l.trim()).length;
       console.log(`  Custom CSS: output/${pageName}-custom.css (${lines} rules)`);
+    }
+    if (output.tailwindCss) {
+      console.log(`  Tailwind CSS: output/${pageName}-tailwind.css`);
     }
     const gs = output.globalStyles as any;
     if (gs?.classes?.length > 0) {
