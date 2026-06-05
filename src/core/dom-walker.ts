@@ -29,6 +29,12 @@ const CONTAINER_TAGS = new Set([
   "ul", "ol", "li", "dl", "dt", "dd", "figure",
 ]);
 
+/** Semantic containers that MUST stay as element blocks (recovery forbidden if text). */
+const SEMANTIC_CONTAINER_TAGS = new Set([
+  "section", "article", "aside", "header", "main",
+  "ul", "ol", "dl", "figure",
+]);
+
 /** Tags that produce generateblocks/text. */
 const TEXT_TAGS = new Set([
   "h1", "h2", "h3", "h4", "h5", "h6", "p", "blockquote", "pre",
@@ -96,8 +102,18 @@ export function walkElement(
     }
   }
 
-  // 4. All inline/text → text block
+  // 4. All inline/text → text block (only for non-container tags)
+  //    Container tags always stay as element blocks (they're semantic wrappers)
   if (!hasBlockChildren && (hasMeaningfulText || hasInlineChildren($el))) {
+    const tag = ($el.prop("tagName") || "").toLowerCase();
+    if (SEMANTIC_CONTAINER_TAGS.has(tag)) {
+      // Container with only text/inline → core/html fallback (GB element blocks
+      // cannot contain raw text — recovery rules §5.3)
+      opts.warnings.push(
+        `Container <${tag}> with only inline/text content → core/html fallback`,
+      );
+      return [makeCoreHtmlBlock($el, $)];
+    }
     return [makeTextBlock($el, $, opts)];
   }
 
@@ -129,19 +145,6 @@ export function walkElement(
     });
   }
 
-  // 7. Warn about class-only styling
-  if (
-    Object.keys(block.styles || {}).length === 0 &&
-    (!block.css || block.css === "")
-  ) {
-    const classAttr = ($el.attr("class") || "").trim();
-    if (classAttr.length > 0) {
-      opts.warnings.push(
-        `CLASS_ONLY_STYLING: <${tag} class="${classAttr}"> — element has class-only styling, may appear unstyled`,
-      );
-    }
-  }
-
   return [block];
 }
 
@@ -157,7 +160,7 @@ function makeCoreHtmlBlock(
     styles: {},
     css: "",
     innerBlocks: [],
-    html: $.html($el),
+    html: $el.html() || "",
   };
 }
 
@@ -397,12 +400,12 @@ function extractGlobalClasses(
   const result: string[] = [];
 
   classNames.forEach((className) => {
+    // Track reusable classes from <head> styles for global-styles manifest
     if (opts.classNameToProperties.has(className)) {
-      const isReusable = opts.collector.recordUsage(className);
-      if (isReusable) {
-        result.push(className);
-      }
+      opts.collector.recordUsage(className);
     }
+    // Preserve ALL class tokens (Tailwind utilities) in globalClasses
+    result.push(className);
   });
 
   return result;
@@ -427,7 +430,7 @@ export function walkDom(
   const blocks: Block[] = [];
 
   // Walk top-level children
-  $("body > *, div > *").each((_, el) => {
+  $("div > *").each((_, el) => {
     const tag = (el as any).name?.toLowerCase() || "";
     if (tag === "nav" || tag === "footer" || tag === "script" || tag === "style") return;
 

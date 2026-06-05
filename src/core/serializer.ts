@@ -209,9 +209,13 @@ function renderHtmlAttributes(attrs?: Record<string, string>): string {
 function renderElementHtml(block: Block): string {
   const tag = block.tagName ?? "div";
   const hasStyles = block.styles && Object.keys(block.styles).length > 0;
-  const classes = hasStyles
+  const gbClasses = hasStyles
     ? `gb-element-${block.uniqueId} gb-element`
     : "gb-element";
+  const globalClasses = (block.globalClasses || []).join(" ");
+  const classes = globalClasses
+    ? `${gbClasses} ${globalClasses}`
+    : gbClasses;
   const attrs = renderHtmlAttributes(block.htmlAttributes);
   const alignClass = block.align ? ` ${block.align === "full" ? "alignfull" : block.align}` : "";
 
@@ -222,9 +226,13 @@ function renderTextHtml(block: Block): string {
   const tag = block.tagName ?? "p";
   const hasStyles = block.styles && Object.keys(block.styles).length > 0;
   // Text uses base-first pattern: gb-text gb-text-{id}
-  const classes = hasStyles
+  const gbClasses = hasStyles
     ? `gb-text gb-text-${block.uniqueId}`
     : "gb-text";
+  const globalClasses = (block.globalClasses || []).join(" ");
+  const classes = globalClasses
+    ? `${gbClasses} ${globalClasses}`
+    : gbClasses;
 
   // htmlAttributes on text blocks (used for <a> links: href, target, rel)
   const attrs = renderHtmlAttributes(block.htmlAttributes);
@@ -235,9 +243,13 @@ function renderTextHtml(block: Block): string {
 
 function renderMediaHtml(block: Block): string {
   const hasStyles = block.styles && Object.keys(block.styles).length > 0;
-  const classes = hasStyles
+  const gbClasses = hasStyles
     ? `gb-media-${block.uniqueId} gb-media`
     : "gb-media";
+  const globalClasses = (block.globalClasses || []).join(" ");
+  const classes = globalClasses
+    ? `${gbClasses} ${globalClasses}`
+    : gbClasses;
   const attrs = renderHtmlAttributes(block.htmlAttributes);
 
   const imgTag = `<img class="${classes}"${attrs} />`;
@@ -280,9 +292,13 @@ function renderCoreEmbedHtml(block: Block): string {
 
 function renderShapeHtml(block: Block): string {
   const hasStyles = block.styles && Object.keys(block.styles).length > 0;
-  const classes = hasStyles
+  const gbClasses = hasStyles
     ? `gb-shape gb-shape-${block.uniqueId}`
     : "gb-shape";
+  const globalClasses = (block.globalClasses || []).join(" ");
+  const classes = globalClasses
+    ? `${gbClasses} ${globalClasses}`
+    : gbClasses;
   const svg = block.html ?? "";
   return `<span class="${classes}">${svg}</span>`;
 }
