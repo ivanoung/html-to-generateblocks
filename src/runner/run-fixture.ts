@@ -160,3 +160,81 @@ export function writeOutput(fixtureName: string, html: string, report: FixtureRe
   writeFileSync(resolve(OUTPUT_DIR, `${fixtureName}.html`), html, "utf-8");
   writeFileSync(resolve(OUTPUT_DIR, `${fixtureName}.report.json`), JSON.stringify(report, null, 2) + "\n", "utf-8");
 }
+
+// ── Fidelity fixture runner ──────────────────────────────────
+
+export interface FidelityFixture {
+  name: string;
+  description: string;
+  inputHtml: string;
+  expect: {
+    shouldPass: boolean;
+    hardFailCount: number;
+    blockCount?: number;
+  };
+}
+
+import { convert } from "../core/orchestrator.js";
+import type { ConversionOutput } from "../core/orchestrator.js";
+
+export function runFidelityFixture(fixture: FidelityFixture): RunResult {
+  const output: ConversionOutput = convert({
+    rawHtml: fixture.inputHtml,
+    pageName: fixture.name,
+  });
+
+  const hardFails: HardFail[] =
+    (output.report.hardFails as any[])?.map((f: any) => ({
+      code: f.code || "UNKNOWN",
+      message: f.message || "",
+    })) || [];
+
+  const warnings: Warning[] =
+    (output.report.warnings as any[])?.map((w: any) => ({
+      code: w.code || "WARNING",
+      message: w.message || "",
+    })) || [];
+
+  const blockCount = (output.report.blockCount as number) || 0;
+  const status: ReportStatus =
+    hardFails.length > 0 ? "validator_fail" : "validator_pass";
+
+  const report: FixtureReport = {
+    fixture: fixture.name,
+    status,
+    blockCount,
+    hardFails,
+    warnings,
+    manualVerification: {
+      wordpressPasted: false,
+      savedWithoutRecovery: null,
+      notes: "",
+    },
+  };
+
+  writeOutput(fixture.name, output.blockHtml, report);
+
+  if (
+    output.globalStyles &&
+    (output.globalStyles as any).classes?.length > 0
+  ) {
+    writeFileSync(
+      resolve(OUTPUT_DIR, `${fixture.name}-global-styles.json`),
+      JSON.stringify(output.globalStyles, null, 2) + "\n",
+      "utf-8",
+    );
+  }
+  if (output.customCss?.length > 0) {
+    writeFileSync(
+      resolve(OUTPUT_DIR, `${fixture.name}-custom.css`),
+      output.customCss + "\n",
+      "utf-8",
+    );
+  }
+
+  return { fixture, report, html: output.blockHtml };
+}
+
+export function isFidelityFixture(f: any): boolean {
+  return typeof f.inputHtml === "string";
+}

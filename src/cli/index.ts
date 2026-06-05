@@ -2,59 +2,28 @@
 //
 // Commands:
 //   fixtures:list              List all available fixtures
-//   fixtures:run <name>        Run single fixture (M1 or M2)
+//   fixtures:run <name>        Run single fixture (M1 or fidelity)
 //   fixtures:run-all           Run all fixtures
+//   convert <input.html>       Convert HTML page to GB blocks
 //   validate <name>            Validate specific fixture output
 //   report:update <name>       Update manual verification in report
 //   regression                 Check M1 fixtures against snapshots
 
-import { resolve, basename, extname, relative, join, dirname } from "node:path";
-import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, statSync } from "node:fs";
+import { resolve, basename, extname } from "node:path";
+import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
 import {
   runFixture, runIRFixture, runHeroFixture, loadFixture, writeOutput, writeHeroOutput,
-  isIRFixture, type IRFixture,
+  isIRFixture, runFidelityFixture, isFidelityFixture,
+  type IRFixture, type FidelityFixture,
 } from "../runner/run-fixture.js";
 import type { Fixture, FixtureReport, ReportStatus } from "../core/types.js";
 import { normalizeHeroHtml } from "../core/hero-intake.js";
 import { convertHero, DEFAULT_OPTIONS } from "../core/hero-converter.js";
 import type { HeroConverterOptions } from "../core/hero-converter.js";
+import { convert } from "../core/orchestrator.js";
 
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
 const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
-
-interface InputFile {
-  fullPath: string;
-  outRel: string;
-  baseName: string;
-}
-
-function collectInputFiles(inputPath: string): InputFile[] {
-  const fullPath = resolve(process.cwd(), inputPath);
-  if (!existsSync(fullPath)) return [];
-  if (statSync(fullPath).isDirectory()) {
-    const files: InputFile[] = [];
-    walkDir(fullPath, inputPath, files);
-    return files.sort((a, b) => a.outRel.localeCompare(b.outRel));
-  }
-  if (fullPath.endsWith(".html")) {
-    const outRel = inputPath.replace(/^inputs\//, "").replace(/\/[^/]+\.html$/, "");
-    return [{ fullPath, outRel, baseName: basename(fullPath, ".html") }];
-  }
-  return [];
-}
-
-function walkDir(dir: string, relDir: string, files: InputFile[]): void {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const rel = join(relDir, entry);
-    if (statSync(full).isDirectory()) {
-      walkDir(full, rel, files);
-    } else if (entry.endsWith(".html") && !entry.includes("Zone.Identifier")) {
-      const outRel = dirname(rel.replace(/^inputs\//, ""));
-      files.push({ fullPath: full, outRel, baseName: basename(entry, ".html") });
-    }
-  }
-}
 
 // ── Fixture listing ───────────────────────────────────────────
 
@@ -107,6 +76,14 @@ function processFixture(name: string, fixPath: string): FixtureReport {
 
   const raw = loadFixture(fixPath);
 
+  // Fidelity fixtures use the new fidelity-first pipeline
+  if (isFidelityFixture(raw)) {
+    const result = runFidelityFixture(raw as FidelityFixture);
+    console.log(`  Output: output/${name}.html`);
+    console.log(`  Report: output/${name}.report.json`);
+    return result.report;
+  }
+
   // Hero fixtures use the hero converter pipeline
   if ((raw as any).kind === "hero") {
     const heroOptions = (raw as any).heroOptions;
@@ -116,7 +93,6 @@ function processFixture(name: string, fixPath: string): FixtureReport {
     console.log(`  Report: output/${name}.report.json`);
     console.log(`  Mode: ${heroReport.mode}, Score: ${heroReport.patternScore.toFixed(2)}`);
 
-    // Return a compatible FixtureReport for display
     const status: ReportStatus = heroReport.mode === "rejected"
       ? "rejected_unsupported"
       : heroReport.hardFails.length > 0 ? "validator_fail" : "validator_pass";
@@ -190,6 +166,7 @@ function main(): void {
     console.log("  fixtures:list              List all fixtures");
     console.log("  fixtures:run <name>        Run single fixture");
     console.log("  fixtures:run-all           Run all fixtures");
+    console.log("  convert <input.html>       Convert HTML page to GB blocks");
     console.log("  regression                 Check M1 vs snapshots");
     process.exit(0);
   }
@@ -336,64 +313,56 @@ function main(): void {
     return;
   }
 
-  // ── hero:convert ─────────────────────────────────────────
-  if (cmd === "hero:convert") {
+  // ── convert ─────────────────────────────────────────────
+  if (cmd === "convert") {
     const inputPath = args[1];
-    const modeIdx = args.indexOf("--mode");
-    const scoreIdx = args.indexOf("--min-pattern-score");
-
     if (!inputPath) {
-      console.error("Usage: hero:convert <path> [--mode auto|pattern|generic] [--min-pattern-score 0.75]");
-      console.error("  <path>    Input file or directory (e.g. inputs/mino-2206/hero.html)");
-      console.error("            Directories are recursively scanned for .html files");
+      console.error("Usage: convert <input.html>");
       process.exit(1);
     }
 
-    const mode = (modeIdx !== -1 ? args[modeIdx + 1] : "auto") as HeroConverterOptions["mode"];
-    const minScore = scoreIdx !== -1 ? parseFloat(args[scoreIdx + 1]) : 0.75;
-
-    // Collect input files
-    const files = collectInputFiles(inputPath);
-    if (files.length === 0) {
-      console.error(`No .html files found in: ${inputPath}`);
+    const fullPath = resolve(process.cwd(), inputPath);
+    if (!existsSync(fullPath)) {
+      console.error(`File not found: ${fullPath}`);
       process.exit(1);
     }
 
-    const options: HeroConverterOptions = { mode, minPatternScore: minScore };
+    const rawHtml = readFileSync(fullPath, "utf-8");
+    const pageName = basename(fullPath, extname(fullPath));
 
-    console.log(`\nConverting ${files.length} hero section(s)...`);
-    console.log(`  Mode: ${mode}, Min score: ${minScore}\n`);
+    const output = convert({ rawHtml, pageName });
 
-    let total = 0;
-    let passed = 0;
-    let rejected = 0;
+    console.log(`\nConverted: ${pageName}`);
+    console.log(`  Output: output/${pageName}.html`);
+    console.log(`  Report: output/${pageName}.report.json`);
+    console.log(`  Blocks: ${output.report.blockCount}`);
+    console.log(`  Status: ${output.report.overallStatus}`);
 
-    for (const { fullPath, outRel, baseName } of files) {
-      console.log(`  ${outRel}/${baseName}.html ← ${fullPath}`);
-      const rawHtml = readFileSync(fullPath, "utf-8");
-      const { root, warnings } = normalizeHeroHtml(rawHtml);
-      const result = convertHero(baseName, root, options);
-
-      // Write to mirrored output folder
-      const outDir = resolve(process.cwd(), "output", outRel);
-      mkdirSync(outDir, { recursive: true });
-      writeFileSync(resolve(outDir, `${baseName}.html`), result.html, "utf-8");
-      writeFileSync(resolve(outDir, `${baseName}.report.json`),
-        JSON.stringify(result.report, null, 2) + "\n", "utf-8");
-
-      console.log(`    → output/${outRel}/${baseName}.html (${result.report.mode}, ${result.report.blockCount} blocks, score ${result.report.patternScore.toFixed(2)})`);
-      total++;
-      if (result.report.mode === "rejected") rejected++;
-      else passed++;
+    const warnings = (output.report.warnings as any[]) || [];
+    if (warnings.length > 0) {
+      console.log(`  Warnings: ${warnings.length}`);
+      const shown = Math.min(warnings.length, 5);
+      for (let i = 0; i < shown; i++) {
+        console.log(`    [${warnings[i].code}] ${warnings[i].message}`);
+      }
+      if (warnings.length > 5) console.log(`    ... and ${warnings.length - 5} more`);
     }
 
-    console.log(`\n  Done: ${total} files (${passed} converted, ${rejected} rejected)\n`);
+    if (output.customCss) {
+      const lines = output.customCss.split("\n").filter(l => l.trim()).length;
+      console.log(`  Custom CSS: output/${pageName}-custom.css (${lines} rules)`);
+    }
+    const gs = output.globalStyles as any;
+    if (gs?.classes?.length > 0) {
+      console.log(`  Global Styles: output/${pageName}-global-styles.json (${gs.classes.length} classes)`);
+    }
+    console.log("");
     return;
   }
 
   // ── Unknown command ───────────────────────────────────────
   console.error(`Unknown command: ${cmd}`);
-  console.error("Available: fixtures:list, fixtures:run, fixtures:run-all, validate, report:update, regression, hero:convert");
+  console.error("Available: fixtures:list, fixtures:run, fixtures:run-all, convert, validate, report:update, regression");
   process.exit(1);
 }
 
