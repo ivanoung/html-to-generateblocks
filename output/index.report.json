@@ -1,6 +1,6 @@
 {
   "page": "index",
-  "blockCount": 1814,
+  "blockCount": 1449,
   "hardFails": [],
   "warnings": [
     {
@@ -21,7 +21,7 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
+      "message": "Mixed content element <button> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -41,7 +41,91 @@
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Unrecognized tag <polygon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -74,6 +158,18 @@
     {
       "code": "WALK",
       "message": "Unrecognized tag <path> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Some inline style properties had no GB styles equivalent; placed in css only"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -85,55 +181,83 @@
     },
     {
       "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <polygon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <polygon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <polygon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <polygon> → core/html"
+    },
+    {
+      "code": "WALK",
       "message": "Some inline style properties had no GB styles equivalent; placed in css only"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
-    },
-    {
-      "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
-    },
-    {
-      "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
-    },
-    {
-      "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
-    },
-    {
-      "code": "WALK",
-      "message": "Some inline style properties had no GB styles equivalent; placed in css only"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -205,7 +329,7 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
+      "message": "Mixed content element <button> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -222,6 +346,14 @@
     {
       "code": "WALK",
       "message": "Unrecognized tag <polygon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <polygon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <button> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -309,23 +441,19 @@
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -333,7 +461,27 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -341,7 +489,7 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -349,7 +497,7 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -357,7 +505,7 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -365,7 +513,7 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -373,7 +521,27 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -381,7 +549,7 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -389,11 +557,135 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
       "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -430,6 +722,10 @@
     {
       "code": "WALK",
       "message": "Unrecognized tag <path> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -449,63 +745,59 @@
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -513,47 +805,7 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -561,27 +813,19 @@
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
-    },
-    {
-      "code": "WALK",
-      "message": "Unrecognized tag <iconify-icon> → core/html"
-    },
-    {
-      "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -589,7 +833,7 @@
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -597,15 +841,43 @@
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Mixed content element <DIV> → core/html fallback"
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
@@ -613,6 +885,66 @@
     },
     {
       "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Unrecognized tag <iconify-icon> → core/html"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
       "message": "Unrecognized tag <iconify-icon> → core/html"
     },
     {
@@ -649,35 +981,55 @@
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",
-      "message": "Unrecognized tag <polygon> → core/html"
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
+    },
+    {
+      "code": "WALK",
+      "message": "Mixed content element <div> → core/html fallback"
     },
     {
       "code": "WALK",

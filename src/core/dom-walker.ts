@@ -66,6 +66,7 @@ export function walkElement(
   // 2. Classify children
   const childNodes = $el.contents().toArray();
   let hasMeaningfulText = false;
+  let hasInlineElements = false;
   let hasBlockChildren = false;
 
   for (const node of childNodes) {
@@ -80,45 +81,33 @@ export function walkElement(
 
       if ($child.attr("data-gb-wrap") === "core-html") {
         hasBlockChildren = true;
-      } else if (!INLINE_TAGS.has(tagName)) {
+      } else if (INLINE_TAGS.has(tagName)) {
+        hasInlineElements = true;
+      } else {
         hasBlockChildren = true;
       }
     }
   }
 
-  // 3. Check for mixed content (text + block children)
-  if (hasBlockChildren && hasMeaningfulText) {
-    // Verify: at least one text node AND at least one block child
-    const textNodeCount = childNodes.filter((n) => {
-      if (n.type !== "text") return false;
-      return ($(n).text() || "").trim().length > 0;
-    }).length;
-
-    if (textNodeCount > 0) {
-      opts.warnings.push(
-        `Mixed content element <${$el.prop("tagName")}> → core/html fallback`,
-      );
-      return [makeCoreHtmlBlock($el, $)];
-    }
+  // 3. Check for mixed content (text/inline + block children)
+  const tag = ($el.prop("tagName") || "").toLowerCase();
+  const hasTextOrInline = hasMeaningfulText || hasInlineElements;
+  if (hasBlockChildren && hasTextOrInline) {
+    return makeCoreHtmlFallback($el, $, opts.warnings, tag);
   }
 
   // 4. All inline/text → text block (only for non-container tags)
   //    Container tags always stay as element blocks (they're semantic wrappers)
-  if (!hasBlockChildren && (hasMeaningfulText || hasInlineChildren($el))) {
-    const tag = ($el.prop("tagName") || "").toLowerCase();
+  if (!hasBlockChildren && (hasMeaningfulText || hasInlineElements)) {
     if (SEMANTIC_CONTAINER_TAGS.has(tag)) {
       // Container with only text/inline → core/html fallback (GB element blocks
       // cannot contain raw text — recovery rules §5.3)
-      opts.warnings.push(
-        `Container <${tag}> with only inline/text content → core/html fallback`,
-      );
-      return [makeCoreHtmlBlock($el, $)];
+      return makeCoreHtmlFallback($el, $, opts.warnings, tag);
     }
     return [makeTextBlock($el, $, opts)];
   }
 
   // 5. Determine block type from tag
-  const tag = ($el.prop("tagName") || "").toLowerCase();
   const block = makeBlockByTag($el, $, tag, opts);
 
   if (!block) {
@@ -154,6 +143,7 @@ function makeCoreHtmlBlock(
   $el: cheerio.Cheerio<any>,
   $: cheerio.CheerioAPI,
 ): Block {
+  // For wrapper divs (data-gb-wrap), return innerHTML (original wrapped element)
   return {
     blockName: "core/html",
     uniqueId: nextId("core"),
@@ -162,6 +152,31 @@ function makeCoreHtmlBlock(
     innerBlocks: [],
     html: $el.html() || "",
   };
+}
+
+function makeCoreHtmlFallback(
+  $el: cheerio.Cheerio<any>,
+  $: cheerio.CheerioAPI,
+  warnings: string[],
+  tag: string,
+): Block[] {
+  warnings.push(
+    `Mixed content element <${tag}> → core/html fallback`,
+  );
+  // Unwrap nested data-gb-wrap markers in children before capturing outerHTML
+  const $clone = $el.clone();
+  $clone.find("[data-gb-wrap]").each((_, child) => {
+    const $child = $(child);
+    $child.replaceWith($child.html() || "");
+  });
+  return [{
+    blockName: "core/html",
+    uniqueId: nextId("core"),
+    styles: {},
+    css: "",
+    innerBlocks: [],
+    html: $.html($clone) || "",
+  }];
 }
 
 function makeTextBlock(
@@ -343,15 +358,6 @@ function makeBlockByTag(
 }
 
 // ── Helpers ────────────────────────────────────────────────
-
-function hasInlineChildren($el: cheerio.Cheerio<any>): boolean {
-  const children = $el.children().toArray();
-  return children.some((child) => {
-    if (child.type !== "tag") return false;
-    const tag = (child as any).name?.toLowerCase() || "";
-    return INLINE_TAGS.has(tag);
-  });
-}
 
 function extractHtmlAttributes(
   $el: cheerio.Cheerio<any>,
