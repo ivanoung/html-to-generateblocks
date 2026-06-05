@@ -1,12 +1,12 @@
 {
   "fixture": "two-col",
-  "status": "wordpress_verified_pass",
+  "status": "validator_pass",
   "blockCount": 8,
   "hardFails": [],
   "warnings": [],
   "manualVerification": {
-    "wordpressPasted": true,
-    "savedWithoutRecovery": true,
-    "notes": "Re-verified with granular padding/margin/border-radius styles."
+    "wordpressPasted": false,
+    "savedWithoutRecovery": null,
+    "notes": ""
   }
 }
