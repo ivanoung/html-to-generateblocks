@@ -6,7 +6,7 @@
 
 import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 
@@ -32,9 +32,16 @@ export function resolveStyles(sectionHtml: string, fullPageHtml: string): StyleR
   const warnings: string[] = [];
 
   // Step 1: Extract tailwind.config from <script> block
-  const configMatch = fullPageHtml.match(
-    /tailwind\.config\s*=\s*(\{[\s\S]*?\});/,
+  // Try script-scoped extraction first (captures full config to </script>)
+  let configMatch = fullPageHtml.match(
+    /<script[^>]*>\s*tailwind\.config\s*=\s*(\{[^<]+\})/s,
   );
+  if (!configMatch) {
+    // Fallback: config at page level (no <script> wrapper)
+    configMatch = fullPageHtml.match(
+      /tailwind\.config\s*=\s*(\{[\s\S]*?\n\s*\})/,
+    );
+  }
   if (!configMatch) {
     warnings.push("No tailwind.config found in page. Skipping Tailwind resolution.");
     return { resolvedHtml: sectionHtml, warnings };
@@ -66,9 +73,10 @@ export function resolveStyles(sectionHtml: string, fullPageHtml: string): StyleR
     // Write HTML content
     writeFileSync(contentPath, sectionHtml, "utf-8");
 
-    // Step 3: Run Tailwind CLI
+    // Step 3: Run Tailwind v3 CLI (pinned via npm alias tailwindcss3)
+    const twCli = resolve(process.cwd(), "node_modules/tailwindcss3/lib/cli.js");
     execSync(
-      `npx tailwindcss -i "${inputCssPath}" -o "${outputCssPath}" --content "${contentPath}" --minify`,
+      `node "${twCli}" -i "${inputCssPath}" -o "${outputCssPath}" --content "${contentPath}" --minify`,
       { cwd: tmpDir, timeout: 30000, stdio: "pipe" },
     );
 
@@ -172,7 +180,8 @@ function parseTailwindOutput(css: string): Record<string, Record<string, string>
 
 /**
  * Apply resolved class → declarations map to HTML elements.
- * Replaces class attributes with inline style attributes.
+ * Adds inline styles alongside existing class attributes (does NOT strip classes).
+ * This preserves CSS selectors for manifest-based element lookup in Phase 4.
  */
 function applyClassMap(
   html: string,
@@ -189,11 +198,8 @@ function applyClassMap(
       // Check for responsive prefix
       const respMatch = cls.match(/^(sm|md|lg|xl):(.+)$/);
       if (respMatch) {
-        const bp = respMatch[1];
         const coreClass = respMatch[2];
         if (classMap[coreClass]) {
-          // Responsive: apply as base style (desktop-first inversion)
-          // The base (small-screen) value would be the non-responsive equivalent
           Object.assign(baseStyles, classMap[coreClass]);
         } else {
           if (cls.includes("hover:")) {
@@ -224,9 +230,10 @@ function applyClassMap(
     );
 
     if (styleParts.length === 0) {
-      return ""; // Remove class attribute entirely
+      return _full; // Keep original class attribute unchanged
     }
 
-    return `style="${styleParts.join(";")}"`;
+    // Keep BOTH class and style
+    return `${_full} style="${styleParts.join(";")}"`;
   });
 }

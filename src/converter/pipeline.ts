@@ -93,10 +93,13 @@ export function runPipeline(input: PipelineInput): PipelineOutput {
     };
   }
 
-  // Phase 1: Style resolution (once per page, cached)
+  // Phase 1: Style resolution (once per page)
   const resolvedSectionHtmls: Record<string, string> = {};
+  // Keep original HTML for manifest validation (selectors need class attributes)
+  const originalSectionHtmls: Record<string, string> = {};
 
   for (const snippet of structure.snippets) {
+    originalSectionHtmls[snippet.sectionId] = snippet.html;
     const result = resolveStyles(snippet.html, rawHtml);
     resolvedSectionHtmls[snippet.sectionId] = result.resolvedHtml;
   }
@@ -111,20 +114,21 @@ export function runPipeline(input: PipelineInput): PipelineOutput {
   const reportSections: PipelineOutput["report"]["sections"] = [];
 
   for (const manifest of finalManifests) {
-    const sectionHtml = resolvedSectionHtmls[manifest.sectionId];
-    if (!sectionHtml) {
+    const originalHtml = originalSectionHtmls[manifest.sectionId];
+    const resolvedHtml = resolvedSectionHtmls[manifest.sectionId];
+    if (!resolvedHtml) {
       errors.push(`No resolved HTML for section: ${manifest.sectionId}`);
       continue;
     }
 
-    // Validate manifest
-    const validation = validateManifest(manifest, sectionHtml);
+    // Validate manifest against ORIGINAL HTML (with classes for selector matching)
+    const validation = validateManifest(manifest, originalHtml || resolvedHtml);
     if (!validation.valid) {
       errors.push(...validation.errors.map((e) => `${manifest.sectionId}: ${e}`));
     }
 
-    // Convert
-    const irResult = htmlToIR(manifest, sectionHtml);
+    // Convert against RESOLVED HTML (with inline styles)
+    const irResult = htmlToIR(manifest, resolvedHtml);
     const allWarnings = [...validation.warnings, ...irResult.warnings];
 
     let sectionHtmlOutput = "";
