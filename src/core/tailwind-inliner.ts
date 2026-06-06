@@ -343,48 +343,36 @@ function resolveTransform(transform: string): string {
 // ── Phase 4: Value Normalization ───────────────────────
 
 function normalizeValue(value: string): string {
-  // Modern space-separated rgb(R G B / opacity) — resolve var() → 1
+  // Resolve var(--tw-*) references
   let v = value.replace(/var\(--tw-[^,)]*(?:,\s*([^)]+))?\)/g, (_, fallback) => fallback || "1");
 
-  // rgb(R, G, B) with commas
-  const rgbMatch = v.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
-  if (rgbMatch) {
-    const [r, g, b] = [parseInt(rgbMatch[1]), parseInt(rgbMatch[2]), parseInt(rgbMatch[3])];
-    const hex = [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
+  // Normalize rgb() ANYWHERE in the value (inside gradients, shadows, etc.)
+  v = v.replace(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/g, (_, r, g, b) => {
+    const hex = [parseInt(r), parseInt(g), parseInt(b)]
+      .map((c: number) => c.toString(16).padStart(2, "0")).join("");
     if (hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]) {
       return `#${hex[0]}${hex[2]}${hex[4]}`;
     }
     return `#${hex}`;
-  }
+  });
 
-  // rgb(R G B / A) space-separated (modern syntax)
-  const spaceMatch = v.match(/^rgb\((\d+)\s+(\d+)\s+(\d+)\s*\/\s*([\d.]+)\)$/);
-  if (spaceMatch) {
-    const [r, g, b, a] = [
-      parseInt(spaceMatch[1]), parseInt(spaceMatch[2]),
-      parseInt(spaceMatch[3]), parseFloat(spaceMatch[4]),
-    ];
-    if (a >= 1) {
-      const hex = [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
-      if (hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]) {
-        return `#${hex[0]}${hex[2]}${hex[4]}`;
-      }
-      return `#${hex}`;
+  // Also normalize space-separated rgb(R G B)
+  v = v.replace(/rgb\((\d+)\s+(\d+)\s+(\d+)\s*\/\s*([\d.]+)\)/g, (_, r, g, b, a) => {
+    const ai = parseFloat(a);
+    if (ai >= 1) {
+      const hex = [parseInt(r), parseInt(g), parseInt(b)]
+        .map((c: number) => c.toString(16).padStart(2, "0")).join("");
+      return hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]
+        ? `#${hex[0]}${hex[2]}${hex[4]}` : `#${hex}`;
     }
-    // Has alpha — keep as rgba
     return `rgba(${r}, ${g}, ${b}, ${a})`;
-  }
-
-  // rgb(R G B) without alpha (space-separated, no /)
-  const spaceNoAlpha = v.match(/^rgb\((\d+)\s+(\d+)\s+(\d+)\)$/);
-  if (spaceNoAlpha) {
-    const [r, g, b] = [parseInt(spaceNoAlpha[1]), parseInt(spaceNoAlpha[2]), parseInt(spaceNoAlpha[3])];
-    const hex = [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
-    if (hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]) {
-      return `#${hex[0]}${hex[2]}${hex[4]}`;
-    }
-    return `#${hex}`;
-  }
+  });
+  v = v.replace(/rgb\((\d+)\s+(\d+)\s+(\d+)\)/g, (_, r, g, b) => {
+    const hex = [parseInt(r), parseInt(g), parseInt(b)]
+      .map((c: number) => c.toString(16).padStart(2, "0")).join("");
+    return hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]
+      ? `#${hex[0]}${hex[2]}${hex[4]}` : `#${hex}`;
+  });
 
   if (v === "0px") return "0";
   return v;
