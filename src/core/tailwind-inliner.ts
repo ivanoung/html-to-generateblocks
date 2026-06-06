@@ -500,14 +500,12 @@ function buildCustomCss(customCssRules: string[], styleBlocks: string[]): string
 // ── Style Injection ────────────────────────────────────
 
 /**
- * Inject resolved styles as inline style attributes AND add
- * consolidated class names to elements. Shared properties go to
- * class only, unique properties go inline only.
+ * Assign every element a gb-s-{hash} class reference.
+ * All styles live in global-styles.json — no inline styles.
  */
-function injectInlineStyles(
+function injectClassReferences(
   html: string,
   desktopFirstStyles: Map<string, DesktopFirstStyles>,
-  sharedHashes: Set<string>,  // hashes that appear on 2+ elements
 ): string {
   const $ = cheerioLoad(html);
 
@@ -518,22 +516,8 @@ function injectInlineStyles(
     if (!dfs || Object.keys(dfs.desktop).length === 0) return;
 
     const hash = hashProps(dfs.desktop);
-    const isShared = sharedHashes.has(hash);
-
-    if (isShared) {
-      // Shared: add class reference, keep only existing source inline styles
-      const existingClass = $(el).attr("class") || "";
-      $(el).attr("class", (existingClass + " gb-s-" + hash).trim());
-      // Don't inject resolved styles — they come from the global class
-      // Keep existing source inline styles only
-    } else {
-      // Unique: inject all resolved properties as inline style
-      const existing = $(el).attr("style") || "";
-      const resolved = Object.entries(dfs.desktop)
-        .map(([k, v]) => `${kebab(k)}: ${v}`)
-        .join("; ");
-      $(el).attr("style", resolved + (existing ? "; " + existing : ""));
-    }
+    const existingClass = $(el).attr("class") || "";
+    $(el).attr("class", (existingClass + " gb-s-" + hash).trim());
   });
 
   return $.html() || html;
@@ -666,23 +650,11 @@ export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResu
       desktopFirstStyles.set(idx, dfs);
     }
 
-    // Build sharedHashes set: hashes that appear on 2+ elements
-    const hashCounts = new Map<string, number>();
-    for (const dfs of desktopFirstStyles.values()) {
-      if (Object.keys(dfs.desktop).length === 0) continue;
-      const h = hashProps(dfs.desktop);
-      hashCounts.set(h, (hashCounts.get(h) || 0) + 1);
-    }
-    const sharedHashes = new Set<string>();
-    for (const [h, count] of hashCounts) {
-      if (count >= 2) sharedHashes.add(h);
-    }
-
     // Strip Tailwind classes
     let cleanedHtml = stripTailwindClasses(extractionPayload.html);
 
-    // Inject styles: shared → class only, unique → inline only
-    cleanedHtml = injectInlineStyles(cleanedHtml, desktopFirstStyles, sharedHashes);
+    // Assign gb-s-{hash} class references (all styles in global-styles.json)
+    cleanedHtml = injectClassReferences(cleanedHtml, desktopFirstStyles);
 
     // Build custom.css
     const customCss = buildCustomCss(customCssRules, extractionPayload.styleBlocks);

@@ -62,7 +62,6 @@ export function consolidateStyles(
 
   const entries: GlobalStyleEntry[] = [];
   for (const [hash, idxs] of hashToIdxs) {
-    if (idxs.length < 2) continue;
     const className = `gb-s-${hash}`;
     const desktop = hashToProps.get(hash)!;
     const overrides = hashToOverrides.get(hash)!;
