@@ -203,12 +203,17 @@ so it registers before GB Pro's default-priority hooks at the same position.
 │  └─────────────────────────────────────────────┘ │
 │                                                   │
 │  ┌─ Import ────────────────────────────────────┐ │
-│  │  Upload a global-styles.json file.          │ │
+│  │  Paste the contents of global-styles.json. │ │
 │  │  All existing styles will be replaced.      │ │
 │  │                                             │ │
-│  │  [Choose File] [Upload & Preview]           │ │
+│  │  ┌──────────────────────────────────────┐   │ │
+│  │  │ [large textarea]                     │   │ │
+│  │  │                                      │   │ │
+│  │  │                                      │   │ │
+│  │  └──────────────────────────────────────┘   │ │
+│  │  [Paste & Preview]                          │ │
 │  │                                             │ │
-│  │  ── Preview (after upload) ──               │ │
+│  │  ── Preview (after paste) ──                │ │
 │  │  48 styles found. 0 errors.                 │ │
 │  │  This will DELETE all 48 existing styles    │ │
 │  │  and import 48 new ones.                    │ │
@@ -223,9 +228,10 @@ so it registers before GB Pro's default-priority hooks at the same position.
 1. **Export** — Queries all `gblocks_styles` posts, reads `gb_style_css` and
    `gb_style_data` metas, outputs JSON download.
 
-2. **Import (preview)** — Accepts file upload via POST. Parses and validates JSON.
-   If invalid: returns error messages inline (no DB writes). If valid: shows summary
-   with "Confirm Import" button. The JSON is stored in a transient for the next step.
+2. **Import (preview)** — Accepts pasted JSON via a `<textarea>` input. Parses and
+   validates JSON. If invalid: returns error messages inline (no DB writes). If
+   valid: shows summary with "Confirm Import" button. The JSON is stored in a
+   transient for the next step.
 
 3. **Import (commit)** — Reads JSON from transient, deletes all existing
    `gblocks_styles` posts, bulk-inserts new ones via `wp_insert_post` +
@@ -426,11 +432,10 @@ project share the same tailwind.config.
 
 | Scenario | Behavior |
 |---|---|
-| No file uploaded | "Please select a file to upload" |
-| File upload fails (PHP error) | "Upload failed: <system error>" |
+| Textarea is empty | "Please paste JSON content" |
 | JSON parse error | "Invalid JSON: <error message at line X>" |
 | Structural validation fails | List all errors; no writes made |
-| Preview JSON too large for transient | "File too large for preview. Max 500KB." |
+| Pasted JSON too large (>500KB) | "Content too large. Max 500KB." |
 | DB insert fails on commit | Roll back any inserted posts; "Import failed: <error>" |
 
 ### CLI
