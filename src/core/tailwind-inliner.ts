@@ -31,6 +31,11 @@ export interface InlinerResult {
   elementCount: number;
   classListPerElement: Record<string, string>;
   styleBlocks: string[];
+  responsiveOverrides: Array<{
+    breakpoint: string;
+    maxWidth: number;
+    overrides: Record<string, Record<string, string>>;
+  }>;
   warnings: string[];
 }
 
@@ -304,6 +309,111 @@ export async function inlineTailwindStyles(
     }
 
     const payload = await extractStyles(page);
+
+    // ── Multi-viewport capture ──────────────────────────
+    const responsiveOverrides: InlinerResult["responsiveOverrides"] = [];
+    const breakpoints = [
+      { label: "xl", width: 1280 },
+      { label: "lg", width: 1024 },
+      { label: "md", width: 768 },
+      { label: "sm", width: 640 },
+      { label: "mobile", width: 375 },
+    ];
+
+    // Capture lightweight style snapshots at each breakpoint
+    const bpSnapshots: Array<{
+      label: string;
+      width: number;
+      styles: Record<string, Record<string, string>>;
+    }> = [];
+
+    for (const bp of breakpoints) {
+      await page.setViewportSize({ width: bp.width, height: 900 });
+      await page.waitForTimeout(300);
+
+      const bpStyles = await page.evaluate(() => {
+        const result: Record<string, Record<string, string>> = {};
+        document.querySelectorAll("[data-gb-idx]").forEach((el) => {
+          if (!(el instanceof HTMLElement)) return;
+          const idx = el.getAttribute("data-gb-idx")!;
+          const cs = window.getComputedStyle(el);
+          const props: Record<string, string> = {};
+          for (let i = 0; i < cs.length; i++) {
+            const prop = cs[i];
+            // Only capture layout/sizing/spacing/typography props
+            if (
+              !prop.startsWith("border-") &&
+              prop !== "display" &&
+              prop !== "position" &&
+              !prop.startsWith("flex-") &&
+              prop !== "flex-direction" &&
+              prop !== "flex-wrap" &&
+              !prop.startsWith("grid-") &&
+              !prop.startsWith("padding-") &&
+              !prop.startsWith("margin-") &&
+              prop !== "gap" &&
+              prop !== "column-gap" &&
+              prop !== "row-gap" &&
+              !prop.startsWith("font-") &&
+              prop !== "font-size" &&
+              prop !== "font-weight" &&
+              prop !== "line-height" &&
+              prop !== "letter-spacing" &&
+              !prop.startsWith("width") &&
+              !prop.startsWith("height") &&
+              !prop.startsWith("min-") &&
+              !prop.startsWith("max-") &&
+              prop !== "text-align" &&
+              prop !== "overflow-x" &&
+              prop !== "overflow-y" &&
+              prop !== "z-index" &&
+              prop !== "opacity" &&
+              prop !== "visibility" &&
+              prop !== "transform"
+            ) {
+              continue;
+            }
+            const val = cs.getPropertyValue(prop);
+            if (val) props[prop] = val;
+          }
+          if (Object.keys(props).length > 0) {
+            result[idx] = props;
+          }
+        });
+        return result;
+      });
+
+      bpSnapshots.push({ label: bp.label, width: bp.width, styles: bpStyles });
+    }
+
+    // Diff each breakpoint against desktop base
+    // Desktop styles are the inline attributes already on elements
+    for (const snap of bpSnapshots) {
+      const overrides: Record<string, Record<string, string>> = {};
+
+      for (const [idx, bpProps] of Object.entries(snap.styles)) {
+        // Get desktop base styles by reading the element's style attribute
+        // We already set these inline in extractStyles
+        const diff: Record<string, string> = {};
+        for (const [prop, bpVal] of Object.entries(bpProps)) {
+          // Only record if different from desktop
+          // We'll compare against the stored desktop values in the consolidator
+          diff[prop] = bpVal;
+        }
+        if (Object.keys(diff).length > 0) {
+          overrides[idx] = diff;
+        }
+      }
+
+      if (Object.keys(overrides).length > 0) {
+        responsiveOverrides.push({
+          breakpoint: snap.label,
+          maxWidth: snap.width,
+          overrides,
+        });
+      }
+    }
+
     const cleanedHtml = stripTailwindClasses(payload.html);
 
     return {
@@ -311,6 +421,7 @@ export async function inlineTailwindStyles(
       elementCount: payload.elementCount,
       classListPerElement: payload.classListPerElement,
       styleBlocks: payload.styleBlocks,
+      responsiveOverrides,
       warnings,
     };
   } catch (err: any) {
@@ -322,6 +433,7 @@ export async function inlineTailwindStyles(
       elementCount: 0,
       classListPerElement: {},
       styleBlocks: [],
+      responsiveOverrides: [],
       warnings,
     };
   } finally {
