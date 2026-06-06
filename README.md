@@ -5,13 +5,13 @@ WordPress paste-ready GenerateBlocks & Core block markup, validates against
 known "Attempt Recovery" rules, and writes files for manual verification in
 the WordPress editor.
 
-> **Status:** Fidelity-first pipeline — 17 fixtures (5 M1, 6 fidelity, 6
-> preprocessor/dom-walk) verified across GenerateBlocks Element/Text/Media/Shape
-> + WordPress Core fallbacks (Image, Embed, HTML, List, Quote).
+> **Status:** Intent-based style transfer pipeline — 18 fixtures (5 M1, 6
+> fidelity, 6 preprocessor/dom-walk, 1 tailwind-inliner) verified across
+> GenerateBlocks Element/Text/Media/Shape + WordPress Core fallbacks.
 > The `convert` command processes full HTML pages (e.g. `inputs/mino/index.html`)
-> with automatic Tailwind CSS resolution via Playwright — utility classes are
-> compiled by the browser, extracted as computed inline styles, and stripped
-> before block conversion.
+> with automatic Tailwind CSS resolution: compiled CSS rules are parsed from
+> `document.styleSheets`, mapped to elements by class name, and consolidated
+> into reusable Global Styles classes. No browser defaults, no noise.
 
 ---
 
@@ -53,7 +53,7 @@ the WordPress editor.
 │   │   ├── tailwind-resolver.ts # Compiles Tailwind CSS from extracted config
 │   │   ├── theme-settings-extractor.ts # Generates theme settings prompt payload
 │   │   ├── hero-intake.ts      # Hero detection and conversion intake
-│   │   └── tailwind-inliner.ts  # Playwright-based Tailwind → inline CSS resolution
+│   │   └── tailwind-inliner.ts  # CSS rule parsing → class→property registry → style assignment
 │   ├── runner/
 │   │   └── run-fixture.ts      # Pipeline orchestration (M1 + fidelity)
 │   └── cli/
@@ -197,20 +197,27 @@ npx tsx src/cli/index.ts convert inputs/mino/index.html
 ```
 M1:      FixtureNode → mapper → Block[] → serialize → validate → report
 Fidelity:  inputHtml → preprocess → DOM walk → Block[] → serialize → validate → report
-Convert:  HTML file → (Tailwind inliner: Playwright → computed styles → strip classes)
+Convert:  HTML file → (Tailwind inliner: parse CSS rules → class→property registry
+                    → per-element style assignment → CSS variable resolution
+                    → normalization → desktop-first conversion → consolidation)
                     → preprocess (class extraction + custom CSS)
-                    → DOM walk (tag-driven block mapping)
+                    → DOM walk (section wrapper + tag-driven block mapping)
                     → serialize → validate → multi-file output
 Hero:    HTML section → hero-intake (detect/conform/plan) → Block[]
 ```
 
 ### Tailwind Inliner (convert only)
 When Tailwind is detected (CDN script or utility classes), the inliner:
-1. Loads the page in headless Chromium to compile and apply all Tailwind CSS
-2. Extracts `getComputedStyle()` for every element
-3. Injects resolved values as inline `style="..."` attributes
-4. Strips Tailwind class tokens and CDN references
-5. Falls through gracefully on failure (original HTML preserved)
+1. Loads the page in headless Chromium and waits for the CDN to compile
+2. Parses `document.styleSheets` to extract every CSS rule (class base,
+   responsive, state, compound, element, @keyframes, vendor-prefixed)
+3. Builds a ClassRegistry mapping each class name to its declared properties
+4. For each element, looks up its original class list against the registry
+   and collects only the properties Tailwind actually set (~5-8 per element)
+5. Resolves CSS variable chains in transforms (`--tw-translate-x` etc.)
+6. Normalizes values (rgb→hex, 0px→0) and converts to desktop-first
+7. Consolidates shared property sets into reusable Global Styles classes;
+   unique properties stay inline; pseudo-classes follow their base
 
 ### Preprocessor
 Extracts `<style>` blocks into `customCss`, maps CSS class definitions to
@@ -289,13 +296,13 @@ Walks the preprocessed HTML DOM, mapping elements to blocks by tag name:
 
 ### Convert command output (`output/<projectDir>/`)
 
-- **`<pageName>.html`** — paste-ready WordPress block markup
-- **`<pageName>.report.json`** — validation report with `overallStatus`, `blockCount`, `customCssRequired`, `globalClassesExtracted`
-- **`<pageName>-custom.css`** — extracted `<style>` block CSS
-- **`<pageName>-global-styles.json`** — class→properties manifest for Global Styles registration
-- **`tailwind.css`** — compiled Tailwind CSS (when `--resolve-css` flag and Tailwind config found)
-- **`global-styles.json`** — WordPress Global Styles JSON (when Tailwind CSS is compiled)
-- **`theme-settings-prompt.json`** — theme.json settings prompt payload for AI-assisted setup
+- **`<pageName>.html`** — paste-ready WordPress block markup with section wrapper pattern
+- **`<pageName>.report.json`** — validation report with `overallStatus`, `blockCount`, `hardFails`
+- **`global-styles.json`** — WordPress Global Styles JSON: consolidated reusable classes
+  with responsive `@media` overrides and `&:hover`/`&:focus` state blocks
+- **`custom.css`** — Tailwind Preflight/reset, `@keyframes`, `::-webkit-*` vendor prefixes,
+  body-level rules
+- **`<pageName>-global-styles.json`** — legacy class→properties manifest
 
 ### Report status values
 
@@ -328,13 +335,21 @@ Walks the preprocessed HTML DOM, mapping elements to blocks by tag name:
 - Responsive overrides in `responsiveIntent` per breakpoint
 
 ### HTML conversion pipeline
-- **Preprocessor** extracts `<style>` blocks, maps CSS class definitions, transfers
-  matched styles to inline `style` attributes, and detects Tailwind configs
-- **DOM walker** maps HTML elements to blocks by tag name (element/text/media/shape)
-- **Class collector** registers class→properties for Global Styles output
-- **Tailwind resolver** compiles extracted config against the page's class usage
-- **Theme settings extractor** converts Tailwind config to `theme.json` settings
-- **Global Styles generator** produces WordPress-compatible Global Styles JSON
+- **CSS rule parser** extracts all rules from `document.styleSheets` after Tailwind CDN
+  compilation — classifies into base, responsive (with breakpoint), state (hover/focus),
+  compound (descendant selectors), and element/@keyframes/vendor-prefixed (custom.css)
+- **Class registry** maps each unescaped class name to its declared CSS properties
+- **Per-element assignment** looks up each element's class list against the registry,
+  applying class list order as tiebreaker for conflicting properties
+- **CSS variable resolution** resolves `--tw-translate-*` / `--tw-scale-*` chains in
+  `transform` and `filter` properties, simplifying identity components
+- **Value normalization** converts `rgb()` to `#hex` and strips `0px` → `0`
+- **Desktop-first conversion** transforms mobile-first Tailwind breakpoints to
+  desktop-first: largest breakpoint → base, smaller → `@media(max-width)` overrides
+- **Consolidator** hashes shared property sets into reusable `.gb-s-{hash}` classes;
+  original CSS class names (`.blueprint-bg`, `.clip-hex`) are preserved
+- **Custom CSS assembly** collects element selectors, @keyframes, and vendor-prefixed
+  rules from both the Tailwind CDN output and original `<style>` blocks
 
 ### Critical recovery rules enforced
 - No `className` in GB block JSON
