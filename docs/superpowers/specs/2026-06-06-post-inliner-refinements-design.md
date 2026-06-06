@@ -183,6 +183,83 @@ mobile:  { fontSize: "48px", padding: "96px 24px 40px" }   // same as sm → ski
 
 Only write overrides when values actually differ. This prevents CSS bloat from identical breakpoints.
 
+### State style extraction (hover / focus / group-hover / active)
+
+After the CDN compiles but before any class stripping, scan `document.styleSheets`
+for CSS rules whose selectors match elements on the page AND contain state
+pseudo-classes:
+
+```ts
+// Inside page.evaluate(), after CDN compiles
+const stateRules: Map<string, Array<{state: string, props: Record<string,string>}>> = new Map();
+
+for (const sheet of document.styleSheets) {
+  try {
+    for (const rule of sheet.cssRules) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      const selector = rule.selectorText;
+      
+      // Match state pseudo-classes
+      const stateMatch = selector.match(/(?::：(?:hover|focus|focus-visible|active))|(?:\.[^\s]+:(?:hover|focus|focus-visible|active))|(?:\.group[a-z/]*\s*:hover\s+)|(?:\.peer[a-z/]*\s*:[a-z-]+\s*[+~]\s*)/);
+      if (!stateMatch) continue;
+      
+      // Extract which elements this rule matches
+      const matchingElements = document.querySelectorAll(
+        selector.replace(/:hover|:focus|:focus-visible|:active|::after|::before/g, '')
+      );
+      
+      for (const el of matchingElements) {
+        const idx = el.getAttribute('data-gb-idx');
+        if (!idx) continue;
+        
+        const props: Record<string,string> = {};
+        for (let i = 0; i < rule.style.length; i++) {
+          const prop = rule.style[i];
+          props[prop] = rule.style.getPropertyValue(prop);
+        }
+        
+        // Group by state type
+        let state = '&:hover';
+        if (selector.includes(':focus-visible')) state = '&:focus-visible';
+        else if (selector.includes(':focus')) state = '&:focus';
+        else if (selector.includes(':active')) state = '&:active';
+        else if (selector.includes(':hover')) state = '&:hover';
+        
+        if (!stateRules.has(idx)) stateRules.set(idx, []);
+        stateRules.get(idx)!.push({ state, props });
+      }
+    }
+  } catch(e) { /* cross-origin sheet, skip */ }
+}
+```
+
+**Group-hover mapping**: For `.group/dropdown:hover .child`, the rule is matched to the
+child element (`.child`) and stored with state `&:hover` but tagged with a
+parent-selector hint. The consolidator later generates the correct parent-hover
+selector in `global-styles.json`:
+
+```json
+{
+  "selector": ".gb-s-child",
+  "data": {
+    ".parent-class:is(:hover, :focus) &": {
+      "opacity": "1",
+      "visibility": "visible"
+    }
+  }
+}
+```
+
+**Output**: State styles are included in the consolidated class's `data` block alongside
+responsive overrides. The class CSS string includes the corresponding pseudo-class
+rules. This preserves hover/focus/group-hover behavior without any Tailwind
+classes in the output.
+
+**Limitation**: Group-hover with namespace modifiers (`group/dropdown`) requires
+the parent element to have a stable class selector. If the parent's class is
+also auto-generated (`.gb-s-*`), we need to track the parent-child relationship
+during consolidation to generate the correct compound selector.
+
 ---
 
 ## Component 2: Class Consolidator
@@ -355,6 +432,15 @@ Sections with background colors/images:
 
 `<div>`, `<header>`, `<main>`, and other non-section elements keep their original tag and structure. Only `<section>` triggers the outer/inner pattern.
 
+### metadata attribute
+
+The user's reference block uses `"metadata":{"name":"Outer"}`. This is NOT in
+`generateblocks/element`'s `block.json` schema. WordPress core supports `metadata`
+for editor labeling (list view, block breadcrumbs), but GB may strip it during
+save causing recovery diffs. **Implementation choice**: omit `metadata` in initial
+implementation. Outer/Inner blocks are identifiable via `uniqueId` prefix (`outer*`
+vs `inner*`). If WordPress verification confirms `metadata` is safe, add it back.
+
 ---
 
 ## Component 4: Pre-Flight Check
@@ -380,6 +466,7 @@ This is a warning only — conversion still runs, but output won't have the cont
 |---|---|
 | Pixel-perfect desktop | Computed styles from 1440px viewport, filtered for Tailwind-set properties |
 | Responsive | Media query blocks per breakpoint from real viewport resizes, stored in class data |
+| State styles preserved | hover, focus, focus-visible, active, group-hover extracted from CSSOM, stored in class data as `&:hover`/`:focus`/etc. blocks |
 | No Tailwind classes | Stripped by inliner; relative values reconstructed to pure CSS equivalents |
 | Clean section structure | Outer `<section>` (backgrounds) + Inner `<div>` (max-width, padding, content) |
 | Minimal CSS bloat | Browser defaults stripped, structural styles → global-styles.json classes |
