@@ -60,6 +60,58 @@ function stripTailwindClasses(html: string): string {
   });
 }
 
+// ── Browser defaults filter ──────────────────────────────
+
+/** CSS properties and their browser default values. Stripped from output. */
+const DEFAULTS: Record<string, string> = {
+  "position": "static",
+  "margin-top": "0px",
+  "margin-right": "0px",
+  "margin-bottom": "0px",
+  "margin-left": "0px",
+  "padding-top": "0px",
+  "padding-right": "0px",
+  "padding-bottom": "0px",
+  "padding-left": "0px",
+  "border-top-width": "0px",
+  "border-right-width": "0px",
+  "border-bottom-width": "0px",
+  "border-left-width": "0px",
+  "border-top-left-radius": "0px",
+  "border-top-right-radius": "0px",
+  "border-bottom-right-radius": "0px",
+  "border-bottom-left-radius": "0px",
+  "flex-grow": "0",
+  "flex-shrink": "1",
+  "flex-basis": "auto",
+  "flex-wrap": "nowrap",
+  "order": "0",
+  "float": "none",
+  "clear": "none",
+  "opacity": "1",
+  "z-index": "auto",
+  "overflow-x": "visible",
+  "overflow-y": "visible",
+  "visibility": "visible",
+  "box-sizing": "content-box",
+  "column-count": "auto",
+  "column-gap": "normal",
+  "column-width": "auto",
+  "transform": "none",
+  "transition-delay": "0s",
+  "transition-duration": "0s",
+  "transition-property": "all",
+  "transition-timing-function": "ease",
+  "animation-name": "none",
+  "animation-duration": "0s",
+  "animation-timing-function": "ease",
+  "animation-delay": "0s",
+  "animation-iteration-count": "1",
+  "animation-direction": "normal",
+  "animation-fill-mode": "none",
+  "animation-play-state": "running",
+};
+
 // ── Browser-internal property filter ────────────────────
 
 const SKIP_PROPS = new Set([
@@ -145,7 +197,7 @@ const SKIP_PROPS = new Set([
 // ── Core extraction (runs inside page.evaluate) ──────────
 
 async function extractStyles(page: Page): Promise<ExtractionPayload> {
-  return page.evaluate((skipPropList) => {
+  return page.evaluate(({ skipPropList, defaults }) => {
     const SKIP = new Set(skipPropList);
 
     // 1. Assign stable indices
@@ -182,7 +234,13 @@ async function extractStyles(page: Page): Promise<ExtractionPayload> {
           continue;
         }
         const value = cs.getPropertyValue(prop);
-        if (value) parts.push(`${prop}: ${value}`);
+        if (!value) continue;
+
+        // Strip browser default values
+        const def = defaults[prop];
+        if (def !== undefined && value === def) continue;
+
+        parts.push(`${prop}: ${value}`);
       }
       const cssText = parts.join("; ");
 
@@ -204,7 +262,7 @@ async function extractStyles(page: Page): Promise<ExtractionPayload> {
       classListPerElement,
       styleBlocks,
     };
-  }, [...SKIP_PROPS]);
+  }, { skipPropList: [...SKIP_PROPS], defaults: DEFAULTS });
 }
 
 // ── Main entry point ────────────────────────────────────
