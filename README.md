@@ -9,7 +9,9 @@ the WordPress editor.
 > preprocessor/dom-walk) verified across GenerateBlocks Element/Text/Media/Shape
 > + WordPress Core fallbacks (Image, Embed, HTML, List, Quote).
 > The `convert` command processes full HTML pages (e.g. `inputs/mino/index.html`)
-> with Tailwind CSS class extraction and custom CSS generation.
+> with automatic Tailwind CSS resolution via Playwright — utility classes are
+> compiled by the browser, extracted as computed inline styles, and stripped
+> before block conversion.
 
 ---
 
@@ -50,7 +52,8 @@ the WordPress editor.
 │   │   ├── global-styles-generator.ts  # Generates Global Styles JSON from Tailwind
 │   │   ├── tailwind-resolver.ts # Compiles Tailwind CSS from extracted config
 │   │   ├── theme-settings-extractor.ts # Generates theme settings prompt payload
-│   │   └── hero-intake.ts      # Hero detection and conversion intake
+│   │   ├── hero-intake.ts      # Hero detection and conversion intake
+│   │   └── tailwind-inliner.ts  # Playwright-based Tailwind → inline CSS resolution
 │   ├── runner/
 │   │   └── run-fixture.ts      # Pipeline orchestration (M1 + fidelity)
 │   └── cli/
@@ -80,6 +83,7 @@ the WordPress editor.
 
 - Node.js 18+
 - npm
+- Chromium (for Tailwind resolution — `npx playwright install chromium`)
 
 ### Install
 
@@ -193,11 +197,20 @@ npx tsx src/cli/index.ts convert inputs/mino/index.html
 ```
 M1:      FixtureNode → mapper → Block[] → serialize → validate → report
 Fidelity:  inputHtml → preprocess → DOM walk → Block[] → serialize → validate → report
-Convert:  HTML file → preprocess (class extraction + custom CSS)
+Convert:  HTML file → (Tailwind inliner: Playwright → computed styles → strip classes)
+                    → preprocess (class extraction + custom CSS)
                     → DOM walk (tag-driven block mapping)
                     → serialize → validate → multi-file output
 Hero:    HTML section → hero-intake (detect/conform/plan) → Block[]
 ```
+
+### Tailwind Inliner (convert only)
+When Tailwind is detected (CDN script or utility classes), the inliner:
+1. Loads the page in headless Chromium to compile and apply all Tailwind CSS
+2. Extracts `getComputedStyle()` for every element
+3. Injects resolved values as inline `style="..."` attributes
+4. Strips Tailwind class tokens and CDN references
+5. Falls through gracefully on failure (original HTML preserved)
 
 ### Preprocessor
 Extracts `<style>` blocks into `customCss`, maps CSS class definitions to
