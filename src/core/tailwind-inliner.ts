@@ -39,6 +39,7 @@ export interface InlinerResult {
     maxWidth: number;
     overrides: Record<string, Record<string, string>>;
   }>;
+  stateStyles: Record<string, Array<{ state: string; props: Record<string, string> }>>;
   warnings: string[];
 }
 
@@ -315,6 +316,73 @@ const SKIP_PROPS = new Set([
   "tab-size", "clip", "accent-color", "anchor-name", "anchor-scope",
 ]);
 
+// ── State style extraction ──────────────────────────────
+
+async function extractStateStyles(
+  page: Page,
+): Promise<
+  Record<string, Array<{ state: string; props: Record<string, string> }>>
+> {
+  return page.evaluate(() => {
+    const result: Record<
+      string,
+      Array<{ state: string; props: Record<string, string> }>
+    > = {};
+
+    for (const sheet of document.styleSheets) {
+      try {
+        for (const rule of sheet.cssRules) {
+          if (!(rule instanceof CSSStyleRule)) continue;
+          const sel = rule.selectorText;
+
+          // Detect state type
+          let state: string | null = null;
+          if (sel.includes(":focus-visible")) state = "&:focus-visible";
+          else if (sel.includes(":focus")) state = "&:focus";
+          else if (sel.includes(":active")) state = "&:active";
+          else if (sel.includes(":hover")) state = "&:hover";
+          if (!state) continue;
+
+          // Build a test selector without pseudo-classes to find matching elements
+          const testSel = sel
+            .replace(/:hover|:focus-visible|:focus|:active/g, "")
+            .trim();
+          if (!testSel) continue;
+
+          let matches: Element[] = [];
+          try {
+            matches = [...document.querySelectorAll(testSel)];
+          } catch {
+            // Complex selector that querySelectorAll can't handle — skip
+            continue;
+          }
+
+          const props: Record<string, string> = {};
+          for (let i = 0; i < rule.style.length; i++) {
+            const prop = rule.style[i];
+            props[prop] = rule.style.getPropertyValue(prop);
+          }
+
+          if (Object.keys(props).length === 0) continue;
+
+          for (const el of matches) {
+            if (!(el instanceof HTMLElement)) continue;
+            const idx = el.getAttribute("data-gb-idx");
+            if (!idx) continue;
+
+            if (!result[idx]) result[idx] = [];
+            result[idx].push({ state, props });
+          }
+        }
+      } catch {
+        // Cross-origin stylesheet — skip
+      }
+    }
+
+    return result;
+  });
+}
+
 // ── Core extraction (runs inside page.evaluate) ──────────
 
 async function extractStyles(page: Page): Promise<ExtractionPayload> {
@@ -425,6 +493,10 @@ export async function inlineTailwindStyles(
     }
 
     const payload = await extractStyles(page);
+
+    // ── State style extraction (CSSOM) ──────────────────
+    const stateStyles: InlinerResult["stateStyles"] =
+      await extractStateStyles(page);
 
     // ── Multi-viewport capture ──────────────────────────
     const responsiveOverrides: InlinerResult["responsiveOverrides"] = [];
@@ -542,6 +614,7 @@ export async function inlineTailwindStyles(
       classListPerElement: payload.classListPerElement,
       styleBlocks: payload.styleBlocks,
       responsiveOverrides,
+      stateStyles,
       warnings,
     };
   } catch (err: any) {
@@ -554,6 +627,7 @@ export async function inlineTailwindStyles(
       classListPerElement: {},
       styleBlocks: [],
       responsiveOverrides: [],
+      stateStyles: {},
       warnings,
     };
   } finally {
