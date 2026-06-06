@@ -298,24 +298,35 @@ const TW_VARIABLE_DEFAULTS: Record<string, string> = {
   "--tw-translate-x": "0", "--tw-translate-y": "0",
   "--tw-rotate": "0deg", "--tw-scale-x": "1", "--tw-scale-y": "1",
   "--tw-skew-x": "0deg", "--tw-skew-y": "0deg",
+  "--tw-text-opacity": "1",
+  "--tw-bg-opacity": "1",
+  "--tw-border-opacity": "1",
+  "--tw-backdrop-blur": "", "--tw-backdrop-brightness": "",
+  "--tw-backdrop-contrast": "", "--tw-backdrop-grayscale": "",
+  "--tw-backdrop-hue-rotate": "", "--tw-backdrop-invert": "",
+  "--tw-backdrop-opacity": "", "--tw-backdrop-saturate": "",
+  "--tw-backdrop-sepia": "",
 };
 
-function resolveTransform(transform: string, classList: string, registry: ClassRegistry): string {
-  const vars = { ...TW_VARIABLE_DEFAULTS };
+/**
+ * Resolve all var(--tw-*) references in property values.
+ * Substitutes defaults from TW_VARIABLE_DEFAULTS.
+ */
+function resolveCssVars(value: string): string {
+  return value.replace(
+    /var\(--tw-([^,)]*?)(?:,\s*([^)]+))?\)/g,
+    (_, name, fallback) => {
+      const key = "--tw-" + name;
+      const def = TW_VARIABLE_DEFAULTS[key];
+      if (def !== undefined && def !== "") return def;
+      return fallback || "";
+    },
+  );
+}
 
-  for (const cls of classList.split(/\s+/)) {
-    const name = cls.replace(/^(?:sm|md|lg|xl|2xl):/, "");
-    const rule = registry.base[name];
-    if (!rule) continue;
-    for (const [prop, val] of Object.entries(rule.properties)) {
-      if (prop.startsWith("--tw-")) vars[prop] = val;
-    }
-  }
-
+function resolveTransform(transform: string): string {
+  // Variables already resolved by resolveCssVars — just simplify
   let resolved = transform;
-  for (const [varName, val] of Object.entries(vars)) {
-    resolved = resolved.replace(new RegExp(`var\\(${varName.replace(/-/g, "\\-")}[^)]*\\)`, "g"), val);
-  }
 
   // Simplify identity components
   resolved = resolved.replace(/translate\(0px,\s*0px\)\s*/g, "");
@@ -334,7 +345,11 @@ function resolveTransform(transform: string, classList: string, registry: ClassR
 // ── Phase 4: Value Normalization ───────────────────────
 
 function normalizeValue(value: string): string {
-  const rgbMatch = value.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+  // Modern space-separated rgb(R G B / opacity) — resolve var() → 1
+  let v = value.replace(/var\(--tw-[^,)]*(?:,\s*([^)]+))?\)/g, (_, fallback) => fallback || "1");
+
+  // rgb(R, G, B) with commas
+  const rgbMatch = v.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
   if (rgbMatch) {
     const [r, g, b] = [parseInt(rgbMatch[1]), parseInt(rgbMatch[2]), parseInt(rgbMatch[3])];
     const hex = [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
@@ -343,8 +358,38 @@ function normalizeValue(value: string): string {
     }
     return `#${hex}`;
   }
-  if (value === "0px") return "0";
-  return value;
+
+  // rgb(R G B / A) space-separated (modern syntax)
+  const spaceMatch = v.match(/^rgb\((\d+)\s+(\d+)\s+(\d+)\s*\/\s*([\d.]+)\)$/);
+  if (spaceMatch) {
+    const [r, g, b, a] = [
+      parseInt(spaceMatch[1]), parseInt(spaceMatch[2]),
+      parseInt(spaceMatch[3]), parseFloat(spaceMatch[4]),
+    ];
+    if (a >= 1) {
+      const hex = [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
+      if (hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]) {
+        return `#${hex[0]}${hex[2]}${hex[4]}`;
+      }
+      return `#${hex}`;
+    }
+    // Has alpha — keep as rgba
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+
+  // rgb(R G B) without alpha (space-separated, no /)
+  const spaceNoAlpha = v.match(/^rgb\((\d+)\s+(\d+)\s+(\d+)\)$/);
+  if (spaceNoAlpha) {
+    const [r, g, b] = [parseInt(spaceNoAlpha[1]), parseInt(spaceNoAlpha[2]), parseInt(spaceNoAlpha[3])];
+    const hex = [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
+    if (hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]) {
+      return `#${hex[0]}${hex[2]}${hex[4]}`;
+    }
+    return `#${hex}`;
+  }
+
+  if (v === "0px") return "0";
+  return v;
 }
 
 function normalizeStyles(styles: Record<string, string>): Record<string, string> {
@@ -545,9 +590,14 @@ export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResu
       const classStr = typeof classList === "string" ? classList : String(classList || "");
       const styles = assignStylesToElement(classStr, registry);
 
-      // Resolve CSS variables in transform
+      // Resolve CSS variables in all property values
+      for (const prop of Object.keys(styles.base)) {
+        styles.base[prop] = resolveCssVars(styles.base[prop]);
+      }
+
+      // Simplify transform (resolve + remove identity components)
       if (styles.base["transform"]) {
-        styles.base["transform"] = resolveTransform(styles.base["transform"], classList, registry);
+        styles.base["transform"] = resolveTransform(styles.base["transform"]);
       }
 
       // Normalize base values
