@@ -1,14 +1,15 @@
 # GenerateBlocks Converter — Prototype
 
-A TypeScript prototype that converts source-like JSON fixtures and normalized
-IR nodes into WordPress paste-ready GenerateBlocks & Core block markup,
-validates against known "Attempt Recovery" rules, and writes files for manual
-verification in the WordPress editor.
+A TypeScript prototype that converts HTML pages and JSON fixtures into
+WordPress paste-ready GenerateBlocks & Core block markup, validates against
+known "Attempt Recovery" rules, and writes files for manual verification in
+the WordPress editor.
 
-> **Status:** Milestone 2 complete — all 22 fixtures WordPress-verified
-> (paste / save / reload / no recovery). 50+ blocks tested across GenerateBlocks
-> Element/Text/Media/Shape + WordPress Core fallbacks (Image, Embed, HTML,
-> List, Quote).
+> **Status:** Fidelity-first pipeline — 17 fixtures (5 M1, 6 fidelity, 6
+> preprocessor/dom-walk) verified across GenerateBlocks Element/Text/Media/Shape
+> + WordPress Core fallbacks (Image, Embed, HTML, List, Quote).
+> The `convert` command processes full HTML pages (e.g. `inputs/mino/index.html`)
+> with Tailwind CSS class extraction and custom CSS generation.
 
 ---
 
@@ -16,47 +17,56 @@ verification in the WordPress editor.
 
 ```
 .
-├── fixtures/              # Input fixture JSON files (22 total)
-│   ├── text-stack.json          # M1 — section + heading + paragraph
-│   ├── button-link.json         # M1 — CTA as text<a> block
-│   ├── two-col.json             # M1 — two-column flex layout
-│   ├── captioned-image.json     # M1 — core/image with caption
-│   ├── embed-fallback.json      # M1 — core/embed for YouTube
-│   ├── section-shell.json       # M2P1 — outer section + constrained inner
-│   ├── button-group.json        # M2P1 — two CTAs in flex row
-│   ├── rich-text-inline.json    # M2P2 — text block with inline HTML
-│   ├── list-basic.json          # M2P2 — core/list fallback
-│   ├── card-grid-2up.json       # M2P2 — two cards with heading/copy/CTA
-│   ├── quote-simple.json        # M2P3 — core/quote with citation
-│   ├── stats-row.json           # M2P3 — flex row of stat cards
-│   ├── icon-text-row.json       # M2P3 — shape + text items
-│   ├── media-text-split.json    # M2P3 — image + text in two-column
-│   ├── hero-simple.json         # M2P4 — hero with heading/p/CTA
-│   ├── two-col-responsive.json  # M2P4 — 2-col grid → 1-col on mobile
-│   ├── card-grid-responsive.json # M2P4 — 3-col grid → 2 → 1
-│   ├── stats-row-responsive.json # M2P4 — stats row with wrapping
-│   ├── media-text-split-responsive.json # M2P4 — flex split → column
-│   ├── hero-pattern.json        # M2P5 — pattern hero (score 0.85)
-│   ├── hero-generic.json        # M2P5 — generic hero (score 0.60)
-│   └── hero-rejected.json       # M2P5 — rejected (tabs/carousel)
+├── fixtures/              # Input fixture JSON files (17 total)
+│   ├── text-stack.json            # M1 — section + heading + paragraph
+│   ├── button-link.json           # M1 — CTA as text<a> block
+│   ├── two-col.json               # M1 — two-column flex layout
+│   ├── captioned-image.json       # M1 — core/image with caption
+│   ├── embed-fallback.json        # M1 — core/embed for YouTube
+│   ├── fidelity-flat-section.json # Fidelity — flat heading + paragraph
+│   ├── fidelity-cta-link.json     # Fidelity — CTA button
+│   ├── fidelity-captioned-image.json # Fidelity — captioned image
+│   ├── fidelity-inline-formatting.json # Fidelity — rich inline text
+│   ├── fidelity-svg-icon.json     # Fidelity — SVG icon shape
+│   ├── fidelity-form-fallback.json # Fidelity — form → HTML fallback
+│   ├── dom-walk-text-only.json    # DOM walk — text-only structure
+│   ├── dom-walk-nested.json       # DOM walk — nested elements
+│   ├── dom-walk-mixed.json        # DOM walk — mixed tags + styles
+│   ├── preprocess-basic.json      # Preprocessor — class extraction
+│   ├── style-transfer-flat.json   # Class → inline style transfer
+│   └── global-class-ref.json      # Global class reference resolution
 ├── src/
 │   ├── core/
 │   │   ├── types.ts            # TypeScript type definitions
-│   │   ├── ir-node.ts          # Intermediate Representation types
 │   │   ├── id-generator.ts     # Deterministic auto-increment IDs
 │   │   ├── style-parser.ts     # Inline style parsing → styles/css split
 │   │   ├── mapper.ts           # M1: FixtureNode → Block conversion
-│   │   ├── ir-planner.ts       # M2: IRNode → Block conversion (plan-blocks)
 │   │   ├── serializer.ts       # Blocks → WordPress block markup
 │   │   ├── validator.ts        # Hard-fail & warning checks
-│   │   ├── hero-scorer.ts      # Pattern scoring for hero detection
-│   │   └── hero-converter.ts   # Hero conversion (pattern/generic/rejected)
+│   │   ├── preprocessor.ts     # HTML preprocess: extract classes, custom CSS
+│   │   ├── dom-walker.ts       # DOM walk: HTML → Block[] via tag rules
+│   │   ├── orchestrator.ts     # Full pipeline: preprocess → walk → serialize
+│   │   ├── global-styles-collector.ts  # Registers class→styles from preprocessor
+│   │   ├── global-styles-generator.ts  # Generates Global Styles JSON from Tailwind
+│   │   ├── tailwind-resolver.ts # Compiles Tailwind CSS from extracted config
+│   │   ├── theme-settings-extractor.ts # Generates theme settings prompt payload
+│   │   └── hero-intake.ts      # Hero detection and conversion intake
 │   ├── runner/
-│   │   └── run-fixture.ts      # Pipeline orchestration (M1 + M2 + hero)
+│   │   └── run-fixture.ts      # Pipeline orchestration (M1 + fidelity)
 │   └── cli/
 │       └── index.ts            # CLI entry point
+├── skill-reference/            # Skills for manual HTML→GB conversion workflows
+│   ├── html-to-generateblocks/
+│   ├── elementor-to-generateblocks/
+│   └── figma-to-generateblocks/
+├── plugin/                     # GenerateBlocks plugin JSON for schema reference
+│   ├── generateblocks/
+│   ├── generateblocks-pro/
+│   └── gp-premium/
+├── inputs/                     # Raw HTML inputs for convert command (e.g. inputs/mino/)
+├── snippets/                   # Reusable GB snippet PHP files
 ├── snapshots/m1/               # M1 regression golden files
-├── output/                     # Generated output (gitignored)
+├── output/                     # Generated output (gitignored), organized by project
 ├── package.json
 ├── tsconfig.json
 └── README.md                   # ← You are here (living doc)
@@ -101,6 +111,21 @@ npx tsx src/cli/index.ts fixtures:list
 npx tsx src/cli/index.ts regression
 ```
 
+### Convert an HTML page to blocks
+
+```bash
+npx tsx src/cli/index.ts convert inputs/mino/index.html
+```
+
+Outputs go to `output/<project>/` with `.html` (blocks), `.report.json`,
+optional `-custom.css`, `-global-styles.json`, and `tailwind.css`.
+
+### Validate a fixture output
+
+```bash
+npx tsx src/cli/index.ts validate button-link
+```
+
 ### Update report after WordPress verification
 
 ```bash
@@ -111,7 +136,7 @@ npx tsx src/cli/index.ts report:update <name> --pasted true --saved true --notes
 
 ## Input Formats
 
-The project supports three fixture formats, auto-detected by the CLI:
+The project supports multiple input formats, auto-detected by the CLI:
 
 ### M1 Format (FixtureNode)
 
@@ -132,39 +157,33 @@ The original format — uses `element`/`text`/`image` node types with inline CSS
 }
 ```
 
-### M2 IR Format (IRNode)
+### Fidelity Format (HTML string)
 
-Uses semantic IR types (`section`/`container`/`heading`/`button-link`/`icon`),
-kebab-case style keys, and optional `responsiveIntent` for breakpoints.
+Takes raw HTML as a string — the fixture is processed through the full
+preprocessor → DOM walk → serialization pipeline. Used for testing the
+convert command's block output against known inputs.
 
 ```json
 {
-  "name": "icon-text-row",
-  "input": {
-    "nodeType": "container",
-    "tagName": "div",
-    "styleIntent": { "display": "flex", "gap": "32px" },
-    "children": [
-      { "nodeType": "icon", "html": "<svg>...</svg>", "styleIntent": { "display": "inline-flex", "svg:fill": "currentColor" } },
-      { "nodeType": "paragraph", "textContent": "Label", "styleIntent": { "font-size": "1rem" } }
-    ]
-  },
-  "expect": { "shouldPass": true, "hardFailCount": 0, "warningCodes": [] }
+  "name": "fidelity-flat-section",
+  "description": "Section with heading and paragraph — fidelity-first, tag-driven",
+  "inputHtml": "<main><section id=\"hero\"><h1 style=\"font-size:2rem;color:#111\">Title</h1><p style=\"font-size:1rem;color:#444\">Body text</p></section></main>",
+  "expect": {
+    "shouldPass": true,
+    "hardFailCount": 0,
+    "blockCount": 3
+  }
 }
 ```
 
-### Hero Format
+### HTML Page (convert command)
 
-Same shape as M2 IR but with `"kind": "hero"` and optional `heroOptions`.
-Uses the hero converter pipeline (pattern scoring + mode selection).
+Any `.html` file — processed through `convert` with Tailwind config extraction,
+class-to-inline transfer, and custom CSS generation. Output goes to
+`output/<projectDir>/`.
 
-```json
-{
-  "name": "hero-pattern",
-  "kind": "hero",
-  "input": { "nodeType": "section", "tagName": "section", ... },
-  "heroOptions": { "mode": "auto", "minPatternScore": 0.75 }
-}
+```bash
+npx tsx src/cli/index.ts convert inputs/mino/index.html
 ```
 
 ---
@@ -172,10 +191,34 @@ Uses the hero converter pipeline (pattern scoring + mode selection).
 ## Pipeline
 
 ```
-M1: FixtureNode → mapper → Block[] → serialize → validate → report
-M2: IRNode → ir-planner → Block[] → serialize → validate → report
-Hero: IRNode → hero-scorer → convertHero (pattern|generic|rejected) → report
+M1:      FixtureNode → mapper → Block[] → serialize → validate → report
+Fidelity:  inputHtml → preprocess → DOM walk → Block[] → serialize → validate → report
+Convert:  HTML file → preprocess (class extraction + custom CSS)
+                    → DOM walk (tag-driven block mapping)
+                    → serialize → validate → multi-file output
+Hero:    HTML section → hero-intake (detect/conform/plan) → Block[]
 ```
+
+### Preprocessor
+Extracts `<style>` blocks into `customCss`, maps CSS class definitions to
+property dictionaries, and transfers matched class styles to inline `style`
+attributes on elements. Also detects inline `<script>` Tailwind configs for
+compilation.
+
+### DOM Walker
+Walks the preprocessed HTML DOM, mapping elements to blocks by tag name:
+- `section`, `div`, `nav`, `header`, `footer`, `main`, `article`, `aside` → `generateblocks/element`
+- `h1`–`h6`, `p`, `span`, `a`, `strong`, `em`, `small`, `label` → `generateblocks/text`
+- `<a>` with only text → `generateblocks/text` (tagName `a`, no blocks inside)
+- `<a>` with inner blocks → `generateblocks/element` (tagName `a`)
+- `<img>` → `generateblocks/media` or `core/image` (if caption)
+- `<figure>` with `<figcaption>` → `core/image`
+- `<svg>` → `generateblocks/shape`
+- `<iframe>` → `core/embed`
+- `<ul>`, `<ol>` → `core/list`
+- `<blockquote>` → `core/quote`
+- `<form>` → `core/html` (fallback)
+- Unknown/unsupported → stripped with warning
 
 ---
 
@@ -198,43 +241,48 @@ Hero: IRNode → hero-scorer → convertHero (pattern|generic|rejected) → repo
 
 ---
 
-## Verified Fixtures (22 total)
+## Verified Fixtures (17 total)
 
-| Fixture | Blocks | Phase | Status |
+| Fixture | Blocks | Pipeline | Status |
 |---|---|---|---|
 | text-stack | 3 | M1 | ✅ |
 | button-link | 1 | M1 | ✅ |
 | two-col | 8 | M1 | ✅ |
 | captioned-image | 1 | M1 | ✅ |
 | embed-fallback | 1 | M1 | ✅ |
-| section-shell | 2 | P1 | ✅ |
-| button-group | 5 | P1 | ✅ |
-| rich-text-inline | 1 | P2 | ✅ |
-| list-basic | 1 | P2 | ✅ |
-| card-grid-2up | 10 | P2 | ✅ |
-| quote-simple | 1 | P3 | ✅ |
-| stats-row | 10 | P3 | ✅ |
-| icon-text-row | 10 | P3 | ✅ |
-| media-text-split | 7 | P3 | ✅ |
-| hero-simple | 5 | P4 | ✅ |
-| two-col-responsive | 7 | P4 | ✅ |
-| card-grid-responsive | 11 | P4 | ✅ |
-| stats-row-responsive | 11 | P4 | ✅ |
-| media-text-split-responsive | 7 | P4 | ✅ |
-| hero-pattern | 9 | P5 | ✅ |
-| hero-generic | 5 | P5 | ✅ |
-| hero-rejected | 0 | P5 | ✅ (rejected) |
+| fidelity-flat-section | 3 | Fidelity | ✅ |
+| fidelity-cta-link | 1 | Fidelity | ✅ |
+| fidelity-captioned-image | 1 | Fidelity | ✅ |
+| fidelity-inline-formatting | 1 | Fidelity | ✅ |
+| fidelity-svg-icon | 1 | Fidelity | ✅ |
+| fidelity-form-fallback | 1 | Fidelity | ✅ |
+| dom-walk-text-only | — | DOM walk | ✅ |
+| dom-walk-nested | — | DOM walk | ✅ |
+| dom-walk-mixed | — | DOM walk | ✅ |
+| preprocess-basic | — | Preprocess | ✅ |
+| style-transfer-flat | — | Preprocess | ✅ |
+| global-class-ref | — | Preprocess | ✅ |
 
 ---
 
 ## Output Files
 
-Each fixture generates files in `output/`:
+### Fixture output (`output/`)
 
 - **`<fixture-name>.html`** — paste-ready WordPress block markup
 - **`<fixture-name>.report.json`** — validation report
+- **`<fixture-name>-global-styles.json`** — extracted class→properties manifest (fidelity fixtures with global classes)
+- **`<fixture-name>-custom.css`** — extracted `<style>` block CSS (fidelity fixtures)
 
-Hero fixtures generate an extended report with `mode`, `patternScore`, `simplifications[]`, and `unsupportedFeatures[]`.
+### Convert command output (`output/<projectDir>/`)
+
+- **`<pageName>.html`** — paste-ready WordPress block markup
+- **`<pageName>.report.json`** — validation report with `overallStatus`, `blockCount`, `customCssRequired`, `globalClassesExtracted`
+- **`<pageName>-custom.css`** — extracted `<style>` block CSS
+- **`<pageName>-global-styles.json`** — class→properties manifest for Global Styles registration
+- **`tailwind.css`** — compiled Tailwind CSS (when `--resolve-css` flag and Tailwind config found)
+- **`global-styles.json`** — WordPress Global Styles JSON (when Tailwind CSS is compiled)
+- **`theme-settings-prompt.json`** — theme.json settings prompt payload for AI-assisted setup
 
 ### Report status values
 
@@ -266,10 +314,14 @@ Hero fixtures generate an extended report with `mode`, `patternScore`, `simplifi
 - Mobile: `@media(max-width:768px)`
 - Responsive overrides in `responsiveIntent` per breakpoint
 
-### Hero conversion
-- Pattern scoring detects hero-composite layout family
-- Three modes: pattern (score ≥ threshold), generic (fallback), rejected
-- Rejection reasons: `PRO_REQUIRED_TABS`, `TOO_MANY_BLOCKS`
+### HTML conversion pipeline
+- **Preprocessor** extracts `<style>` blocks, maps CSS class definitions, transfers
+  matched styles to inline `style` attributes, and detects Tailwind configs
+- **DOM walker** maps HTML elements to blocks by tag name (element/text/media/shape)
+- **Class collector** registers class→properties for Global Styles output
+- **Tailwind resolver** compiles extracted config against the page's class usage
+- **Theme settings extractor** converts Tailwind config to `theme.json` settings
+- **Global Styles generator** produces WordPress-compatible Global Styles JSON
 
 ### Critical recovery rules enforced
 - No `className` in GB block JSON
