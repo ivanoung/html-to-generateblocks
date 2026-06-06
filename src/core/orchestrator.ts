@@ -12,6 +12,7 @@ import { serializeBlocks, countBlocks } from "./serializer.js";
 import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
+import { generateCustomizerSettings } from "./customizer-generator.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
 import type { GlobalStyleEntry } from "./class-consolidator.js";
 
@@ -132,6 +133,16 @@ export async function convert(
     writeFileSync(
       resolve(outDir, "styles.css"),
       combinedCss + "\n",
+      "utf-8",
+    );
+  }
+
+  // Customizer import JSON (colors, typography, container width)
+  const customizer = generateCustomizerSettings(input.rawHtml);
+  if (customizer) {
+    writeFileSync(
+      resolve(outDir, "customizer-import.json"),
+      JSON.stringify(customizer, null, 2) + "\n",
       "utf-8",
     );
   }
