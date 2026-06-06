@@ -9,6 +9,9 @@
 // consolidation.
 
 import { chromium, type Browser, type Page } from "playwright";
+import * as cheerio from "cheerio";
+
+const cheerioLoad = cheerio.load;
 
 // ── Detection ──────────────────────────────────────────
 
@@ -53,6 +56,119 @@ const TAILWIND_CLASS_REGEX =
 
 function isTailwindClass(className: string): boolean {
   return TAILWIND_CLASS_REGEX.test(className);
+}
+
+// ── Relative value reconstruction ───────────────────────
+
+/**
+ * Post-process HTML to replace computed pixel values with
+ * their original relative units (fr, vh, %, etc.) based on
+ * the element's original Tailwind class list.
+ */
+function reconstructRelativeValues(
+  html: string,
+  classListPerElement: Record<string, string>,
+): string {
+  const $ = cheerioLoad(html);
+
+  $("[data-gb-idx]").each((_, el) => {
+    const idx = $(el).attr("data-gb-idx");
+    if (!idx) return;
+    const classList = classListPerElement[idx] || "";
+    const style = $(el).attr("style") || "";
+    if (!style) return;
+
+    const revised = applyReconstruction(style, classList);
+    if (revised !== style) {
+      $(el).attr("style", revised);
+    }
+  });
+
+  return $.html() || html;
+}
+
+function applyReconstruction(style: string, classList: string): string {
+  const props = parseStyleToMap(style);
+
+  // grid-cols-N → repeat(N, minmax(0, 1fr))
+  const gridMatch = classList.match(
+    /(?:^|\s)(?:(?:lg|md|sm|xl):)?grid-cols-(\d+)(?:\s|$)/,
+  );
+  if (gridMatch) {
+    const count = parseInt(gridMatch[1]);
+    for (const key of Object.keys(props)) {
+      if (
+        key === "grid-template-columns" ||
+        key === "gridTemplateColumns"
+      ) {
+        const values = props[key].split(/\s+/).filter((v) => v.endsWith("px"));
+        if (values.length === count) {
+          const first = parseFloat(values[0]);
+          const allEqual = values.every(
+            (v) => Math.abs(parseFloat(v) - first) < 2,
+          );
+          if (allEqual) {
+            props[key] = `repeat(${count}, minmax(0, 1fr))`;
+          }
+        }
+      }
+    }
+  }
+
+  // min-h-screen → 100vh, min-h-[Xvh] → Xvh
+  const vhMatch = classList.match(/min-h-\[(\d+)vh\]|(?:^|\s)min-h-screen(?:\s|$)/);
+  if (vhMatch) {
+    for (const key of ["min-height", "minHeight"]) {
+      if (props[key]) {
+        props[key] = vhMatch[1] ? `${vhMatch[1]}vh` : "100vh";
+      }
+    }
+  }
+
+  // w-full → 100%
+  if (/\bw-full\b/.test(classList)) {
+    for (const key of ["width"]) {
+      if (props[key]) props[key] = "100%";
+    }
+  }
+
+  // h-full → 100%
+  if (/\bh-full\b/.test(classList)) {
+    for (const key of ["height"]) {
+      if (props[key]) props[key] = "100%";
+    }
+  }
+
+  // w-1/2, w-1/3, w-2/3, etc. → percentage
+  const fracMatch = classList.match(/\bw-(\d+)\/(\d+)\b/);
+  if (fracMatch) {
+    const pct = Math.round(
+      (parseInt(fracMatch[1]) / parseInt(fracMatch[2])) * 100,
+    );
+    for (const key of ["width"]) {
+      if (props[key]) props[key] = `${pct}%`;
+    }
+  }
+
+  return mapToStyleString(props);
+}
+
+function parseStyleToMap(style: string): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const decl of style.split(";")) {
+    const colonIdx = decl.indexOf(":");
+    if (colonIdx === -1) continue;
+    const prop = decl.substring(0, colonIdx).trim();
+    const val = decl.substring(colonIdx + 1).trim();
+    if (prop && val) map[prop] = val;
+  }
+  return map;
+}
+
+function mapToStyleString(map: Record<string, string>): string {
+  return Object.entries(map)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join("; ");
 }
 
 function stripTailwindClasses(html: string): string {
@@ -416,8 +532,12 @@ export async function inlineTailwindStyles(
 
     const cleanedHtml = stripTailwindClasses(payload.html);
 
+    // ── Post-processing: reconstruct relative values ────
+    let finalHtml = cleanedHtml;
+    finalHtml = reconstructRelativeValues(finalHtml, payload.classListPerElement);
+
     return {
-      html: cleanedHtml,
+      html: finalHtml,
       elementCount: payload.elementCount,
       classListPerElement: payload.classListPerElement,
       styleBlocks: payload.styleBlocks,

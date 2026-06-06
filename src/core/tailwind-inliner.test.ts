@@ -38,6 +38,14 @@ async function main() {
   console.log("input size:", html.length, "bytes");
   console.log("output size:", result.html.length, "bytes");
 
+  // Check relative value reconstruction
+  const hasRepeat = result.html.includes("repeat(");
+  console.log("Has repeat():", hasRepeat);
+  const idx = result.html.indexOf("grid-template-columns");
+  if (idx >= 0) {
+    console.log("Grid cols at", idx, ":", result.html.substring(idx, idx + 80));
+  }
+
   if (hasTailwindAfter || !hasInlineStyles || hasCdnRefs) {
     console.error("\n❌ Checks failed");
     process.exit(1);
