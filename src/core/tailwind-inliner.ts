@@ -11,6 +11,7 @@
 
 import { chromium, type Browser, type Page } from "playwright";
 import * as cheerio from "cheerio";
+import { createHash } from "node:crypto";
 
 const cheerioLoad = cheerio.load;
 
@@ -502,6 +503,54 @@ function buildCustomCss(customCssRules: string[], styleBlocks: string[]): string
   return parts.filter(Boolean).join("\n");
 }
 
+// ── Style Injection ────────────────────────────────────
+
+/**
+ * Inject resolved DesktopFirstStyles as inline style attributes
+ * AND add consolidated class names to elements.
+ */
+function injectInlineStyles(
+  html: string,
+  desktopFirstStyles: Map<string, DesktopFirstStyles>,
+  hashToClass: Map<string, string>,  // style hash → class name
+): string {
+  const $ = cheerioLoad(html);
+
+  $("[data-gb-idx]").each((_, el) => {
+    const idx = $(el).attr("data-gb-idx");
+    if (!idx) return;
+    const dfs = desktopFirstStyles.get(idx);
+    if (!dfs || Object.keys(dfs.desktop).length === 0) return;
+
+    const existing = $(el).attr("style") || "";
+    const resolved = Object.entries(dfs.desktop)
+      .map(([k, v]) => `${kebab(k)}: ${v}`)
+      .join("; ");
+    const merged = resolved + (existing ? "; " + existing : "");
+    $(el).attr("style", merged);
+
+    // Add consolidated class name if this element's styles are in a shared class
+    const hash = hashProps(dfs.desktop);
+    const className = hashToClass.get(hash);
+    if (className) {
+      const existingClass = $(el).attr("class") || "";
+      $(el).attr("class", (existingClass + " " + className).trim());
+    }
+  });
+
+  return $.html() || html;
+}
+
+function hashProps(props: Record<string, string>): string {
+  const sorted = Object.keys(props).sort().map((k) => `${k}:${props[k]}`);
+  return createHash("sha256")
+    .update(sorted.join(";")).digest("hex").substring(0, 8);
+}
+
+function kebab(camel: string): string {
+  return camel.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
+}
+
 // ── Main Entry Point ────────────────────────────────────
 
 export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResult> {
@@ -619,8 +668,23 @@ export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResu
       desktopFirstStyles.set(idx, dfs);
     }
 
+    // Build hash→class map for elements that share consolidated classes
+    const hashToClass = new Map<string, string>();
+    const hashCounts = new Map<string, number>();
+    for (const dfs of desktopFirstStyles.values()) {
+      if (Object.keys(dfs.desktop).length === 0) continue;
+      const h = hashProps(dfs.desktop);
+      hashCounts.set(h, (hashCounts.get(h) || 0) + 1);
+    }
+    for (const [h, count] of hashCounts) {
+      if (count >= 2) hashToClass.set(h, `gb-s-${h}`);
+    }
+
     // Strip Tailwind classes
-    const cleanedHtml = stripTailwindClasses(extractionPayload.html);
+    let cleanedHtml = stripTailwindClasses(extractionPayload.html);
+
+    // Inject resolved desktop styles as inline style attributes
+    cleanedHtml = injectInlineStyles(cleanedHtml, desktopFirstStyles, hashToClass);
 
     // Build custom.css
     const customCss = buildCustomCss(customCssRules, extractionPayload.styleBlocks);

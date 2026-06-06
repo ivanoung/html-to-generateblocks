@@ -535,9 +535,8 @@ function extractGlobalClasses(
   const result: string[] = [];
 
   classNames.forEach((className) => {
-    // Only track classes from <head> <style> definitions.
-    // Tailwind classes are already resolved to inline styles by the inliner.
-    if (opts.classNameToProperties.has(className)) {
+    // Track classes from <head> <style> definitions + inliner-generated gb-s-* classes
+    if (opts.classNameToProperties.has(className) || className.startsWith("gb-s-")) {
       opts.collector.recordUsage(className);
       result.push(className);
     }
