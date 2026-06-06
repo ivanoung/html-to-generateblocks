@@ -22,8 +22,9 @@ const OUTPUT_DIR = resolve(process.cwd(), "output");
 export interface ConversionInput {
   rawHtml: string;
   pageName: string;
-  projectDir?: string;   // e.g. "mino" or "mino/services"
+  projectDir?: string;
   resolveCss?: boolean;
+  skipShared?: boolean;  // skip styles.css, customizer, manual-steps
 }
 
 export interface ConversionOutput {
@@ -44,6 +45,7 @@ export async function convert(
   let rawHtml = input.rawHtml;
   const inlinerWarnings: { code: string; message: string }[] = [];
   let compiledCss = "";
+  let outputCss = "";
 
   if (usesTailwind(rawHtml)) {
     const compiled = await inlineTailwindStyles(rawHtml);
@@ -130,31 +132,31 @@ export async function convert(
   // Single styles.css: compiled Tailwind CSS + custom CSS
   const combinedCss = [compiledCss, prepResult.customCss]
     .filter(Boolean).join("\n");
-  if (combinedCss.trim()) {
+  if (!input.skipShared) {
+    if (combinedCss.trim()) {
+      writeFileSync(
+        resolve(outDir, "styles.css"),
+        combinedCss + "\n",
+        "utf-8",
+      );
+    }
+
+    const customizer = generateCustomizerSettings(input.rawHtml);
+    if (customizer) {
+      writeFileSync(
+        resolve(outDir, "customizer-import.json"),
+        JSON.stringify(customizer, null, 2) + "\n",
+        "utf-8",
+      );
+    }
+
+    const manualSteps = analyzeSource(input.rawHtml);
     writeFileSync(
-      resolve(outDir, "styles.css"),
-      combinedCss + "\n",
+      resolve(outDir, "manual-steps.txt"),
+      generateManualStepsReport(manualSteps) + "\n",
       "utf-8",
     );
   }
-
-  // Customizer import JSON (colors, typography, container width)
-  const customizer = generateCustomizerSettings(input.rawHtml);
-  if (customizer) {
-    writeFileSync(
-      resolve(outDir, "customizer-import.json"),
-      JSON.stringify(customizer, null, 2) + "\n",
-      "utf-8",
-    );
-  }
-
-  // Manual steps report
-  const manualSteps = analyzeSource(input.rawHtml);
-  writeFileSync(
-    resolve(outDir, "manual-steps.txt"),
-    generateManualStepsReport(manualSteps) + "\n",
-    "utf-8",
-  );
 
   return {
     pageName: input.pageName,

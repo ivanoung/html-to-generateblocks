@@ -10,7 +10,7 @@
 //   regression                 Check M1 fixtures against snapshots
 
 import { resolve, basename, extname } from "node:path";
-import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import {
   runFixture, loadFixture, writeOutput,
   runFidelityFixture, isFidelityFixture,
@@ -284,13 +284,59 @@ async function main(): Promise<void> {
   }
 
   // ── convert ─────────────────────────────────────────────
-  if (cmd === "convert") {
-    const inputPath = args[1];
-    if (!inputPath) {
-      console.error("Usage: convert <input.html>");
+  if (cmd === "project:setup") {
+    const projectPath = args[1];
+    if (!projectPath) {
+      console.error("Usage: project:setup <inputs/project/>");
       process.exit(1);
     }
 
+    const fullDir = resolve(process.cwd(), projectPath);
+    if (!existsSync(fullDir)) {
+      console.error(`Directory not found: ${fullDir}`);
+      process.exit(1);
+    }
+
+    const htmlFiles = readdirSync(fullDir).filter((f) => f.endsWith(".html"));
+    if (htmlFiles.length === 0) {
+      console.error(`No .html files found in ${fullDir}`);
+      process.exit(1);
+    }
+
+    console.log(`\nSetting up project from ${htmlFiles.length} page(s)...\n`);
+
+    // Use the first HTML file to generate shared files
+    const firstFile = htmlFiles[0];
+    const rawHtml = readFileSync(resolve(fullDir, firstFile), "utf-8");
+    const projectDir = projectPath.replace(/^inputs\//, "").replace(/\/$/, "");
+
+    await convert({ rawHtml, pageName: "_setup", projectDir, skipShared: false });
+
+    // Clean up throwaway setup blocks
+    const outDir = projectDir ? `output/${projectDir}/` : "output/";
+    try { unlinkSync(resolve(process.cwd(), outDir, "_setup.html")); } catch {}
+    try { unlinkSync(resolve(process.cwd(), outDir, "_setup.report.json")); } catch {}
+    console.log(`  styles.css:         ${outDir}styles.css`);
+    console.log(`  customizer-import:  ${outDir}customizer-import.json`);
+    console.log(`  manual-steps:       ${outDir}manual-steps.txt`);
+    console.log("");
+    console.log("Now run individual pages:");
+    htmlFiles.forEach((f) => {
+      console.log(`  npx tsx src/cli/index.ts convert ${projectPath}${f} --skip-shared`);
+    });
+    console.log("");
+    return;
+  }
+
+  // ── convert ─────────────────────────────────────────────
+  if (cmd === "convert") {
+    const inputPath = args[1];
+    if (!inputPath) {
+      console.error("Usage: convert <input.html> [--skip-shared]");
+      process.exit(1);
+    }
+
+    const skipShared = args.includes("--skip-shared");
     const fullPath = resolve(process.cwd(), inputPath);
     if (!existsSync(fullPath)) {
       console.error(`File not found: ${fullPath}`);
@@ -320,7 +366,7 @@ async function main(): Promise<void> {
       pageName = basename(fullPath, extname(fullPath));
     }
 
-    const output = await convert({ rawHtml, pageName, projectDir, resolveCss: args.includes("--resolve-css") });
+    const output = await convert({ rawHtml, pageName, projectDir, resolveCss: args.includes("--resolve-css"), skipShared });
 
     const outputPrefix = projectDir ? `output/${projectDir}/` : "output/";
     console.log(`\nConverted: ${projectDir ? projectDir + "/" : ""}${pageName}`);
