@@ -92,6 +92,12 @@ export function walkElement(
   // 3. Check for mixed content (text/inline + block children)
   const tag = ($el.prop("tagName") || "").toLowerCase();
   const hasTextOrInline = hasMeaningfulText || hasInlineElements;
+
+  // Buttons with mixed content → text block, strip icons
+  if (tag === "button" && hasTextOrInline) {
+    return [makeTextBlock($el, $, opts)];
+  }
+
   if (hasBlockChildren && hasTextOrInline) {
     return makeCoreHtmlFallback($el, $, opts.warnings, tag);
   }
