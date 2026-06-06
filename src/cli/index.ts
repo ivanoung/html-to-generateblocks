@@ -298,13 +298,34 @@ function main(): void {
     }
 
     const rawHtml = readFileSync(fullPath, "utf-8");
-    const pageName = basename(fullPath, extname(fullPath));
 
-    const output = convert({ rawHtml, pageName, resolveCss: args.includes("--resolve-css") });
+    // Derive project dir and page name from input path
+    // inputs/mino/index.html        → projectDir = "mino", pageName = "index"
+    // inputs/mino/services/a.html   → projectDir = "mino/services", pageName = "a"
+    const relPath = fullPath.replace(process.cwd() + "/", "");
+    const inputsPrefix = "inputs/";
+    let projectDir: string | undefined;
+    let pageName: string;
 
-    console.log(`\nConverted: ${pageName}`);
-    console.log(`  Output: output/${pageName}.html`);
-    console.log(`  Report: output/${pageName}.report.json`);
+    if (relPath.startsWith(inputsPrefix)) {
+      const afterInputs = relPath.slice(inputsPrefix.length);
+      const lastSlash = afterInputs.lastIndexOf("/");
+      if (lastSlash >= 0) {
+        projectDir = afterInputs.substring(0, lastSlash);
+        pageName = basename(afterInputs, extname(afterInputs));
+      } else {
+        pageName = basename(afterInputs, extname(afterInputs));
+      }
+    } else {
+      pageName = basename(fullPath, extname(fullPath));
+    }
+
+    const output = convert({ rawHtml, pageName, projectDir, resolveCss: args.includes("--resolve-css") });
+
+    const outputPrefix = projectDir ? `output/${projectDir}/` : "output/";
+    console.log(`\nConverted: ${projectDir ? projectDir + "/" : ""}${pageName}`);
+    console.log(`  Output: ${outputPrefix}${pageName}.html`);
+    console.log(`  Report: ${outputPrefix}${pageName}.report.json`);
     console.log(`  Blocks: ${output.report.blockCount}`);
     console.log(`  Status: ${output.report.overallStatus}`);
 
@@ -320,14 +341,14 @@ function main(): void {
 
     if (output.customCss) {
       const lines = output.customCss.split("\n").filter(l => l.trim()).length;
-      console.log(`  Custom CSS: output/${pageName}-custom.css (${lines} rules)`);
+      console.log(`  Custom CSS: ${outputPrefix}${pageName}-custom.css (${lines} rules)`);
     }
     if (output.tailwindCss) {
-      console.log(`  Tailwind CSS: output/${pageName}-tailwind.css`);
+      console.log(`  Tailwind CSS: ${outputPrefix}tailwind.css`);
     }
     const gs = output.globalStyles as any;
     if (gs?.classes?.length > 0) {
-      console.log(`  Global Styles: output/${pageName}-global-styles.json (${gs.classes.length} classes)`);
+      console.log(`  Global Styles: ${outputPrefix}${pageName}-global-styles.json (${gs.classes.length} classes)`);
     }
     console.log("");
     return;
