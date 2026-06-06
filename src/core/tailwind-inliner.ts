@@ -193,17 +193,12 @@ async function extractCssRules(page: Page, configJson: string | null): Promise<E
       }
       if (Object.keys(props).length === 0) return;
 
-      // Simple class selector? Extract class name
-      const classMatch = sel.match(/^\.([a-zA-Z0-9_-]+(?:(?::(?:hover|focus|focus-visible|active))?))/);
+      // Extract class name. Unescape Tailwind escaping: \: → :, \/ → /
+      const simple = sel.replace(/\\:/g, ":").replace(/\\\//g, "/").replace(/\\\./g, ".");
       let className: string | undefined;
-      if (classMatch) {
-        className = classMatch[1];
-      } else {
-        // Try unescaping: \: → :, \/ → /
-        const simple = sel.replace(/\\:/g, ":").replace(/\\\//g, "/").replace(/\\\./g, ".");
-        const cm2 = simple.match(/^\.([a-zA-Z0-9_-]+)/);
-        if (cm2) className = cm2[1];
-      }
+      // Match .className or .prefix:className (stop before pseudo-class or space)
+      const nameMatch = simple.match(/^\.([a-zA-Z0-9_-]+(?::[a-zA-Z0-9_-]+)?)/);
+      if (nameMatch) className = nameMatch[1];
 
       // Detect state
       let state: string | null = null;
@@ -231,7 +226,9 @@ async function extractCssRules(page: Page, configJson: string | null): Promise<E
         reg.compound.push(parsed);
       } else if (bp) {
         parsed.kind = "class-responsive";
-        const key = className || sel;
+        // Strip responsive prefix from className key for lookup
+        // e.g., "lg:col-span-7" → key is "col-span-7"
+        const key = (className || "").replace(/^(?:sm|md|lg|xl|2xl):/, "");
         if (!reg.responsive[key]) reg.responsive[key] = [];
         reg.responsive[key].push(parsed);
       } else if (state) {
@@ -436,19 +433,28 @@ function convertToDesktopFirst(
   const sortedBps = Object.entries(breakpoints)
     .sort(([, a], [, b]) => parseInt(b) - parseInt(a));
 
-  // First (largest) breakpoint: responsive properties become desktop base
-  if (sortedBps.length > 0) {
-    const largestBp = sortedBps[0][0];
-    const largestProps = styles.responsive[largestBp];
-    if (largestProps) {
-      for (const [prop, val] of Object.entries(largestProps)) {
+  // Find the first (largest) breakpoint the element actually has
+  let desktopBpIdx = -1;
+  for (let i = 0; i < sortedBps.length; i++) {
+    if (styles.responsive[sortedBps[i][0]]) {
+      desktopBpIdx = i;
+      break;
+    }
+  }
+
+  // Apply that breakpoint's values as desktop base
+  if (desktopBpIdx >= 0) {
+    const desktopBp = sortedBps[desktopBpIdx];
+    const desktopProps = styles.responsive[desktopBp[0]];
+    if (desktopProps) {
+      for (const [prop, val] of Object.entries(desktopProps)) {
         desktop[prop] = normalizeValue(val);
       }
     }
   }
 
   // Smaller breakpoints: max-width overrides
-  for (let i = 1; i < sortedBps.length; i++) {
+  for (let i = desktopBpIdx + 1; i < sortedBps.length; i++) {
     const [bpName] = sortedBps[i];
     const bpProps = styles.responsive[bpName];
     if (!bpProps) continue;
@@ -461,18 +467,6 @@ function convertToDesktopFirst(
     }
     if (Object.keys(diff).length > 0) {
       overrides.push({ maxWidth: maxW, props: diff });
-    }
-  }
-
-  // Also add base-level responsive override if base differs from desktop
-  // (for properties set by base classes but not by the largest breakpoint)
-  if (sortedBps.length > 1) {
-    const mobileBp = sortedBps[sortedBps.length - 1][1];
-    const baseDiff: Record<string, string> = {};
-    for (const [prop, val] of Object.entries(desktop)) {
-      if (styles.base[prop] && normalizeValue(styles.base[prop]) !== val) {
-        // Only if there was an original base value that differs from desktop
-      }
     }
   }
 
