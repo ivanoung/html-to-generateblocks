@@ -16,6 +16,8 @@ async function main() {
   console.log("elapsed:", Date.now() - start, "ms");
   console.log("elementCount:", result.elementCount);
   console.log("warnings:", result.warnings);
+  console.log("classList count:", Object.keys(result.classListPerElement).length);
+  console.log("styleBlocks count:", result.styleBlocks.length);
 
   // The result should have NO Tailwind classes
   const hasTailwindAfter =

@@ -3,13 +3,19 @@
 // Loads HTML in Playwright, extracts computed styles for every
 // element, and injects them as inline style attributes. Produces
 // Tailwind-free HTML ready for the GB converter pipeline.
+//
+// Returns structured data: class lists (pre-stripping), <style>
+// block contents, and responsive/state overrides for downstream
+// consolidation.
 
-/** Check if the HTML contains an inline Tailwind config script. */
+import { chromium, type Browser, type Page } from "playwright";
+
+// ── Detection ──────────────────────────────────────────
+
 export function hasTailwindConfig(html: string): boolean {
   return /tailwind\.config\s*=\s*/.test(html);
 }
 
-/** Check if the HTML uses Tailwind utility classes in class attributes. */
 export function hasTailwindClasses(html: string): boolean {
   return /class\s*=\s*"[^"]*(?:pt-\d+|pb-\d+|px-\d+|py-\d+|p-\d+|mt-\d+|mb-\d+|mx-\d+|my-\d+|m-\d+|w-(?:full|\d+\/|\[)|h-(?:full|\d+\/|\[)|flex|grid|inline-flex|relative|absolute|fixed|sticky|text-(?:xs|sm|base|lg|xl|\[)|font-(?:sans|serif|mono|display|script)|bg-\[|hover:|focus:|active:|group-|peer-|lg:|md:|sm:|xl:)/.test(html);
 }
@@ -18,15 +24,24 @@ export function usesTailwind(html: string): boolean {
   return hasTailwindConfig(html) || hasTailwindClasses(html);
 }
 
-// ── Inliner ────────────────────────────────────────────
-
-import { chromium, type Browser } from "playwright";
+// ── Types ──────────────────────────────────────────────
 
 export interface InlinerResult {
   html: string;
   elementCount: number;
+  classListPerElement: Record<string, string>;
+  styleBlocks: string[];
   warnings: string[];
 }
+
+interface ExtractionPayload {
+  html: string;
+  elementCount: number;
+  classListPerElement: Record<string, string>;
+  styleBlocks: string[];
+}
+
+// ── Tailwind class stripping ───────────────────────────
 
 const TAILWIND_CLASS_REGEX =
   /^(?:sr-only|static|fixed|absolute|relative|sticky|isolate|inline|block|inline-block|flex|inline-flex|grid|inline-grid|hidden|contents|table|table-caption|table-cell|table-column|table-column-group|table-footer-group|table-header-group|table-row|table-row-group|flow-root|overflow|overflow-x|overflow-y|truncate|uppercase|lowercase|capitalize|normal-case|italic|not-italic|underline|line-through|no-underline|antialiased|subpixel-antialiased|select-all|select-auto|select-none|select-text|border|bg-|text-|font-|tracking-|leading-|list-|placeholder-|opacity-|shadow-|outline-|ring-|ring-offset-|border-|rounded-|divide-|space-|gap-|p-|px-|py-|pt-|pr-|pb-|pl-|m-|mx-|my-|mt-|mr-|mb-|ml-|w-|min-w-|max-w-|h-|min-h-|max-h-|flex-|grow|shrink|basis-|order-|col-|row-|grid-|auto-|justify-|content-|items-|self-|place-|inset-|top-|right-|bottom-|left-|z-|float-|clear-|object-|overflow-|overscroll-|box-|whitespace-|break-|align-|text-|decoration-|indent-|align-|whitespace-|break-|transition-|duration-|ease-|delay-|animate-|scale-|rotate-|translate-|skew-|origin-|transform|snap-|scroll-|touch-|cursor-|pointer-|resize-|appearance|columns-|auto-cols-|auto-rows-|aspect-|backdrop-|will-change-|content-|forced-|sr-|contrast-|hue-rotate-|invert|saturate-|sepia-|drop-shadow-|grayscale-|blur-|brightness-|backdrop-|mix-|bg-blend-|from-|via-|to-|shadow-|decoration-|accent-|caret-|stroke-|fill-|divide-|outline-|ring-|ring-offset|group|hover:|focus:|active:|disabled:|visited:|first:|last:|odd:|even:|group-|peer-|motion-|dark:|lg:|md:|sm:|xl:|2xl:|min-|max-|-translate-|-skew-|-scale-|-rotate-|-mx-|-my-|-mt-|-mr-|-mb-|-ml-|-px-|-py-|-pt-|-pr-|-pb-|-pl-|data-|aria-)/;
@@ -34,6 +49,165 @@ const TAILWIND_CLASS_REGEX =
 function isTailwindClass(className: string): boolean {
   return TAILWIND_CLASS_REGEX.test(className);
 }
+
+function stripTailwindClasses(html: string): string {
+  return html.replace(/class="([^"]*)"/g, (_match, classList: string) => {
+    const kept = classList
+      .split(/\s+/)
+      .filter((c: string) => c.length > 0 && !isTailwindClass(c));
+    if (kept.length > 0) return `class="${kept.join(" ")}"`;
+    return "";
+  });
+}
+
+// ── Browser-internal property filter ────────────────────
+
+const SKIP_PROPS = new Set([
+  "-webkit-border-horizontal-spacing", "-webkit-border-image",
+  "-webkit-border-vertical-spacing", "-webkit-box-align",
+  "-webkit-box-decoration-break", "-webkit-box-direction",
+  "-webkit-box-flex", "-webkit-box-ordinal-group",
+  "-webkit-box-orient", "-webkit-box-pack", "-webkit-box-reflect",
+  "-webkit-font-smoothing", "-webkit-line-break", "-webkit-line-clamp",
+  "-webkit-locale", "-webkit-mask-box-image",
+  "-webkit-mask-box-image-outset", "-webkit-mask-box-image-repeat",
+  "-webkit-mask-box-image-slice", "-webkit-mask-box-image-source",
+  "-webkit-mask-box-image-width", "-webkit-mask-position-x",
+  "-webkit-mask-position-y", "-webkit-rtl-ordering",
+  "-webkit-ruby-position", "-webkit-tap-highlight-color",
+  "-webkit-text-combine", "-webkit-text-decorations-in-effect",
+  "-webkit-text-fill-color", "-webkit-text-orientation",
+  "-webkit-text-security", "-webkit-text-stroke-color",
+  "-webkit-text-stroke-width", "-webkit-user-drag",
+  "-webkit-user-modify", "-webkit-writing-mode",
+  "--tw-border-spacing-x", "--tw-border-spacing-y",
+  "--tw-ring-color", "--tw-ring-offset-color",
+  "--tw-ring-offset-shadow", "--tw-ring-offset-width",
+  "--tw-ring-shadow", "--tw-rotate", "--tw-scale-x", "--tw-scale-y",
+  "--tw-scroll-snap-strictness", "--tw-shadow-colored",
+  "--tw-shadow", "--tw-skew-x", "--tw-skew-y",
+  "--tw-translate-x", "--tw-translate-y",
+  "view-transition-class", "view-transition-group",
+  "view-transition-name", "view-transition-scope",
+  "zoom", "app-region", "border-shape",
+  "corner-bottom-left-shape", "corner-bottom-right-shape",
+  "corner-end-end-shape", "corner-end-start-shape",
+  "corner-start-end-shape", "corner-start-start-shape",
+  "corner-top-left-shape", "corner-top-right-shape",
+  "contain-intrinsic-block-size", "contain-intrinsic-height",
+  "contain-intrinsic-inline-size", "contain-intrinsic-size",
+  "contain-intrinsic-width", "dynamic-range-limit", "field-sizing",
+  "initial-letter", "interactivity", "interest-delay-end",
+  "interest-delay-start", "interpolate-size", "object-view-box",
+  "overlay", "position-anchor", "position-area",
+  "position-try-fallbacks", "position-try-order", "position-visibility",
+  "ruby-align", "ruby-position", "scroll-initial-target",
+  "scroll-marker-group", "scroll-target-group", "text-autospace",
+  "text-box-edge", "text-box-trim", "text-spacing-trim",
+  "text-wrap-mode", "text-wrap-style", "timeline-scope",
+  "timeline-trigger-activation-range-end",
+  "timeline-trigger-activation-range-start",
+  "timeline-trigger-active-range-end",
+  "timeline-trigger-active-range-start",
+  "timeline-trigger-name", "timeline-trigger-source", "trigger-scope",
+  "view-timeline-axis", "view-timeline-inset", "view-timeline-name",
+  "buffered-rendering", "color-interpolation-filters",
+  "cx", "cy", "d", "r", "rx", "ry", "x", "y",
+  "math-depth", "math-shift", "math-style",
+  "reading-flow", "reading-order",
+  "font-feature-settings", "font-kerning", "font-language-override",
+  "font-optical-sizing", "font-palette", "font-size-adjust",
+  "font-stretch", "font-synthesis-small-caps", "font-synthesis-style",
+  "font-synthesis-weight", "font-variant-alternates",
+  "font-variant-caps", "font-variant-east-asian",
+  "font-variant-emoji", "font-variant-ligatures",
+  "font-variant-numeric", "font-variant-position",
+  "font-variation-settings", "hyphenate-character",
+  "hyphenate-limit-chars", "print-color-adjust", "text-size-adjust",
+  "offset-anchor", "offset-distance", "offset-path",
+  "offset-position", "offset-rotate",
+  "scroll-timeline-axis", "scroll-timeline-name",
+  "speak", "dominant-baseline", "alignment-baseline",
+  "baseline-shift", "baseline-source", "clip-rule",
+  "color-interpolation", "color-rendering", "fill-opacity",
+  "fill-rule", "flood-color", "flood-opacity", "lighting-color",
+  "marker-end", "marker-mid", "marker-start", "mask-type",
+  "paint-order", "shape-rendering", "stop-color", "stop-opacity",
+  "stroke-dasharray", "stroke-dashoffset", "stroke-linecap",
+  "stroke-linejoin", "stroke-miterlimit", "stroke-opacity",
+  "text-anchor", "text-rendering", "vector-effect",
+  "writing-mode", "caption-side", "counter-increment",
+  "counter-reset", "counter-set", "orphans", "quotes",
+  "unicode-bidi", "widows", "color-scheme", "forced-color-adjust",
+  "tab-size", "clip", "accent-color", "anchor-name", "anchor-scope",
+]);
+
+// ── Core extraction (runs inside page.evaluate) ──────────
+
+async function extractStyles(page: Page): Promise<ExtractionPayload> {
+  return page.evaluate((skipPropList) => {
+    const SKIP = new Set(skipPropList);
+
+    // 1. Assign stable indices
+    document.body.querySelectorAll("*").forEach((el, i) => {
+      el.setAttribute("data-gb-idx", String(i));
+    });
+
+    // 2. Capture class lists BEFORE stripping
+    const classListPerElement: Record<string, string> = {};
+    document.querySelectorAll("[data-gb-idx]").forEach((el) => {
+      const idx = el.getAttribute("data-gb-idx")!;
+      classListPerElement[idx] = el.className;
+    });
+
+    // 3. Capture <style> block contents BEFORE removing script/link
+    const styleBlocks: string[] = [];
+    document.querySelectorAll("style").forEach((el) => {
+      styleBlocks.push(el.textContent || "");
+    });
+
+    // 4. Extract computed styles, inject as inline
+    const allElements = document.body.querySelectorAll("*");
+    let count = 0;
+
+    for (const el of allElements) {
+      if (!(el instanceof HTMLElement)) continue;
+
+      const cs = window.getComputedStyle(el);
+      const parts: string[] = [];
+      for (let i = 0; i < cs.length; i++) {
+        const prop = cs[i];
+        if (SKIP.has(prop) || prop.startsWith("-webkit-") ||
+            prop.startsWith("-internal-") || prop.startsWith("--tw-")) {
+          continue;
+        }
+        const value = cs.getPropertyValue(prop);
+        if (value) parts.push(`${prop}: ${value}`);
+      }
+      const cssText = parts.join("; ");
+
+      if (!cssText || cssText.length < 10) continue;
+
+      const existing = el.getAttribute("style") || "";
+      el.setAttribute("style", cssText + (existing ? ";" + existing : ""));
+      count++;
+    }
+
+    console.log(`[INLINER] Total elements: ${allElements.length}, styled: ${count}`);
+
+    // 5. Remove <script> and <link> tags (CDN references)
+    document.querySelectorAll("script, link").forEach((el) => el.remove());
+
+    return {
+      html: document.documentElement.outerHTML,
+      elementCount: count,
+      classListPerElement,
+      styleBlocks,
+    };
+  }, [...SKIP_PROPS]);
+}
+
+// ── Main entry point ────────────────────────────────────
 
 export async function inlineTailwindStyles(
   rawHtml: string,
@@ -48,20 +222,20 @@ export async function inlineTailwindStyles(
     });
     const page = await context.newPage();
 
-    // Capture browser console for debugging
     page.on("console", (msg) => {
       if (msg.text().startsWith("[INLINER]")) {
         console.log(msg.text());
       }
     });
 
-    // Load the page and wait for Tailwind CDN to compile
     await page.setContent(rawHtml, { waitUntil: "networkidle" });
-    // Wait for Tailwind CDN to apply styles — poll for a known class
+
     try {
       await page.waitForFunction(
         () => {
-          const el = document.querySelector(".pt-32, [class*='pt-32']");
+          const el = document.querySelector(
+            ".pt-32, [class*='pt-32']",
+          );
           if (!el || !(el instanceof HTMLElement)) return false;
           return window.getComputedStyle(el).paddingTop !== "0px";
         },
@@ -71,214 +245,28 @@ export async function inlineTailwindStyles(
       warnings.push("Tailwind CDN did not compile within timeout");
     }
 
-    // Extract computed styles and inject as inline styles
-    const inlinedHtml = await page.evaluate(() => {
-      const allElements = document.body.querySelectorAll("*");
-      let count = 0;
+    const payload = await extractStyles(page);
+    const cleanedHtml = stripTailwindClasses(payload.html);
 
-      for (const el of allElements) {
-        if (!(el instanceof HTMLElement)) continue;
-
-        const cs = window.getComputedStyle(el);
-        // computedStyle.cssText is empty in Chromium — build manually
-        const parts: string[] = [];
-        for (let i = 0; i < cs.length; i++) {
-          const prop = cs[i];
-          // Skip browser-internal and non-standard properties
-          if (prop.startsWith("-webkit-") ||
-              prop.startsWith("-internal-") ||
-              prop.startsWith("view-transition-") ||
-              prop.startsWith("--tw-") ||
-              prop === "zoom" ||
-              prop === "-webkit-locale" ||
-              prop === "app-region" ||
-              prop === "border-shape" ||
-              prop === "corner-bottom-left-shape" ||
-              prop === "corner-bottom-right-shape" ||
-              prop === "corner-end-end-shape" ||
-              prop === "corner-end-start-shape" ||
-              prop === "corner-start-end-shape" ||
-              prop === "corner-start-start-shape" ||
-              prop === "corner-top-left-shape" ||
-              prop === "corner-top-right-shape" ||
-              prop === "contain-intrinsic-block-size" ||
-              prop === "contain-intrinsic-height" ||
-              prop === "contain-intrinsic-inline-size" ||
-              prop === "contain-intrinsic-size" ||
-              prop === "contain-intrinsic-width" ||
-              prop === "dynamic-range-limit" ||
-              prop === "field-sizing" ||
-              prop === "initial-letter" ||
-              prop === "interactivity" ||
-              prop === "interest-delay-end" ||
-              prop === "interest-delay-start" ||
-              prop === "interpolate-size" ||
-              prop === "object-view-box" ||
-              prop === "overlay" ||
-              prop === "position-anchor" ||
-              prop === "position-area" ||
-              prop === "position-try-fallbacks" ||
-              prop === "position-try-order" ||
-              prop === "position-visibility" ||
-              prop === "ruby-align" ||
-              prop === "ruby-position" ||
-              prop === "scroll-initial-target" ||
-              prop === "scroll-marker-group" ||
-              prop === "scroll-target-group" ||
-              prop === "text-autospace" ||
-              prop === "text-box-edge" ||
-              prop === "text-box-trim" ||
-              prop === "text-spacing-trim" ||
-              prop === "text-wrap-mode" ||
-              prop === "text-wrap-style" ||
-              prop === "timeline-scope" ||
-              prop === "timeline-trigger-activation-range-end" ||
-              prop === "timeline-trigger-activation-range-start" ||
-              prop === "timeline-trigger-active-range-end" ||
-              prop === "timeline-trigger-active-range-start" ||
-              prop === "timeline-trigger-name" ||
-              prop === "timeline-trigger-source" ||
-              prop === "trigger-scope" ||
-              prop === "view-timeline-axis" ||
-              prop === "view-timeline-inset" ||
-              prop === "view-timeline-name" ||
-              prop === "buffered-rendering" ||
-              prop === "color-interpolation-filters" ||
-              prop === "cx" ||
-              prop === "cy" ||
-              prop === "d" ||
-              prop === "r" ||
-              prop === "rx" ||
-              prop === "ry" ||
-              prop === "x" ||
-              prop === "y" ||
-              prop === "math-depth" ||
-              prop === "math-shift" ||
-              prop === "math-style" ||
-              prop === "reading-flow" ||
-              prop === "reading-order" ||
-              prop === "font-feature-settings" ||
-              prop === "font-kerning" ||
-              prop === "font-language-override" ||
-              prop === "font-optical-sizing" ||
-              prop === "font-palette" ||
-              prop === "font-size-adjust" ||
-              prop === "font-stretch" ||
-              prop === "font-synthesis-small-caps" ||
-              prop === "font-synthesis-style" ||
-              prop === "font-synthesis-weight" ||
-              prop === "font-variant-alternates" ||
-              prop === "font-variant-caps" ||
-              prop === "font-variant-east-asian" ||
-              prop === "font-variant-emoji" ||
-              prop === "font-variant-ligatures" ||
-              prop === "font-variant-numeric" ||
-              prop === "font-variant-position" ||
-              prop === "font-variation-settings" ||
-              prop === "hyphenate-character" ||
-              prop === "hyphenate-limit-chars" ||
-              prop === "print-color-adjust" ||
-              prop === "text-size-adjust" ||
-              prop === "offset-anchor" ||
-              prop === "offset-distance" ||
-              prop === "offset-path" ||
-              prop === "offset-position" ||
-              prop === "offset-rotate" ||
-              prop === "scroll-timeline-axis" ||
-              prop === "scroll-timeline-name" ||
-              prop === "speak" ||
-              prop === "dominant-baseline" ||
-              prop === "alignment-baseline" ||
-              prop === "baseline-shift" ||
-              prop === "baseline-source" ||
-              prop === "clip-rule" ||
-              prop === "color-interpolation" ||
-              prop === "color-rendering" ||
-              prop === "fill-opacity" ||
-              prop === "fill-rule" ||
-              prop === "flood-color" ||
-              prop === "flood-opacity" ||
-              prop === "lighting-color" ||
-              prop === "marker-end" ||
-              prop === "marker-mid" ||
-              prop === "marker-start" ||
-              prop === "mask-type" ||
-              prop === "paint-order" ||
-              prop === "shape-rendering" ||
-              prop === "stop-color" ||
-              prop === "stop-opacity" ||
-              prop === "stroke-dasharray" ||
-              prop === "stroke-dashoffset" ||
-              prop === "stroke-linecap" ||
-              prop === "stroke-linejoin" ||
-              prop === "stroke-miterlimit" ||
-              prop === "stroke-opacity" ||
-              prop === "text-anchor" ||
-              prop === "text-rendering" ||
-              prop === "vector-effect" ||
-              prop === "writing-mode" ||
-              prop === "caption-side" ||
-              prop === "counter-increment" ||
-              prop === "counter-reset" ||
-              prop === "counter-set" ||
-              prop === "orphans" ||
-              prop === "quotes" ||
-              prop === "unicode-bidi" ||
-              prop === "widows" ||
-              prop === "color-scheme" ||
-              prop === "forced-color-adjust" ||
-              prop === "tab-size" ||
-              prop === "clip" ||
-              prop === "accent-color" ||
-              prop === "anchor-name" ||
-              prop === "anchor-scope") {
-            continue;
-          }
-          const value = cs.getPropertyValue(prop);
-          if (value) parts.push(`${prop}: ${value}`);
-        }
-        const cssText = parts.join("; ");
-
-        // Skip elements with no meaningful computed styles
-        if (!cssText || cssText.length < 10) continue;
-
-        // Merge with existing style attribute (existing wins for conflicts)
-        const existing = el.getAttribute("style") || "";
-        el.setAttribute("style", cssText + (existing ? ";" + existing : ""));
-        count++;
-      }
-
-      console.log(`[INLINER] Total elements: ${allElements.length}, styled: ${count}`);
-
-      // Remove <script> and <link> tags (CDN references)
-      document.querySelectorAll("script, link").forEach((el) => el.remove());
-
-      return { html: document.documentElement.outerHTML, count };
-    });
-
-    // Strip Tailwind classes from elements, keep non-Tailwind classes
-    const cleanedHtml = stripTailwindClasses(inlinedHtml.html);
-
-    return { html: cleanedHtml, elementCount: inlinedHtml.count, warnings };
+    return {
+      html: cleanedHtml,
+      elementCount: payload.elementCount,
+      classListPerElement: payload.classListPerElement,
+      styleBlocks: payload.styleBlocks,
+      warnings,
+    };
   } catch (err: any) {
     warnings.push(
       `Tailwind inliner failed: ${err.message}. Falling through with original HTML.`,
     );
-    return { html: rawHtml, elementCount: 0, warnings };
+    return {
+      html: rawHtml,
+      elementCount: 0,
+      classListPerElement: {},
+      styleBlocks: [],
+      warnings,
+    };
   } finally {
     if (browser) await browser.close();
   }
-}
-
-/** Remove Tailwind class tokens from class attributes, keeping custom classes. */
-function stripTailwindClasses(html: string): string {
-  return html.replace(/class="([^"]*)"/g, (_match, classList: string) => {
-    const kept = classList
-      .split(/\s+/)
-      .filter((c: string) => c.length > 0 && !isTailwindClass(c));
-    if (kept.length > 0) {
-      return `class="${kept.join(" ")}"`;
-    }
-    return "";
-  });
 }
