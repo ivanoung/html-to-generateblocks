@@ -506,13 +506,14 @@ function buildCustomCss(customCssRules: string[], styleBlocks: string[]): string
 // ── Style Injection ────────────────────────────────────
 
 /**
- * Inject resolved DesktopFirstStyles as inline style attributes
- * AND add consolidated class names to elements.
+ * Inject resolved styles as inline style attributes AND add
+ * consolidated class names to elements. Shared properties go to
+ * class only, unique properties go inline only.
  */
 function injectInlineStyles(
   html: string,
   desktopFirstStyles: Map<string, DesktopFirstStyles>,
-  hashToClass: Map<string, string>,  // style hash → class name
+  sharedHashes: Set<string>,  // hashes that appear on 2+ elements
 ): string {
   const $ = cheerioLoad(html);
 
@@ -522,19 +523,22 @@ function injectInlineStyles(
     const dfs = desktopFirstStyles.get(idx);
     if (!dfs || Object.keys(dfs.desktop).length === 0) return;
 
-    const existing = $(el).attr("style") || "";
-    const resolved = Object.entries(dfs.desktop)
-      .map(([k, v]) => `${kebab(k)}: ${v}`)
-      .join("; ");
-    const merged = resolved + (existing ? "; " + existing : "");
-    $(el).attr("style", merged);
-
-    // Add consolidated class name if this element's styles are in a shared class
     const hash = hashProps(dfs.desktop);
-    const className = hashToClass.get(hash);
-    if (className) {
+    const isShared = sharedHashes.has(hash);
+
+    if (isShared) {
+      // Shared: add class reference, keep only existing source inline styles
       const existingClass = $(el).attr("class") || "";
-      $(el).attr("class", (existingClass + " " + className).trim());
+      $(el).attr("class", (existingClass + " gb-s-" + hash).trim());
+      // Don't inject resolved styles — they come from the global class
+      // Keep existing source inline styles only
+    } else {
+      // Unique: inject all resolved properties as inline style
+      const existing = $(el).attr("style") || "";
+      const resolved = Object.entries(dfs.desktop)
+        .map(([k, v]) => `${kebab(k)}: ${v}`)
+        .join("; ");
+      $(el).attr("style", resolved + (existing ? "; " + existing : ""));
     }
   });
 
@@ -668,23 +672,23 @@ export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResu
       desktopFirstStyles.set(idx, dfs);
     }
 
-    // Build hash→class map for elements that share consolidated classes
-    const hashToClass = new Map<string, string>();
+    // Build sharedHashes set: hashes that appear on 2+ elements
     const hashCounts = new Map<string, number>();
     for (const dfs of desktopFirstStyles.values()) {
       if (Object.keys(dfs.desktop).length === 0) continue;
       const h = hashProps(dfs.desktop);
       hashCounts.set(h, (hashCounts.get(h) || 0) + 1);
     }
+    const sharedHashes = new Set<string>();
     for (const [h, count] of hashCounts) {
-      if (count >= 2) hashToClass.set(h, `gb-s-${h}`);
+      if (count >= 2) sharedHashes.add(h);
     }
 
     // Strip Tailwind classes
     let cleanedHtml = stripTailwindClasses(extractionPayload.html);
 
-    // Inject resolved desktop styles as inline style attributes
-    cleanedHtml = injectInlineStyles(cleanedHtml, desktopFirstStyles, hashToClass);
+    // Inject styles: shared → class only, unique → inline only
+    cleanedHtml = injectInlineStyles(cleanedHtml, desktopFirstStyles, sharedHashes);
 
     // Build custom.css
     const customCss = buildCustomCss(customCssRules, extractionPayload.styleBlocks);
