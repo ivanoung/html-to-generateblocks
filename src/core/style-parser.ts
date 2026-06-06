@@ -122,6 +122,7 @@ function isCssForbidden(prop: string): boolean {
   const p = prop.toLowerCase();
   return p === "transition" ||
     p.startsWith("transition-") ||
+    p.includes("transition-") ||
     p === "animation" ||
     p.startsWith("animation-");
 }

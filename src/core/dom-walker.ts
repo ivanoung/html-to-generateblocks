@@ -406,12 +406,12 @@ function extractGlobalClasses(
   const result: string[] = [];
 
   classNames.forEach((className) => {
-    // Track reusable classes from <head> styles for global-styles manifest
+    // Only track classes from <head> <style> definitions.
+    // Tailwind classes are already resolved to inline styles by the inliner.
     if (opts.classNameToProperties.has(className)) {
       opts.collector.recordUsage(className);
+      result.push(className);
     }
-    // Preserve ALL class tokens (Tailwind utilities) in globalClasses
-    result.push(className);
   });
 
   return result;

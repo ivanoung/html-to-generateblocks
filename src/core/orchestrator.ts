@@ -14,6 +14,7 @@ import { resetIds } from "./id-generator.js";
 import { compileTailwindCss } from "./tailwind-resolver.js";
 import { generateThemeSettingsPrompt } from "./theme-settings-extractor.js";
 import { generateGlobalStyles } from "./global-styles-generator.js";
+import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
 
@@ -33,11 +34,30 @@ export interface ConversionOutput {
   tailwindCss: string;
 }
 
-export function convert(input: ConversionInput): ConversionOutput {
+export async function convert(
+  input: ConversionInput,
+): Promise<ConversionOutput> {
   resetIds();
 
+  // Stage 0: Resolve Tailwind to inline CSS (if present)
+  let rawHtml = input.rawHtml;
+  const inlinerWarnings: { code: string; message: string }[] = [];
+
+  if (usesTailwind(rawHtml)) {
+    const inlined = await inlineTailwindStyles(rawHtml);
+    if (inlined.warnings.length > 0) {
+      inlinerWarnings.push(
+        ...inlined.warnings.map((m) => ({ code: "INLINER", message: m })),
+      );
+    }
+    // Only use inlined output if it actually produced results
+    if (inlined.elementCount > 0) {
+      rawHtml = inlined.html;
+    }
+  }
+
   // Stage 1: Preprocess
-  const prepResult = preprocess(input.rawHtml);
+  const prepResult = preprocess(rawHtml);
 
   // Stage 2: Register class definitions in collector
   const collector = new GlobalStylesCollector(input.pageName);
@@ -54,6 +74,7 @@ export function convert(input: ConversionInput): ConversionOutput {
 
   // Collect all warnings
   const allWarnings = [
+    ...inlinerWarnings,
     ...prepResult.warnings.map((w) => ({ code: "PREPROCESS", message: w })),
     ...walkResult.warnings.map((w) => ({ code: "WALK", message: w })),
   ];

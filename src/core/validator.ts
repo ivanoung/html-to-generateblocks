@@ -279,7 +279,7 @@ function checkCssRestrictions(
   const css = block.css;
 
   // a) No transitions
-  if (css.includes("transition:") || css.match(/transition-[a-z]+:/)) {
+  if (css.includes("transition:") || /\btransition-[a-z]+:/.test(css)) {
     hardFails.push({
       code: "FORBIDDEN_TRANSITION",
       message: `Block ${id}: css contains transition property — use styles object instead`,

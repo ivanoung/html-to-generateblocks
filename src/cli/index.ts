@@ -68,7 +68,7 @@ function printResults(reports: FixtureReport[]): void {
 
 // ── Process a single fixture ──────────────────────────────────
 
-function processFixture(name: string, fixPath: string): FixtureReport {
+async function processFixture(name: string, fixPath: string): Promise<FixtureReport> {
   console.log(`\nProcessing: ${name}`);
 
   const raw = loadFixture(fixPath);
@@ -126,7 +126,7 @@ function regressionCheck(): boolean {
 
 // ── Main CLI ──────────────────────────────────────────────────
 
-function main(): void {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
@@ -171,7 +171,7 @@ function main(): void {
 
     for (const fp of files) {
       const name = basename(fp, extname(fp));
-      const report = processFixture(name, fp);
+      const report = await processFixture(name, fp);
       reports.push(report);
       if (report.status === "validator_fail") hasFailure = true;
     }
@@ -193,7 +193,7 @@ function main(): void {
       process.exit(1);
     }
 
-    const report = processFixture(name, fp);
+    const report = await processFixture(name, fp);
     printResults([report]);
     if (report.status === "validator_fail") process.exit(1);
     return;
@@ -320,7 +320,7 @@ function main(): void {
       pageName = basename(fullPath, extname(fullPath));
     }
 
-    const output = convert({ rawHtml, pageName, projectDir, resolveCss: args.includes("--resolve-css") });
+    const output = await convert({ rawHtml, pageName, projectDir, resolveCss: args.includes("--resolve-css") });
 
     const outputPrefix = projectDir ? `output/${projectDir}/` : "output/";
     console.log(`\nConverted: ${projectDir ? projectDir + "/" : ""}${pageName}`);

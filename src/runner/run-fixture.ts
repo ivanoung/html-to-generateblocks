@@ -84,8 +84,8 @@ export function writeOutput(fixtureName: string, html: string, report: FixtureRe
 
 // ── Fidelity fixture runner ──────────────────────────────────
 
-export function runFidelityFixture(fixture: FidelityFixture): RunResult {
-  const output: ConversionOutput = convert({
+export async function runFidelityFixture(fixture: FidelityFixture): Promise<RunResult> {
+  const output: ConversionOutput = await convert({
     rawHtml: fixture.inputHtml,
     pageName: fixture.name,
   });
