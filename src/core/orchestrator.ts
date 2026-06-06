@@ -12,12 +12,15 @@ import { serializeBlocks, countBlocks } from "./serializer.js";
 import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
 import { compileTailwindCss } from "./tailwind-resolver.js";
+import { generateThemeSettingsPrompt } from "./theme-settings-extractor.js";
+import { generateGlobalStyles } from "./global-styles-generator.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
 
 export interface ConversionInput {
   rawHtml: string;
   pageName: string;
+  projectDir?: string;   // e.g. "mino" or "mino/services"
   resolveCss?: boolean;
 }
 
@@ -84,28 +87,31 @@ export function convert(input: ConversionInput): ConversionOutput {
       .map((w) => w.replace("Stripped ", "").replace(" element(s)", "")),
   };
 
-  // Write output files
-  mkdirSync(OUTPUT_DIR, { recursive: true });
+  // Write output files — use project subfolder if specified
+  const outDir = input.projectDir
+    ? resolve(OUTPUT_DIR, input.projectDir)
+    : OUTPUT_DIR;
+  mkdirSync(outDir, { recursive: true });
 
   // Block markup
   writeFileSync(
-    resolve(OUTPUT_DIR, `${input.pageName}.html`),
+    resolve(outDir, `${input.pageName}.html`),
     html,
     "utf-8",
   );
 
   // Report
   writeFileSync(
-    resolve(OUTPUT_DIR, `${input.pageName}.report.json`),
+    resolve(outDir, `${input.pageName}.report.json`),
     JSON.stringify(report, null, 2) + "\n",
     "utf-8",
   );
 
-  // Global styles manifest
+  // Global styles manifest (existing format — classNameToProperties)
   const globalStylesManifest = collector.toManifest();
   if (globalStylesManifest.classes.length > 0) {
     writeFileSync(
-      resolve(OUTPUT_DIR, `${input.pageName}-global-styles.json`),
+      resolve(outDir, `${input.pageName}-global-styles.json`),
       JSON.stringify(globalStylesManifest, null, 2) + "\n",
       "utf-8",
     );
@@ -114,7 +120,7 @@ export function convert(input: ConversionInput): ConversionOutput {
   // Custom CSS
   if (prepResult.customCss.length > 0) {
     writeFileSync(
-      resolve(OUTPUT_DIR, `${input.pageName}-custom.css`),
+      resolve(outDir, `${input.pageName}-custom.css`),
       prepResult.customCss + "\n",
       "utf-8",
     );
@@ -130,13 +136,49 @@ export function convert(input: ConversionInput): ConversionOutput {
     );
     if (twResult.css) {
       tailwindCss = twResult.css;
+      // Write to project root (shared across pages in same project)
       writeFileSync(
-        resolve(OUTPUT_DIR, `${input.pageName}-tailwind.css`),
+        resolve(outDir, "tailwind.css"),
         tailwindCss,
         "utf-8",
       );
     } else if (twResult.error) {
       console.error(`Tailwind CSS compilation error: ${twResult.error}`);
+    }
+  }
+
+  // ── Layer 1: Theme Settings Prompt ───────────────────
+  if (prepResult.tailwindConfig) {
+    let configObj: Record<string, unknown> | null = null;
+    try {
+      const configStr = prepResult.tailwindConfig
+        .replace(/tailwind\.config\s*=\s*/, "")
+        .trim();
+      const jsonCompat = configStr.replace(/,(\s*[}\]])/g, "$1");
+      configObj = JSON.parse(jsonCompat);
+    } catch {
+      console.warn("Could not parse tailwind.config for theme settings extraction");
+    }
+
+    if (configObj) {
+      const promptPayload = generateThemeSettingsPrompt(configObj as any);
+      writeFileSync(
+        resolve(outDir, "theme-settings-prompt.json"),
+        JSON.stringify(promptPayload, null, 2) + "\n",
+        "utf-8",
+      );
+    }
+  }
+
+  // ── Layer 2: Global Styles JSON ──────────────────────
+  if (tailwindCss) {
+    const styles = generateGlobalStyles(tailwindCss);
+    if (styles.length > 0) {
+      writeFileSync(
+        resolve(outDir, "global-styles.json"),
+        JSON.stringify(styles, null, 2) + "\n",
+        "utf-8",
+      );
     }
   }
 
