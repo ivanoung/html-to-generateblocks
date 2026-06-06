@@ -1,12 +1,13 @@
-// ── Tailwind Inliner ──────────────────────────────────────
+// ── Tailwind Inliner (Intent-Based) ─────────────────────
 //
-// Loads HTML in Playwright, extracts computed styles for every
-// element, and injects them as inline style attributes. Produces
-// Tailwind-free HTML ready for the GB converter pipeline.
+// Instead of extracting computed styles (getComputedStyle),
+// parses the compiled Tailwind CSS rules from document.styleSheets
+// and maps them to elements by class name. Only captures properties
+// Tailwind actually set (~5-8 per element vs ~300).
 //
-// Returns structured data: class lists (pre-stripping), <style>
-// block contents, and responsive/state overrides for downstream
-// consolidation.
+// Pipeline: CSS rule extraction → per-element assignment →
+//   CSS variable resolution → normalization → desktop-first conversion
+//   → return clean HTML + consolidated style data.
 
 import { chromium, type Browser, type Page } from "playwright";
 import * as cheerio from "cheerio";
@@ -29,25 +30,50 @@ export function usesTailwind(html: string): boolean {
 
 // ── Types ──────────────────────────────────────────────
 
+type RuleKind = "class-base" | "class-state" | "class-responsive" | "compound" | "element" | "keyframe" | "vendor-pseudo";
+
+interface ParsedRule {
+  kind: RuleKind;
+  selector: string;
+  className?: string;
+  properties: Record<string, string>;
+  breakpoint?: string;
+  state?: string;
+  index: number;
+}
+
+interface ClassRegistry {
+  base: Record<string, ParsedRule>;
+  responsive: Record<string, ParsedRule[]>;
+  state: Record<string, ParsedRule[]>;
+  compound: ParsedRule[];
+}
+
+interface ExtractionResult {
+  registry: ClassRegistry;
+  customCssRules: string[];
+  breakpoints: Record<string, string>;
+}
+
+export interface ElementStyles {
+  base: Record<string, string>;
+  responsive: Record<string, Record<string, string>>;
+  state: Record<string, Record<string, string>>;
+}
+
+export interface DesktopFirstStyles {
+  desktop: Record<string, string>;
+  overrides: Array<{ maxWidth: number; props: Record<string, string> }>;
+}
+
 export interface InlinerResult {
   html: string;
   elementCount: number;
   classListPerElement: Record<string, string>;
   styleBlocks: string[];
-  responsiveOverrides: Array<{
-    breakpoint: string;
-    maxWidth: number;
-    overrides: Record<string, Record<string, string>>;
-  }>;
-  stateStyles: Record<string, Array<{ state: string; props: Record<string, string> }>>;
+  customCss: string;
+  desktopFirstStyles: Map<string, DesktopFirstStyles>;
   warnings: string[];
-}
-
-interface ExtractionPayload {
-  html: string;
-  elementCount: number;
-  classListPerElement: Record<string, string>;
-  styleBlocks: string[];
 }
 
 // ── Tailwind class stripping ───────────────────────────
@@ -59,457 +85,391 @@ function isTailwindClass(className: string): boolean {
   return TAILWIND_CLASS_REGEX.test(className);
 }
 
-// ── Relative value reconstruction ───────────────────────
-
-/**
- * Post-process HTML to replace computed pixel values with
- * their original relative units (fr, vh, %, etc.) based on
- * the element's original Tailwind class list.
- */
-function reconstructRelativeValues(
-  html: string,
-  classListPerElement: Record<string, string>,
-): string {
-  const $ = cheerioLoad(html);
-
-  $("[data-gb-idx]").each((_, el) => {
-    const idx = $(el).attr("data-gb-idx");
-    if (!idx) return;
-    const classList = classListPerElement[idx] || "";
-    const style = $(el).attr("style") || "";
-    if (!style) return;
-
-    const revised = applyReconstruction(style, classList);
-    if (revised !== style) {
-      $(el).attr("style", revised);
-    }
-  });
-
-  return $.html() || html;
-}
-
-function applyReconstruction(style: string, classList: string): string {
-  const props = parseStyleToMap(style);
-
-  // grid-cols-N → repeat(N, minmax(0, 1fr))
-  // Match ALL grid-cols occurrences; prefer the one matching the computed column count
-  const gridMatches = [...classList.matchAll(
-    /(?:^|\s)((?:(?:lg|md|sm|xl):)?grid-cols-(\d+))(?=\s|$)/g,
-  )];
-  if (gridMatches.length > 0) {
-    for (const key of Object.keys(props)) {
-      if (
-        key === "grid-template-columns" ||
-        key === "gridTemplateColumns"
-      ) {
-        const values = props[key].split(/\s+/).filter((v) => v.endsWith("px"));
-        // Try each grid-cols match, prefer the one whose count matches the values
-        let bestCount = 0;
-        for (const gm of gridMatches) {
-          const count = parseInt(gm[2]);
-          if (values.length === count) {
-            bestCount = count;
-            break;
-          }
-          // Also allow if all values are equal (fr units produce equal pixel columns)
-          const first = parseFloat(values[0]);
-          const allEqual = values.every(
-            (v) => Math.abs(parseFloat(v) - first) < 2,
-          );
-          if (allEqual && values.length === count) {
-            bestCount = count;
-            break;
-          }
-        }
-        // Fallback: use the last match (typically the largest breakpoint)
-        if (bestCount === 0 && gridMatches.length > 0) {
-          const last = gridMatches[gridMatches.length - 1];
-          const count = parseInt(last[2]);
-          const first = parseFloat(values[0]);
-          const allEqual = values.every(
-            (v) => Math.abs(parseFloat(v) - first) < 2,
-          );
-          if (allEqual && values.length >= count) {
-            bestCount = count;
-          }
-        }
-        if (bestCount > 0) {
-          props[key] = `repeat(${bestCount}, minmax(0, 1fr))`;
-        }
-      }
-    }
-  }
-
-  // min-h-screen → 100vh, min-h-[Xvh] → Xvh
-  const vhMatch = classList.match(/min-h-\[(\d+)vh\]|(?:^|\s)min-h-screen(?:\s|$)/);
-  if (vhMatch) {
-    for (const key of ["min-height", "minHeight"]) {
-      if (props[key]) {
-        props[key] = vhMatch[1] ? `${vhMatch[1]}vh` : "100vh";
-      }
-    }
-  }
-
-  // w-full → 100%
-  if (/\bw-full\b/.test(classList)) {
-    for (const key of ["width"]) {
-      if (props[key]) props[key] = "100%";
-    }
-  }
-
-  // h-full → 100%
-  if (/\bh-full\b/.test(classList)) {
-    for (const key of ["height"]) {
-      if (props[key]) props[key] = "100%";
-    }
-  }
-
-  // w-1/2, w-1/3, w-2/3, etc. → percentage
-  const fracMatch = classList.match(/\bw-(\d+)\/(\d+)\b/);
-  if (fracMatch) {
-    const pct = Math.round(
-      (parseInt(fracMatch[1]) / parseInt(fracMatch[2])) * 100,
-    );
-    for (const key of ["width"]) {
-      if (props[key]) props[key] = `${pct}%`;
-    }
-  }
-
-  // If element has no explicit sizing class, strip computed width/height
-  // (block elements fill their parent naturally — these are viewport artifacts)
-  if (!hasExplicitSizing(classList)) {
-    for (const key of ["width", "height"]) {
-      delete props[key];
-    }
-  }
-
-  return mapToStyleString(props);
-}
-
-/** Check if class list has any explicit sizing class (w-, h-, min-w-, etc.) */
-function hasExplicitSizing(classList: string): boolean {
-  return /\b(?:(?:lg|md|sm|xl|2xl):)?(?:w-|h-|min-w-|min-h-|max-w-|max-h-)(?:\[|\d+|full|screen|auto|fit|min|max)/.test(classList);
-}
-
-function parseStyleToMap(style: string): Record<string, string> {
-  const map: Record<string, string> = {};
-  for (const decl of style.split(";")) {
-    const colonIdx = decl.indexOf(":");
-    if (colonIdx === -1) continue;
-    const prop = decl.substring(0, colonIdx).trim();
-    const val = decl.substring(colonIdx + 1).trim();
-    if (prop && val) map[prop] = val;
-  }
-  return map;
-}
-
-function mapToStyleString(map: Record<string, string>): string {
-  return Object.entries(map)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join("; ");
-}
-
 function stripTailwindClasses(html: string): string {
-  return html.replace(/class="([^"]*)"/g, (_match, classList: string) => {
-    const kept = classList
-      .split(/\s+/)
-      .filter((c: string) => c.length > 0 && !isTailwindClass(c));
-    if (kept.length > 0) return `class="${kept.join(" ")}"`;
-    return "";
+  return html.replace(/class="([^"]*)"/g, (_m, classList: string) => {
+    const kept = classList.split(/\s+/).filter((c: string) => c.length > 0 && !isTailwindClass(c));
+    return kept.length > 0 ? `class="${kept.join(" ")}"` : "";
   });
 }
 
-// ── Browser defaults filter ──────────────────────────────
+// ── Phase 1: CSS Rule Extraction ───────────────────────
 
-/** CSS properties and their browser default values. Stripped from output. */
-const DEFAULTS: Record<string, string> = {
-  "position": "static",
-  "margin-top": "0px",
-  "margin-right": "0px",
-  "margin-bottom": "0px",
-  "margin-left": "0px",
-  "padding-top": "0px",
-  "padding-right": "0px",
-  "padding-bottom": "0px",
-  "padding-left": "0px",
-  "border-top-width": "0px",
-  "border-right-width": "0px",
-  "border-bottom-width": "0px",
-  "border-left-width": "0px",
-  "border-top-left-radius": "0px",
-  "border-top-right-radius": "0px",
-  "border-bottom-right-radius": "0px",
-  "border-bottom-left-radius": "0px",
-  "flex-grow": "0",
-  "flex-shrink": "1",
-  "flex-basis": "auto",
-  "flex-wrap": "nowrap",
-  "order": "0",
-  "float": "none",
-  "clear": "none",
-  "opacity": "1",
-  "z-index": "auto",
-  "overflow-x": "visible",
-  "overflow-y": "visible",
-  "visibility": "visible",
-  "box-sizing": "content-box",
-  "column-count": "auto",
-  "column-gap": "normal",
-  "column-width": "auto",
-  "transform": "none",
-  "transition-delay": "0s",
-  "transition-duration": "0s",
-  "transition-property": "all",
-  "transition-timing-function": "ease",
-  "animation-name": "none",
-  "animation-duration": "0s",
-  "animation-timing-function": "ease",
-  "animation-delay": "0s",
-  "animation-iteration-count": "1",
-  "animation-direction": "normal",
-  "animation-fill-mode": "none",
-  "animation-play-state": "running",
-};
+async function extractCssRules(page: Page, configJson: string | null): Promise<ExtractionResult> {
+  return page.evaluate((configStr) => {
+    const bp = parseBreakpoints(configStr);
 
-// ── Browser-internal property filter ────────────────────
-
-const SKIP_PROPS = new Set([
-  "-webkit-border-horizontal-spacing", "-webkit-border-image",
-  "-webkit-border-vertical-spacing", "-webkit-box-align",
-  "-webkit-box-decoration-break", "-webkit-box-direction",
-  "-webkit-box-flex", "-webkit-box-ordinal-group",
-  "-webkit-box-orient", "-webkit-box-pack", "-webkit-box-reflect",
-  "-webkit-font-smoothing", "-webkit-line-break", "-webkit-line-clamp",
-  "-webkit-locale", "-webkit-mask-box-image",
-  "-webkit-mask-box-image-outset", "-webkit-mask-box-image-repeat",
-  "-webkit-mask-box-image-slice", "-webkit-mask-box-image-source",
-  "-webkit-mask-box-image-width", "-webkit-mask-position-x",
-  "-webkit-mask-position-y", "-webkit-rtl-ordering",
-  "-webkit-ruby-position", "-webkit-tap-highlight-color",
-  "-webkit-text-combine", "-webkit-text-decorations-in-effect",
-  "-webkit-text-fill-color", "-webkit-text-orientation",
-  "-webkit-text-security", "-webkit-text-stroke-color",
-  "-webkit-text-stroke-width", "-webkit-user-drag",
-  "-webkit-user-modify", "-webkit-writing-mode",
-  "--tw-border-spacing-x", "--tw-border-spacing-y",
-  "--tw-ring-color", "--tw-ring-offset-color",
-  "--tw-ring-offset-shadow", "--tw-ring-offset-width",
-  "--tw-ring-shadow", "--tw-rotate", "--tw-scale-x", "--tw-scale-y",
-  "--tw-scroll-snap-strictness", "--tw-shadow-colored",
-  "--tw-shadow", "--tw-skew-x", "--tw-skew-y",
-  "--tw-translate-x", "--tw-translate-y",
-  "view-transition-class", "view-transition-group",
-  "view-transition-name", "view-transition-scope",
-  "zoom", "app-region", "border-shape",
-  "corner-bottom-left-shape", "corner-bottom-right-shape",
-  "corner-end-end-shape", "corner-end-start-shape",
-  "corner-start-end-shape", "corner-start-start-shape",
-  "corner-top-left-shape", "corner-top-right-shape",
-  "contain-intrinsic-block-size", "contain-intrinsic-height",
-  "contain-intrinsic-inline-size", "contain-intrinsic-size",
-  "contain-intrinsic-width", "dynamic-range-limit", "field-sizing",
-  "initial-letter", "interactivity", "interest-delay-end",
-  "interest-delay-start", "interpolate-size", "object-view-box",
-  "overlay", "position-anchor", "position-area",
-  "position-try-fallbacks", "position-try-order", "position-visibility",
-  "ruby-align", "ruby-position", "scroll-initial-target",
-  "scroll-marker-group", "scroll-target-group", "text-autospace",
-  "text-box-edge", "text-box-trim", "text-spacing-trim",
-  "text-wrap-mode", "text-wrap-style", "timeline-scope",
-  "timeline-trigger-activation-range-end",
-  "timeline-trigger-activation-range-start",
-  "timeline-trigger-active-range-end",
-  "timeline-trigger-active-range-start",
-  "timeline-trigger-name", "timeline-trigger-source", "trigger-scope",
-  "view-timeline-axis", "view-timeline-inset", "view-timeline-name",
-  "buffered-rendering", "color-interpolation-filters",
-  "cx", "cy", "d", "r", "rx", "ry", "x", "y",
-  "math-depth", "math-shift", "math-style",
-  "reading-flow", "reading-order",
-  "font-feature-settings", "font-kerning", "font-language-override",
-  "font-optical-sizing", "font-palette", "font-size-adjust",
-  "font-stretch", "font-synthesis-small-caps", "font-synthesis-style",
-  "font-synthesis-weight", "font-variant-alternates",
-  "font-variant-caps", "font-variant-east-asian",
-  "font-variant-emoji", "font-variant-ligatures",
-  "font-variant-numeric", "font-variant-position",
-  "font-variation-settings", "hyphenate-character",
-  "hyphenate-limit-chars", "print-color-adjust", "text-size-adjust",
-  "offset-anchor", "offset-distance", "offset-path",
-  "offset-position", "offset-rotate",
-  "scroll-timeline-axis", "scroll-timeline-name",
-  "speak", "dominant-baseline", "alignment-baseline",
-  "baseline-shift", "baseline-source", "clip-rule",
-  "color-interpolation", "color-rendering", "fill-opacity",
-  "fill-rule", "flood-color", "flood-opacity", "lighting-color",
-  "marker-end", "marker-mid", "marker-start", "mask-type",
-  "paint-order", "shape-rendering", "stop-color", "stop-opacity",
-  "stroke-dasharray", "stroke-dashoffset", "stroke-linecap",
-  "stroke-linejoin", "stroke-miterlimit", "stroke-opacity",
-  "text-anchor", "text-rendering", "vector-effect",
-  "writing-mode", "caption-side", "counter-increment",
-  "counter-reset", "counter-set", "orphans", "quotes",
-  "unicode-bidi", "widows", "color-scheme", "forced-color-adjust",
-  "tab-size", "clip", "accent-color", "anchor-name", "anchor-scope",
-]);
-
-// ── State style extraction ──────────────────────────────
-
-async function extractStateStyles(
-  page: Page,
-): Promise<
-  Record<string, Array<{ state: string; props: Record<string, string> }>>
-> {
-  return page.evaluate(() => {
-    const result: Record<
-      string,
-      Array<{ state: string; props: Record<string, string> }>
-    > = {};
+    const registry: ClassRegistry = { base: {}, responsive: {}, state: {}, compound: [] };
+    const cssRules: string[] = [];
+    let idx = 0;
 
     for (const sheet of document.styleSheets) {
-      try {
-        for (const rule of sheet.cssRules) {
-          if (!(rule instanceof CSSStyleRule)) continue;
-          const sel = rule.selectorText;
-
-          // Detect state type
-          let state: string | null = null;
-          if (sel.includes(":focus-visible")) state = "&:focus-visible";
-          else if (sel.includes(":focus")) state = "&:focus";
-          else if (sel.includes(":active")) state = "&:active";
-          else if (sel.includes(":hover")) state = "&:hover";
-          if (!state) continue;
-
-          // Build a test selector without pseudo-classes to find matching elements
-          const testSel = sel
-            .replace(/:hover|:focus-visible|:focus|:active/g, "")
-            .trim();
-          if (!testSel) continue;
-
-          let matches: Element[] = [];
-          try {
-            matches = [...document.querySelectorAll(testSel)];
-          } catch {
-            // Complex selector that querySelectorAll can't handle — skip
-            continue;
-          }
-
-          const props: Record<string, string> = {};
-          for (let i = 0; i < rule.style.length; i++) {
-            const prop = rule.style[i];
-            props[prop] = rule.style.getPropertyValue(prop);
-          }
-
-          if (Object.keys(props).length === 0) continue;
-
-          for (const el of matches) {
-            if (!(el instanceof HTMLElement)) continue;
-            const idx = el.getAttribute("data-gb-idx");
-            if (!idx) continue;
-
-            if (!result[idx]) result[idx] = [];
-            result[idx].push({ state, props });
-          }
-        }
-      } catch {
-        // Cross-origin stylesheet — skip
-      }
+      try { walkRules(sheet, registry, cssRules, bp, idx); } catch { /* cross-origin */ }
     }
-
-    return result;
-  });
-}
-
-// ── Core extraction (runs inside page.evaluate) ──────────
-
-async function extractStyles(page: Page): Promise<ExtractionPayload> {
-  return page.evaluate(({ skipPropList, defaults }) => {
-    const SKIP = new Set(skipPropList);
-
-    // 1. Assign stable indices
-    document.body.querySelectorAll("*").forEach((el, i) => {
-      el.setAttribute("data-gb-idx", String(i));
-    });
-
-    // 2. Capture class lists BEFORE stripping
-    const classListPerElement: Record<string, string> = {};
-    document.querySelectorAll("[data-gb-idx]").forEach((el) => {
-      const idx = el.getAttribute("data-gb-idx")!;
-      classListPerElement[idx] = el.className;
-    });
-
-    // 3. Capture <style> block contents BEFORE removing script/link
-    const styleBlocks: string[] = [];
-    document.querySelectorAll("style").forEach((el) => {
-      styleBlocks.push(el.textContent || "");
-    });
-
-    // 4. Extract computed styles, inject as inline
-    const allElements = document.body.querySelectorAll("*");
-    let count = 0;
-
-    for (const el of allElements) {
-      if (!(el instanceof HTMLElement)) continue;
-
-      const cs = window.getComputedStyle(el);
-      const parts: string[] = [];
-      for (let i = 0; i < cs.length; i++) {
-        const prop = cs[i];
-        if (SKIP.has(prop) || prop.startsWith("-webkit-") ||
-            prop.startsWith("-internal-") || prop.startsWith("--tw-")) {
-          continue;
-        }
-        const value = cs.getPropertyValue(prop);
-        if (!value) continue;
-
-        // Strip browser default values
-        const def = defaults[prop];
-        if (def !== undefined && value === def) continue;
-
-        parts.push(`${prop}: ${value}`);
-      }
-      const cssText = parts.join("; ");
-
-      if (!cssText || cssText.length < 10) continue;
-
-      const existing = el.getAttribute("style") || "";
-      el.setAttribute("style", cssText + (existing ? ";" + existing : ""));
-      count++;
-    }
-
-    console.log(`[INLINER] Total elements: ${allElements.length}, styled: ${count}`);
-
-    // 5. Remove <script> and <link> tags (CDN references)
-    document.querySelectorAll("script, link").forEach((el) => el.remove());
 
     return {
-      html: document.documentElement.outerHTML,
-      elementCount: count,
-      classListPerElement,
-      styleBlocks,
+      registry: {
+        base: registry.base,
+        responsive: registry.responsive,
+        state: registry.state,
+        compound: registry.compound,
+      },
+      customCssRules: cssRules,
+      breakpoints: bp,
     };
-  }, { skipPropList: [...SKIP_PROPS], defaults: DEFAULTS });
+
+    function parseBreakpoints(cfg: string | null): Record<string, string> {
+      if (!cfg) return { sm: "640px", md: "768px", lg: "1024px", xl: "1280px" };
+      try {
+        const o = JSON.parse(cfg);
+        return o?.theme?.screens || { sm: "640px", md: "768px", lg: "1024px", xl: "1280px" };
+      } catch { return { sm: "640px", md: "768px", lg: "1024px", xl: "1280px" }; }
+    }
+
+    function walkRules(
+      sheet: CSSStyleSheet,
+      reg: ClassRegistry,
+      css: string[],
+      bps: Record<string, string>,
+      indexRef: number,
+    ): void {
+      for (const rule of sheet.cssRules) {
+        if (rule instanceof CSSStyleRule) {
+          processRule(rule, null, reg, css, bps, indexRef++);
+        } else if (rule instanceof CSSMediaRule) {
+          const bpName = matchBp(rule.conditionText, bps);
+          for (const inner of rule.cssRules) {
+            if (inner instanceof CSSStyleRule) {
+              processRule(inner, bpName, reg, css, bps, indexRef++);
+            }
+          }
+        } else if (rule instanceof CSSKeyframesRule) {
+          let kfText = "";
+          for (const kr of rule.cssRules) {
+            kfText += `${kr.keyText}{${kr.style.cssText}}`;
+          }
+          css.push(`@keyframes ${rule.name}{${kfText}}`);
+        }
+      }
+    }
+
+    function matchBp(cond: string, bps: Record<string, string>): string | null {
+      const m = cond.match(/min-width:\s*(\d+)px/);
+      if (!m) return null;
+      for (const [k, v] of Object.entries(bps)) {
+        if (v === `${m[1]}px`) return k;
+      }
+      return null;
+    }
+
+    function processRule(
+      rule: CSSStyleRule,
+      bp: string | null,
+      reg: ClassRegistry,
+      css: string[],
+      bps: Record<string, string>,
+      ruleIdx: number,
+    ): void {
+      const sel = rule.selectorText;
+
+      // Element/universal selectors → custom.css
+      if (!sel.trim().startsWith(".")) {
+        css.push(`${sel}{${rule.style.cssText}}`);
+        return;
+      }
+
+      // Vendor-prefixed → custom.css
+      if (/::-webkit-|::-moz-|::-ms-/.test(sel)) {
+        css.push(`${sel}{${rule.style.cssText}}`);
+        return;
+      }
+
+      // Extract properties, skip --tw-* CSS variables
+      const props: Record<string, string> = {};
+      for (let i = 0; i < rule.style.length; i++) {
+        const p = rule.style[i];
+        if (p.startsWith("--tw-")) continue;
+        props[p] = rule.style.getPropertyValue(p);
+      }
+      if (Object.keys(props).length === 0) return;
+
+      // Simple class selector? Extract class name
+      const classMatch = sel.match(/^\.([a-zA-Z0-9_-]+(?:(?::(?:hover|focus|focus-visible|active))?))/);
+      let className: string | undefined;
+      if (classMatch) {
+        className = classMatch[1];
+      } else {
+        // Try unescaping: \: → :, \/ → /
+        const simple = sel.replace(/\\:/g, ":").replace(/\\\//g, "/").replace(/\\\./g, ".");
+        const cm2 = simple.match(/^\.([a-zA-Z0-9_-]+)/);
+        if (cm2) className = cm2[1];
+      }
+
+      // Detect state
+      let state: string | null = null;
+      if (/:hover/.test(sel)) state = "hover";
+      else if (/:focus-visible/.test(sel)) state = "focus-visible";
+      else if (/:focus/.test(sel)) state = "focus";
+      else if (/:active/.test(sel)) state = "active";
+
+      // Compound? (space, >, ~, + after removing pseudo-class)
+      const noPseudo = sel.replace(/:hover|:focus-visible|:focus|:active/g, "");
+      const isCompound = /[\s>~+]/.test(noPseudo);
+
+      const parsed: ParsedRule = {
+        kind: "class-base",
+        selector: sel,
+        className,
+        properties: props,
+        breakpoint: bp ?? undefined,
+        state: state ?? undefined,
+        index: ruleIdx,
+      };
+
+      if (isCompound) {
+        parsed.kind = "compound";
+        reg.compound.push(parsed);
+      } else if (bp) {
+        parsed.kind = "class-responsive";
+        const key = className || sel;
+        if (!reg.responsive[key]) reg.responsive[key] = [];
+        reg.responsive[key].push(parsed);
+      } else if (state) {
+        parsed.kind = "class-state";
+        const key = className || sel;
+        if (!reg.state[key]) reg.state[key] = [];
+        reg.state[key].push(parsed);
+      } else {
+        if (className) reg.base[className] = parsed;
+      }
+    }
+  }, configJson);
 }
 
-// ── Main entry point ────────────────────────────────────
+// ── Phase 2: Per-Element Style Assignment ──────────────
 
-export async function inlineTailwindStyles(
-  rawHtml: string,
-): Promise<InlinerResult> {
+function assignStylesToElement(
+  classList: string,
+  registry: ClassRegistry,
+): ElementStyles {
+  const result: ElementStyles = { base: {}, responsive: {}, state: {} };
+  const classes = classList.split(/\s+/).filter((c) => c.length > 0);
+
+  for (const cls of classes) {
+    const prefixMatch = cls.match(/^(sm|md|lg|xl|2xl):(.+)$/);
+    const name = prefixMatch ? prefixMatch[2] : cls;
+    const bp = prefixMatch ? prefixMatch[1] : null;
+
+    const stateMatch = cls.match(/^(hover|focus|focus-visible|active):(.+)$/);
+    if (stateMatch && !bp) {
+      const rules = registry.state[stateMatch[2]];
+      if (rules) {
+        for (const rule of rules) {
+          result.state[stateMatch[1]] ||= {};
+          Object.assign(result.state[stateMatch[1]], rule.properties);
+        }
+      }
+      continue;
+    }
+
+    if (bp) {
+      const rules = registry.responsive[name];
+      if (rules) {
+        for (const rule of rules) {
+          if (rule.breakpoint === bp) {
+            result.responsive[bp] ||= {};
+            Object.assign(result.responsive[bp], rule.properties);
+          }
+        }
+      }
+    } else {
+      const rule = registry.base[name];
+      if (rule) {
+        Object.assign(result.base, rule.properties);
+      }
+    }
+  }
+
+  return result;
+}
+
+// ── Phase 3: CSS Variable Resolution ───────────────────
+
+const TW_VARIABLE_DEFAULTS: Record<string, string> = {
+  "--tw-translate-x": "0", "--tw-translate-y": "0",
+  "--tw-rotate": "0deg", "--tw-scale-x": "1", "--tw-scale-y": "1",
+  "--tw-skew-x": "0deg", "--tw-skew-y": "0deg",
+};
+
+function resolveTransform(transform: string, classList: string, registry: ClassRegistry): string {
+  const vars = { ...TW_VARIABLE_DEFAULTS };
+
+  for (const cls of classList.split(/\s+/)) {
+    const name = cls.replace(/^(?:sm|md|lg|xl|2xl):/, "");
+    const rule = registry.base[name];
+    if (!rule) continue;
+    for (const [prop, val] of Object.entries(rule.properties)) {
+      if (prop.startsWith("--tw-")) vars[prop] = val;
+    }
+  }
+
+  let resolved = transform;
+  for (const [varName, val] of Object.entries(vars)) {
+    resolved = resolved.replace(new RegExp(`var\\(${varName.replace(/-/g, "\\-")}[^)]*\\)`, "g"), val);
+  }
+
+  // Simplify identity components
+  resolved = resolved.replace(/translate\(0px,\s*0px\)\s*/g, "");
+  resolved = resolved.replace(/translateX\(0px\)\s*/g, "");
+  resolved = resolved.replace(/translateY\(0px\)\s*/g, "");
+  resolved = resolved.replace(/rotate\(0deg\)\s*/g, "");
+  resolved = resolved.replace(/scaleX\(1\)\s*/g, "");
+  resolved = resolved.replace(/scaleY\(1\)\s*/g, "");
+  resolved = resolved.replace(/skewX\(0deg\)\s*/g, "");
+  resolved = resolved.replace(/skewY\(0deg\)\s*/g, "");
+  resolved = resolved.trim();
+
+  return resolved || "none";
+}
+
+// ── Phase 4: Value Normalization ───────────────────────
+
+function normalizeValue(value: string): string {
+  const rgbMatch = value.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+  if (rgbMatch) {
+    const [r, g, b] = [parseInt(rgbMatch[1]), parseInt(rgbMatch[2]), parseInt(rgbMatch[3])];
+    const hex = [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
+    if (hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]) {
+      return `#${hex[0]}${hex[2]}${hex[4]}`;
+    }
+    return `#${hex}`;
+  }
+  if (value === "0px") return "0";
+  return value;
+}
+
+function normalizeStyles(styles: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [prop, val] of Object.entries(styles)) {
+    result[prop] = normalizeValue(val);
+  }
+  return result;
+}
+
+// ── Phase 5: Desktop-First Conversion ──────────────────
+
+const CSS_INITIALS: Record<string, string> = {
+  "display": "inline",
+  "position": "static",
+  "margin-top": "0", "margin-right": "0", "margin-bottom": "0", "margin-left": "0",
+  "padding-top": "0", "padding-right": "0", "padding-bottom": "0", "padding-left": "0",
+  "border-top-width": "0", "border-right-width": "0", "border-bottom-width": "0", "border-left-width": "0",
+  "border-top-left-radius": "0", "border-top-right-radius": "0",
+  "border-bottom-right-radius": "0", "border-bottom-left-radius": "0",
+  "flex-grow": "0", "flex-shrink": "1", "flex-basis": "auto",
+  "order": "0", "float": "none", "opacity": "1", "z-index": "auto",
+  "overflow-x": "visible", "overflow-y": "visible",
+  "visibility": "visible", "transform": "none",
+};
+
+function stripInitials(desktop: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [prop, val] of Object.entries(desktop)) {
+    if (CSS_INITIALS[prop] === val) continue;
+    result[prop] = val;
+  }
+  return result;
+}
+
+function convertToDesktopFirst(
+  styles: ElementStyles,
+  breakpoints: Record<string, string>,
+): DesktopFirstStyles {
+  const desktop = stripInitials({ ...styles.base });
+  const overrides: Array<{ maxWidth: number; props: Record<string, string> }> = [];
+
+  const sortedBps = Object.entries(breakpoints)
+    .sort(([, a], [, b]) => parseInt(b) - parseInt(a));
+
+  // First (largest) breakpoint: responsive properties become desktop base
+  if (sortedBps.length > 0) {
+    const largestBp = sortedBps[0][0];
+    const largestProps = styles.responsive[largestBp];
+    if (largestProps) {
+      for (const [prop, val] of Object.entries(largestProps)) {
+        desktop[prop] = normalizeValue(val);
+      }
+    }
+  }
+
+  // Smaller breakpoints: max-width overrides
+  for (let i = 1; i < sortedBps.length; i++) {
+    const [bpName] = sortedBps[i];
+    const bpProps = styles.responsive[bpName];
+    if (!bpProps) continue;
+
+    const maxW = parseInt(sortedBps[i - 1][1]) - 1;
+    const diff: Record<string, string> = {};
+    for (const [prop, val] of Object.entries(bpProps)) {
+      const nv = normalizeValue(val);
+      if (desktop[prop] !== nv) diff[prop] = nv;
+    }
+    if (Object.keys(diff).length > 0) {
+      overrides.push({ maxWidth: maxW, props: diff });
+    }
+  }
+
+  // Also add base-level responsive override if base differs from desktop
+  // (for properties set by base classes but not by the largest breakpoint)
+  if (sortedBps.length > 1) {
+    const mobileBp = sortedBps[sortedBps.length - 1][1];
+    const baseDiff: Record<string, string> = {};
+    for (const [prop, val] of Object.entries(desktop)) {
+      if (styles.base[prop] && normalizeValue(styles.base[prop]) !== val) {
+        // Only if there was an original base value that differs from desktop
+      }
+    }
+  }
+
+  return { desktop: stripInitials(desktop), overrides };
+}
+
+// ── Phase 8: custom.css Assembly ────────────────────────
+
+function buildCustomCss(customCssRules: string[], styleBlocks: string[]): string {
+  const parts: string[] = [];
+
+  parts.push("/* Tailwind Preflight / Element Resets */");
+  for (const rule of customCssRules) {
+    parts.push(rule);
+  }
+
+  for (const block of styleBlocks) {
+    const keyframes = block.match(/@keyframes\s+[\s\S]+?}(?=\s*(?:$|@|}))/g);
+    if (keyframes) parts.push(...keyframes);
+
+    const vendor = block.match(/::-webkit-[^}]+}/g);
+    if (vendor) parts.push(...vendor);
+
+    const bodyRules = block.match(/body\s*\{[^}]+\}/g);
+    if (bodyRules) parts.push(...bodyRules);
+  }
+
+  return parts.filter(Boolean).join("\n");
+}
+
+// ── Main Entry Point ────────────────────────────────────
+
+export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResult> {
   const warnings: string[] = [];
   let browser: Browser | null = null;
 
   try {
     browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({
-      viewport: { width: 1440, height: 900 },
-    });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
 
     page.on("console", (msg) => {
-      if (msg.text().startsWith("[INLINER]")) {
-        console.log(msg.text());
-      }
+      if (msg.text().startsWith("[INLINER]")) console.log(msg.text());
     });
 
     await page.setContent(rawHtml, { waitUntil: "networkidle" });
@@ -517,9 +477,7 @@ export async function inlineTailwindStyles(
     try {
       await page.waitForFunction(
         () => {
-          const el = document.querySelector(
-            ".pt-32, [class*='pt-32']",
-          );
+          const el = document.querySelector(".pt-32, [class*='pt-32']");
           if (!el || !(el instanceof HTMLElement)) return false;
           return window.getComputedStyle(el).paddingTop !== "0px";
         },
@@ -529,142 +487,112 @@ export async function inlineTailwindStyles(
       warnings.push("Tailwind CDN did not compile within timeout");
     }
 
-    const payload = await extractStyles(page);
+    // Extract the Tailwind config for breakpoint parsing
+    const configMatch = rawHtml.match(/tailwind\.config\s*=\s*/);
+    let configJson: string | null = null;
+    if (configMatch) {
+      let depth = 0;
+      let startIdx = (configMatch.index || 0) + configMatch[0].length;
+      let endIdx = startIdx;
+      for (let i = startIdx; i < rawHtml.length; i++) {
+        if (rawHtml[i] === "{") depth++;
+        else if (rawHtml[i] === "}") { depth--; if (depth === 0) { endIdx = i + 1; break; } }
+      }
+      configJson = rawHtml.substring(startIdx, endIdx).replace(/,(\s*[}\]])/g, "$1");
+    }
 
-    // ── State style extraction (CSSOM) ──────────────────
-    const stateStyles: InlinerResult["stateStyles"] =
-      await extractStateStyles(page);
-
-    // ── Multi-viewport capture ──────────────────────────
-    const responsiveOverrides: InlinerResult["responsiveOverrides"] = [];
-    const breakpoints = [
-      { label: "xl", width: 1280 },
-      { label: "lg", width: 1024 },
-      { label: "md", width: 768 },
-      { label: "sm", width: 640 },
-      { label: "mobile", width: 375 },
-    ];
-
-    // Capture lightweight style snapshots at each breakpoint
-    const bpSnapshots: Array<{
-      label: string;
-      width: number;
-      styles: Record<string, Record<string, string>>;
-    }> = [];
-
-    for (const bp of breakpoints) {
-      await page.setViewportSize({ width: bp.width, height: 900 });
-      await page.waitForTimeout(300);
-
-      const bpStyles = await page.evaluate(() => {
-        const result: Record<string, Record<string, string>> = {};
-        document.querySelectorAll("[data-gb-idx]").forEach((el) => {
-          if (!(el instanceof HTMLElement)) return;
-          const idx = el.getAttribute("data-gb-idx")!;
-          const cs = window.getComputedStyle(el);
-          const props: Record<string, string> = {};
-          for (let i = 0; i < cs.length; i++) {
-            const prop = cs[i];
-            // Only capture layout/sizing/spacing/typography props
-            if (
-              !prop.startsWith("border-") &&
-              prop !== "display" &&
-              prop !== "position" &&
-              !prop.startsWith("flex-") &&
-              prop !== "flex-direction" &&
-              prop !== "flex-wrap" &&
-              !prop.startsWith("grid-") &&
-              !prop.startsWith("padding-") &&
-              !prop.startsWith("margin-") &&
-              prop !== "gap" &&
-              prop !== "column-gap" &&
-              prop !== "row-gap" &&
-              !prop.startsWith("font-") &&
-              prop !== "font-size" &&
-              prop !== "font-weight" &&
-              prop !== "line-height" &&
-              prop !== "letter-spacing" &&
-              !prop.startsWith("width") &&
-              !prop.startsWith("height") &&
-              !prop.startsWith("min-") &&
-              !prop.startsWith("max-") &&
-              prop !== "text-align" &&
-              prop !== "overflow-x" &&
-              prop !== "overflow-y" &&
-              prop !== "z-index" &&
-              prop !== "opacity" &&
-              prop !== "visibility" &&
-              prop !== "transform"
-            ) {
-              continue;
-            }
-            const val = cs.getPropertyValue(prop);
-            if (val) props[prop] = val;
-          }
-          if (Object.keys(props).length > 0) {
-            result[idx] = props;
-          }
-        });
-        return result;
+    // Phase 1: Extract CSS rules + capture element data
+    const extractionPayload = await page.evaluate(() => {
+      document.body.querySelectorAll("*").forEach((el, i) => {
+        el.setAttribute("data-gb-idx", String(i));
       });
 
-      bpSnapshots.push({ label: bp.label, width: bp.width, styles: bpStyles });
-    }
+      const classListPerElement: Record<string, string> = {};
+      document.querySelectorAll("[data-gb-idx]").forEach((el) => {
+        classListPerElement[el.getAttribute("data-gb-idx")!] = el.className;
+      });
 
-    // Diff each breakpoint against desktop base
-    // Desktop styles are the inline attributes already on elements
-    for (const snap of bpSnapshots) {
-      const overrides: Record<string, Record<string, string>> = {};
+      const styleBlocks: string[] = [];
+      document.querySelectorAll("style").forEach((el) => {
+        styleBlocks.push(el.textContent || "");
+      });
 
-      for (const [idx, bpProps] of Object.entries(snap.styles)) {
-        // Get desktop base styles by reading the element's style attribute
-        // We already set these inline in extractStyles
-        const diff: Record<string, string> = {};
-        for (const [prop, bpVal] of Object.entries(bpProps)) {
-          // Only record if different from desktop
-          // We'll compare against the stored desktop values in the consolidator
-          diff[prop] = bpVal;
-        }
-        if (Object.keys(diff).length > 0) {
-          overrides[idx] = diff;
+      const existingStyles: Record<string, string> = {};
+      document.querySelectorAll("[data-gb-idx]").forEach((el) => {
+        const s = (el as HTMLElement).getAttribute("style");
+        if (s) existingStyles[el.getAttribute("data-gb-idx")!] = s;
+      });
+
+      document.querySelectorAll("script, link").forEach((el) => el.remove());
+
+      return {
+        html: document.documentElement.outerHTML,
+        elementCount: document.querySelectorAll("[data-gb-idx]").length,
+        classListPerElement,
+        styleBlocks,
+        existingStyles,
+      };
+    });
+
+    // Phase 1: CSS rule extraction
+    const { registry, customCssRules, breakpoints } = await extractCssRules(page, configJson);
+    console.log(`[INLINER] Registry: ${Object.keys(registry.base).length} base, ${Object.keys(registry.responsive).length} responsive, ${Object.keys(registry.state).length} state, ${registry.compound.length} compound, ${customCssRules.length} custom`);
+
+    // Phase 2-5: Per-element assignment + resolution + normalization + conversion
+    const desktopFirstStyles = new Map<string, DesktopFirstStyles>();
+
+    for (const [idx, classList] of Object.entries(extractionPayload.classListPerElement)) {
+      const classStr = typeof classList === "string" ? classList : String(classList || "");
+      const styles = assignStylesToElement(classStr, registry);
+
+      // Resolve CSS variables in transform
+      if (styles.base["transform"]) {
+        styles.base["transform"] = resolveTransform(styles.base["transform"], classList, registry);
+      }
+
+      // Normalize base values
+      styles.base = normalizeStyles(styles.base);
+
+      // Merge existing inline styles (source style= overrides Tailwind)
+      const existing = extractionPayload.existingStyles[idx] || "";
+      if (existing) {
+        for (const decl of existing.split(";")) {
+          const ci = decl.indexOf(":");
+          if (ci === -1) continue;
+          const k = decl.substring(0, ci).trim().replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+          const v = decl.substring(ci + 1).trim();
+          if (k && v) styles.base[k] = v;
         }
       }
 
-      if (Object.keys(overrides).length > 0) {
-        responsiveOverrides.push({
-          breakpoint: snap.label,
-          maxWidth: snap.width,
-          overrides,
-        });
-      }
+      const dfs = convertToDesktopFirst(styles, breakpoints);
+      desktopFirstStyles.set(idx, dfs);
     }
 
-    const cleanedHtml = stripTailwindClasses(payload.html);
+    // Strip Tailwind classes
+    const cleanedHtml = stripTailwindClasses(extractionPayload.html);
 
-    // ── Post-processing: reconstruct relative values ────
-    let finalHtml = cleanedHtml;
-    finalHtml = reconstructRelativeValues(finalHtml, payload.classListPerElement);
+    // Build custom.css
+    const customCss = buildCustomCss(customCssRules, extractionPayload.styleBlocks);
 
     return {
-      html: finalHtml,
-      elementCount: payload.elementCount,
-      classListPerElement: payload.classListPerElement,
-      styleBlocks: payload.styleBlocks,
-      responsiveOverrides,
-      stateStyles,
+      html: cleanedHtml,
+      elementCount: extractionPayload.elementCount,
+      classListPerElement: extractionPayload.classListPerElement,
+      styleBlocks: extractionPayload.styleBlocks,
+      customCss,
+      desktopFirstStyles,
       warnings,
     };
   } catch (err: any) {
-    warnings.push(
-      `Tailwind inliner failed: ${err.message}. Falling through with original HTML.`,
-    );
+    warnings.push(`Tailwind inliner failed: ${err.message}. Falling through.`);
     return {
       html: rawHtml,
       elementCount: 0,
       classListPerElement: {},
       styleBlocks: [],
-      responsiveOverrides: [],
-      stateStyles: {},
+      customCss: "",
+      desktopFirstStyles: new Map(),
       warnings,
     };
   } finally {

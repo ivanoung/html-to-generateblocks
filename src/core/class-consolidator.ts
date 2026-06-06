@@ -1,10 +1,12 @@
 // ── Class Consolidator ──────────────────────────────────
 //
-// Groups elements by structural style fingerprints, generates
-// reusable Global Style classes for WordPress Global Styles JSON.
+// Groups elements by style fingerprints, generates reusable
+// Global Style classes for WordPress Global Styles JSON.
 //
-// Structural properties are hashed and promoted to shared classes.
-// Decorative properties stay inline on blocks.
+// Takes DesktopFirstStyles from the inliner, hashes the desktop
+// properties (after stripping CSS initial values), and promotes
+// shared sets to .gb-s-{hash} classes. Original CSS class names
+// (.blueprint-bg, .clip-hex, .hover-shadow-md) are preserved.
 
 import { createHash } from "node:crypto";
 
@@ -15,157 +17,95 @@ export interface GlobalStyleEntry {
   data: Record<string, unknown>;
 }
 
-const STRUCTURAL_PROPS = new Set([
-  "display", "flexDirection", "flexWrap", "flexGrow", "flexShrink",
-  "flexBasis", "justifyContent", "alignItems", "alignContent", "alignSelf",
-  "gap", "columnGap", "rowGap",
-  "gridTemplateColumns", "gridTemplateRows", "gridColumn", "gridRow",
-  "gridAutoColumns", "gridAutoRows", "gridAutoFlow",
-  "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
-  "marginTop", "marginRight", "marginBottom", "marginLeft",
-  "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
-  "borderTopLeftRadius", "borderTopRightRadius",
-  "borderBottomRightRadius", "borderBottomLeftRadius",
-  "position", "overflowX", "overflowY", "zIndex", "order",
-  "maxWidth", "maxHeight", "minWidth", "minHeight",
+interface DesktopFirstStyles {
+  desktop: Record<string, string>;
+  overrides: Array<{ maxWidth: number; props: Record<string, string> }>;
+}
+
+const ORIGINAL_CLASS_NAMES = new Set([
+  "blueprint-bg", "blueprint-bg-dark", "clip-hex",
+  "hover-shadow-md", "ruler-x", "no-scrollbar",
 ]);
 
-interface ResponsiveBp {
-  breakpoint: string;
-  maxWidth: number;
-  overrides: Record<string, Record<string, string>>;
-}
-
-type StateStyles = Record<string, Array<{ state: string; props: Record<string, string> }>>;
-
 export function consolidateStyles(
-  html: string,
-  responsiveOverrides: ResponsiveBp[],
-  stateStyles: StateStyles,
+  elementStyles: Map<string, DesktopFirstStyles>,
 ): GlobalStyleEntry[] {
-  const elementStyles = extractInlineStyles(html);
-  const structuralHashes = new Map<string, string[]>();
-  const structuralPropsPerHash = new Map<string, Record<string, string>>();
+  const hashToIdxs = new Map<string, string[]>();
+  const hashToProps = new Map<string, Record<string, string>>();
+  const hashToOverrides = new Map<
+    string,
+    Array<{ maxWidth: number; props: Record<string, string> }>
+  >();
 
-  for (const [idx, allProps] of Object.entries(elementStyles)) {
-    const structural = filterStructural(allProps);
-    if (Object.keys(structural).length === 0) continue;
-    const hash = hashProps(structural);
-    if (!structuralHashes.has(hash)) {
-      structuralHashes.set(hash, []);
-      structuralPropsPerHash.set(hash, structural);
+  for (const [idx, styles] of elementStyles) {
+    if (Object.keys(styles.desktop).length === 0) continue;
+
+    const hash = hashProps(styles.desktop);
+    if (!hashToIdxs.has(hash)) {
+      hashToIdxs.set(hash, []);
+      hashToProps.set(hash, styles.desktop);
+      hashToOverrides.set(hash, []);
     }
-    structuralHashes.get(hash)!.push(idx);
+    hashToIdxs.get(hash)!.push(idx);
+
+    // Collect responsive overrides
+    const existing = hashToOverrides.get(hash)!;
+    for (const ov of styles.overrides) {
+      const match = existing.find((e) => e.maxWidth === ov.maxWidth);
+      if (match) {
+        Object.assign(match.props, ov.props);
+      } else {
+        existing.push({ maxWidth: ov.maxWidth, props: { ...ov.props } });
+      }
+    }
   }
 
-  const globalStyles: GlobalStyleEntry[] = [];
-
-  for (const [hash, idxs] of structuralHashes) {
+  const entries: GlobalStyleEntry[] = [];
+  for (const [hash, idxs] of hashToIdxs) {
     if (idxs.length < 2) continue;
     const className = `gb-s-${hash}`;
-    const structuralProps = structuralPropsPerHash.get(hash)!;
-
-    const responsiveForClass: Record<string, Record<string, string>> = {};
-    for (const bp of responsiveOverrides) {
-      const bpOverrides: Record<string, string> = {};
-      for (const idx of idxs) {
-        const elemOverrides = bp.overrides[idx];
-        if (!elemOverrides) continue;
-        for (const [prop, val] of Object.entries(elemOverrides)) {
-          if (isStructural(prop)) bpOverrides[prop] = val;
-        }
-      }
-      if (Object.keys(bpOverrides).length > 0) {
-        responsiveForClass[`@media (max-width: ${bp.maxWidth}px)`] = bpOverrides;
-      }
-    }
-
-    const stateForClass: Record<string, Record<string, string>> = {};
-    for (const idx of idxs) {
-      const elemStates = stateStyles[idx];
-      if (!elemStates) continue;
-      for (const { state, props } of elemStates) {
-        if (!stateForClass[state]) stateForClass[state] = {};
-        for (const [prop, val] of Object.entries(props)) {
-          if (isStructural(prop)) stateForClass[state][prop] = val;
-        }
-      }
-    }
-
-    globalStyles.push(buildClassEntry(className, structuralProps, responsiveForClass, stateForClass));
+    const desktop = hashToProps.get(hash)!;
+    const overrides = hashToOverrides.get(hash)!;
+    entries.push(buildClassEntry(className, desktop, overrides));
   }
 
-  return globalStyles;
-}
-
-function extractInlineStyles(html: string): Record<string, Record<string, string>> {
-  const result: Record<string, Record<string, string>> = {};
-  const regex = /data-gb-idx="(\d+)"[^>]*style="([^"]*)"/g;
-  let match;
-  while ((match = regex.exec(html)) !== null) {
-    const idx = match[1];
-    const style = match[2];
-    const props: Record<string, string> = {};
-    for (const decl of style.split(";")) {
-      const ci = decl.indexOf(":");
-      if (ci === -1) continue;
-      const k = decl.substring(0, ci).trim();
-      const v = decl.substring(ci + 1).trim();
-      if (!k || !v) continue;
-      props[k.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v;
-    }
-    if (Object.keys(props).length > 0) result[idx] = props;
-  }
-  return result;
-}
-
-function filterStructural(all: Record<string, string>): Record<string, string> {
-  const s: Record<string, string> = {};
-  for (const [k, v] of Object.entries(all)) {
-    if (isStructural(k)) s[k] = v;
-  }
-  return s;
-}
-
-function isStructural(prop: string): boolean {
-  return STRUCTURAL_PROPS.has(prop) ||
-    prop.startsWith("flex") || prop.startsWith("grid") ||
-    prop.startsWith("padding") || prop.startsWith("margin") ||
-    prop.startsWith("border");
+  return entries;
 }
 
 function hashProps(props: Record<string, string>): string {
-  const sorted = Object.keys(props).sort().map((k) => `${k}:${props[k]}`);
+  const sorted = Object.keys(props)
+    .sort()
+    .map((k) => `${k}:${props[k]}`);
   return createHash("sha256").update(sorted.join(";")).digest("hex").substring(0, 8);
 }
 
-function kebab(camel: string): string {
+function kebabCase(camel: string): string {
   return camel.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
 }
 
 function buildClassEntry(
   className: string,
-  structural: Record<string, string>,
-  responsive: Record<string, Record<string, string>>,
-  states: Record<string, Record<string, string>>,
+  desktop: Record<string, string>,
+  overrides: Array<{ maxWidth: number; props: Record<string, string> }>,
 ): GlobalStyleEntry {
-  const sel = `.${className}`;
+  const selector = `.${className}`;
   const parts: string[] = [];
-  const data: Record<string, unknown> = {};
+  const data: Record<string, unknown> = { ...desktop };
 
-  const base = Object.entries(structural).sort(([a], [b]) => a.localeCompare(b));
-  parts.push(`${sel}{${base.map(([k, v]) => `${kebab(k)}:${v}`).join(";")}}`);
-  Object.assign(data, structural);
+  const baseCss = Object.entries(desktop)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${kebabCase(k)}:${v}`)
+    .join(";");
+  parts.push(`${selector}{${baseCss}}`);
 
-  for (const [q, p] of Object.entries(responsive)) {
-    parts.push(`${q}{${sel}{${Object.entries(p).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${kebab(k)}:${v}`).join(";")}}}`);
-    data[q] = p;
+  for (const ov of overrides) {
+    const ovCss = Object.entries(ov.props)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${kebabCase(k)}:${v}`)
+      .join(";");
+    parts.push(`@media(max-width:${ov.maxWidth}px){${selector}{${ovCss}}}`);
+    data[`@media (max-width: ${ov.maxWidth}px)`] = ov.props;
   }
 
-  for (const [st, p] of Object.entries(states)) {
-    parts.push(`${sel}${st.replace("&","")}{${Object.entries(p).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${kebab(k)}:${v}`).join(";")}}`);
-    data[st] = p;
-  }
-
-  return { selector: sel, name: `Generated ${className}`, css: parts.join(""), data };
+  return { selector, name: className, css: parts.join(""), data };
 }

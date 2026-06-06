@@ -11,11 +11,10 @@ import { GlobalStylesCollector } from "./global-styles-collector.js";
 import { serializeBlocks, countBlocks } from "./serializer.js";
 import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
-import { compileTailwindCss } from "./tailwind-resolver.js";
-import { generateThemeSettingsPrompt } from "./theme-settings-extractor.js";
-import { generateGlobalStyles } from "./global-styles-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
+import type { InlinerResult } from "./tailwind-inliner.js";
 import { consolidateStyles } from "./class-consolidator.js";
+import type { GlobalStyleEntry } from "./class-consolidator.js";
 import type { GlobalStyleEntry } from "./class-consolidator.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
@@ -45,9 +44,10 @@ export async function convert(
   let rawHtml = input.rawHtml;
   const inlinerWarnings: { code: string; message: string }[] = [];
   let consolidatedGlobalStyles: GlobalStyleEntry[] | undefined;
+  let inlined: InlinerResult | undefined;
 
   if (usesTailwind(rawHtml)) {
-    const inlined = await inlineTailwindStyles(rawHtml);
+    inlined = await inlineTailwindStyles(rawHtml);
     if (inlined.warnings.length > 0) {
       inlinerWarnings.push(
         ...inlined.warnings.map((m) => ({ code: "INLINER", message: m })),
@@ -57,11 +57,9 @@ export async function convert(
     if (inlined.elementCount > 0) {
       rawHtml = inlined.html;
 
-      // Consolidate structural styles into global classes
+      // Consolidate styles into global classes
       consolidatedGlobalStyles = consolidateStyles(
-        rawHtml,
-        inlined.responsiveOverrides,
-        inlined.stateStyles,
+        inlined.desktopFirstStyles,
       );
     }
   }
@@ -157,69 +155,22 @@ export async function convert(
     );
   }
 
-  // Custom CSS
-  if (prepResult.customCss.length > 0) {
+  // Custom CSS (from inliner: preflight + @keyframes + ::-webkit-*)
+  if (inlined?.customCss) {
     writeFileSync(
-      resolve(outDir, `${input.pageName}-custom.css`),
-      prepResult.customCss + "\n",
+      resolve(outDir, "custom.css"),
+      inlined.customCss + "\n",
       "utf-8",
     );
   }
 
-  // Tailwind CSS (if requested and config found)
-  let tailwindCss = "";
-  if (input.resolveCss && prepResult.tailwindConfig) {
-    const twResult = compileTailwindCss(
-      prepResult.tailwindConfig,
-      input.rawHtml,
-      process.cwd(),
+  // Custom CSS (from inliner: preflight + @keyframes + ::-webkit-*)
+  if (inlined?.customCss) {
+    writeFileSync(
+      resolve(outDir, "custom.css"),
+      inlined.customCss + "\n",
+      "utf-8",
     );
-    if (twResult.css) {
-      tailwindCss = twResult.css;
-      // Write to project root (shared across pages in same project)
-      writeFileSync(
-        resolve(outDir, "tailwind.css"),
-        tailwindCss,
-        "utf-8",
-      );
-    } else if (twResult.error) {
-      console.error(`Tailwind CSS compilation error: ${twResult.error}`);
-    }
-  }
-
-  // ── Layer 1: Theme Settings Prompt ───────────────────
-  if (prepResult.tailwindConfig) {
-    let configObj: Record<string, unknown> | null = null;
-    try {
-      const configStr = prepResult.tailwindConfig
-        .replace(/tailwind\.config\s*=\s*/, "")
-        .trim();
-      const jsonCompat = configStr.replace(/,(\s*[}\]])/g, "$1");
-      configObj = JSON.parse(jsonCompat);
-    } catch {
-      console.warn("Could not parse tailwind.config for theme settings extraction");
-    }
-
-    if (configObj) {
-      const promptPayload = generateThemeSettingsPrompt(configObj as any);
-      writeFileSync(
-        resolve(outDir, "theme-settings-prompt.json"),
-        JSON.stringify(promptPayload, null, 2) + "\n",
-        "utf-8",
-      );
-    }
-  }
-
-  // ── Layer 2: Global Styles JSON ──────────────────────
-  if (tailwindCss) {
-    const styles = generateGlobalStyles(tailwindCss);
-    if (styles.length > 0) {
-      writeFileSync(
-        resolve(outDir, "global-styles.json"),
-        JSON.stringify(styles, null, 2) + "\n",
-        "utf-8",
-      );
-    }
   }
 
   return {
@@ -227,7 +178,7 @@ export async function convert(
     blockHtml: html,
     report,
     globalStyles: globalStylesManifest as unknown as Record<string, unknown>,
-    customCss: prepResult.customCss,
-    tailwindCss,
+    customCss: inlined?.customCss || prepResult.customCss,
+    tailwindCss: "",
   };
 }
