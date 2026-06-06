@@ -535,11 +535,12 @@ function extractGlobalClasses(
   const result: string[] = [];
 
   classNames.forEach((className) => {
-    // Track classes from <head> <style> definitions + inliner-generated gb-s-* classes
-    if (opts.classNameToProperties.has(className) || className.startsWith("gb-s-")) {
+    // Track reusable classes from <head> styles for global-styles manifest
+    if (opts.classNameToProperties.has(className)) {
       opts.collector.recordUsage(className);
-      result.push(className);
     }
+    // Preserve ALL class tokens in globalClasses
+    result.push(className);
   });
 
   return result;

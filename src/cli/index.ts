@@ -351,15 +351,9 @@ async function main(): Promise<void> {
 
     if (output.customCss) {
       const lines = output.customCss.split("\n").filter(l => l.trim()).length;
-      console.log(`  Custom CSS: ${outputPrefix}${pageName}-custom.css (${lines} rules)`);
+      console.log(`  Styles CSS: ${outputPrefix}styles.css (${lines} rules)`);
     }
-    if (output.tailwindCss) {
-      console.log(`  Tailwind CSS: ${outputPrefix}tailwind.css`);
-    }
-    const gs = output.globalStyles as any;
-    if (gs?.classes?.length > 0) {
-      console.log(`  Global Styles: ${outputPrefix}${pageName}-global-styles.json (${gs.classes.length} classes)`);
-    }
+    console.log(`  Global Styles: ${outputPrefix}global-styles.json (class registry)`);
     console.log("");
     return;
   }

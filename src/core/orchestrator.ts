@@ -13,8 +13,6 @@ import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
-import { consolidateStyles } from "./class-consolidator.js";
-import type { GlobalStyleEntry } from "./class-consolidator.js";
 import type { GlobalStyleEntry } from "./class-consolidator.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
@@ -40,28 +38,21 @@ export async function convert(
 ): Promise<ConversionOutput> {
   resetIds();
 
-  // Stage 0: Resolve Tailwind to inline CSS (if present)
+  // Stage 0: Compile Tailwind CSS (if present)
   let rawHtml = input.rawHtml;
   const inlinerWarnings: { code: string; message: string }[] = [];
-  let consolidatedGlobalStyles: GlobalStyleEntry[] | undefined;
-  let inlined: InlinerResult | undefined;
+  let compiledCss = "";
+  let allClassNames: string[] = [];
 
   if (usesTailwind(rawHtml)) {
-    inlined = await inlineTailwindStyles(rawHtml);
-    if (inlined.warnings.length > 0) {
+    const compiled = await inlineTailwindStyles(rawHtml);
+    if (compiled.warnings.length > 0) {
       inlinerWarnings.push(
-        ...inlined.warnings.map((m) => ({ code: "INLINER", message: m })),
+        ...compiled.warnings.map((m) => ({ code: "INLINER", message: m })),
       );
     }
-    // Only use inlined output if it actually produced results
-    if (inlined.elementCount > 0) {
-      rawHtml = inlined.html;
-
-      // Consolidate styles into global classes
-      consolidatedGlobalStyles = consolidateStyles(
-        inlined.desktopFirstStyles,
-      );
-    }
+    compiledCss = compiled.stylesCss;
+    allClassNames = compiled.classNames;
   }
 
   // Stage 1: Preprocess
@@ -136,29 +127,26 @@ export async function convert(
     "utf-8",
   );
 
-  // Consolidated global-styles.json (WordPress Global Styles format)
-  if (consolidatedGlobalStyles && consolidatedGlobalStyles.length > 0) {
+  // Global styles manifest: list of class names used on the page
+  const manifest = collector.toManifest();
+  const allUsedClasses = [
+    ...new Set([...allClassNames, ...manifest.classes.map((c) => c.slug)]),
+  ].sort();
+  if (allUsedClasses.length > 0) {
     writeFileSync(
       resolve(outDir, "global-styles.json"),
-      JSON.stringify(consolidatedGlobalStyles, null, 2) + "\n",
+      JSON.stringify(allUsedClasses, null, 2) + "\n",
       "utf-8",
     );
   }
 
-  // Custom CSS (from inliner: preflight + @keyframes + ::-webkit-*)
-  if (inlined?.customCss) {
+  // Single styles.css: compiled Tailwind CSS + custom CSS
+  const combinedCss = [compiledCss, prepResult.customCss]
+    .filter(Boolean).join("\n");
+  if (combinedCss.trim()) {
     writeFileSync(
-      resolve(outDir, "custom.css"),
-      inlined.customCss + "\n",
-      "utf-8",
-    );
-  }
-
-  // Custom CSS (from inliner: preflight + @keyframes + ::-webkit-*)
-  if (inlined?.customCss) {
-    writeFileSync(
-      resolve(outDir, "custom.css"),
-      inlined.customCss + "\n",
+      resolve(outDir, "styles.css"),
+      combinedCss + "\n",
       "utf-8",
     );
   }
@@ -168,7 +156,7 @@ export async function convert(
     blockHtml: html,
     report,
     globalStyles: {} as Record<string, unknown>,
-    customCss: inlined?.customCss || prepResult.customCss,
+    customCss: combinedCss,
     tailwindCss: "",
   };
 }
