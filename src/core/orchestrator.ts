@@ -136,16 +136,6 @@ export async function convert(
     "utf-8",
   );
 
-  // Global styles manifest (existing format — classNameToProperties)
-  const globalStylesManifest = collector.toManifest();
-  if (globalStylesManifest.classes.length > 0) {
-    writeFileSync(
-      resolve(outDir, `${input.pageName}-global-styles.json`),
-      JSON.stringify(globalStylesManifest, null, 2) + "\n",
-      "utf-8",
-    );
-  }
-
   // Consolidated global-styles.json (WordPress Global Styles format)
   if (consolidatedGlobalStyles && consolidatedGlobalStyles.length > 0) {
     writeFileSync(
@@ -177,7 +167,7 @@ export async function convert(
     pageName: input.pageName,
     blockHtml: html,
     report,
-    globalStyles: globalStylesManifest as unknown as Record<string, unknown>,
+    globalStyles: {} as Record<string, unknown>,
     customCss: inlined?.customCss || prepResult.customCss,
     tailwindCss: "",
   };
