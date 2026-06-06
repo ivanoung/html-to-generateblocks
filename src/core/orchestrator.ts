@@ -13,6 +13,7 @@ import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
 import { generateCustomizerSettings } from "./customizer-generator.js";
+import { analyzeSource, generateManualStepsReport } from "./manual-steps.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
 import type { GlobalStyleEntry } from "./class-consolidator.js";
 
@@ -146,6 +147,14 @@ export async function convert(
       "utf-8",
     );
   }
+
+  // Manual steps report
+  const manualSteps = analyzeSource(input.rawHtml);
+  writeFileSync(
+    resolve(outDir, "manual-steps.txt"),
+    generateManualStepsReport(manualSteps) + "\n",
+    "utf-8",
+  );
 
   return {
     pageName: input.pageName,
