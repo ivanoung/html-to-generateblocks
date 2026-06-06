@@ -42,7 +42,6 @@ export async function convert(
   let rawHtml = input.rawHtml;
   const inlinerWarnings: { code: string; message: string }[] = [];
   let compiledCss = "";
-  let allClassNames: string[] = [];
 
   if (usesTailwind(rawHtml)) {
     const compiled = await inlineTailwindStyles(rawHtml);
@@ -52,7 +51,6 @@ export async function convert(
       );
     }
     compiledCss = compiled.stylesCss;
-    allClassNames = compiled.classNames;
   }
 
   // Stage 1: Preprocess
@@ -126,19 +124,6 @@ export async function convert(
     JSON.stringify(report, null, 2) + "\n",
     "utf-8",
   );
-
-  // Global styles manifest: list of class names used on the page
-  const manifest = collector.toManifest();
-  const allUsedClasses = [
-    ...new Set([...allClassNames, ...manifest.classes.map((c) => c.slug)]),
-  ].sort();
-  if (allUsedClasses.length > 0) {
-    writeFileSync(
-      resolve(outDir, "global-styles.json"),
-      JSON.stringify(allUsedClasses, null, 2) + "\n",
-      "utf-8",
-    );
-  }
 
   // Single styles.css: compiled Tailwind CSS + custom CSS
   const combinedCss = [compiledCss, prepResult.customCss]

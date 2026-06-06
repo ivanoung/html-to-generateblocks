@@ -343,7 +343,6 @@ async function main(): Promise<void> {
       const lines = output.customCss.split("\n").filter(l => l.trim()).length;
       console.log(`  Styles CSS: ${outputPrefix}styles.css (${lines} rules)`);
     }
-    console.log(`  Global Styles: ${outputPrefix}global-styles.json (class registry)`);
     console.log("");
     return;
   }
