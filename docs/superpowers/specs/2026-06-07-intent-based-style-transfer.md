@@ -140,6 +140,24 @@ Color normalization uses a hex conversion: parse `rgb(r, g, b)` → `#rrggbb`, u
 
 ### Phase 5: Property Placement
 
+**Desktop-first conversion**: Tailwind CDN compiles with `min-width` (mobile-first).
+GB's style panel uses desktop-first (base = widest viewport, smaller breakpoints
+override via `max-width`). Conversion rules:
+
+1. **Base properties** come from base classes only (no breakpoint prefix).
+2. **Responsive properties** from larger breakpoints OVERRIDE base for the same key.
+   This mirrors the CSS cascade: Tailwind CDN places @media rules AFTER base rules
+   in the stylesheet, so responsive rules have higher cascade priority.
+3. Largest breakpoint's properties become the desktop base.
+4. Smaller breakpoints' properties become `@media (max-width: Npx)` overrides.
+5. **Class list order** resolves conflicts between two base classes setting the same
+   property: later class in the list wins (author intent).
+
+Example: `text-5xl md:text-7xl lg:text-8xl leading-[0.9]`
+- Desktop base: `font-size: 6rem, line-height: 1` (from `lg:text-8xl` — overrides base)
+- `@media(max-width:1023px)`: `font-size: 4.5rem` (from `md:text-7xl`)
+- `@media(max-width:767px)`: `font-size: 3rem, line-height: 0.9` (from base classes)
+
 For each element's resolved `ElementStyles`:
 
 | Condition | Location | Example |
