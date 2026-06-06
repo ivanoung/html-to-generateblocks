@@ -38,13 +38,22 @@ async function main() {
   console.log("input size:", html.length, "bytes");
   console.log("output size:", result.html.length, "bytes");
 
-  // Check relative value reconstruction
-  const hasRepeat = result.html.includes("repeat(");
-  console.log("Has repeat():", hasRepeat);
-  const idx = result.html.indexOf("grid-template-columns");
-  if (idx >= 0) {
-    console.log("Grid cols at", idx, ":", result.html.substring(idx, idx + 80));
+  // Find grid-cols elements
+  let foundGC = false;
+  for (const [idx, cls] of Object.entries(result.classListPerElement)) {
+    const clsStr = String(cls || "");
+    if (clsStr.includes("grid-cols")) {
+      foundGC = true;
+      console.log(clsStr.substring(0, 80), "at idx", idx);
+      const re = new RegExp('data-gb-idx="' + idx + '"[^>]*style="([^"]*)"');
+      const m = result.html.match(re);
+      if (m) {
+        const tc = (m[1] || "").match(/grid-template-columns[^;]*/);
+        console.log("  grid-template-columns:", tc ? tc[0].substring(0, 80) : "NOT FOUND");
+      }
+    }
   }
+  if (!foundGC) console.log("grid-cols-*: NOT FOUND in any class list");
 
   if (hasTailwindAfter || !hasInlineStyles || hasCdnRefs) {
     console.error("\n❌ Checks failed");

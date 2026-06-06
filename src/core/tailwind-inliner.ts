@@ -92,25 +92,49 @@ function applyReconstruction(style: string, classList: string): string {
   const props = parseStyleToMap(style);
 
   // grid-cols-N → repeat(N, minmax(0, 1fr))
-  const gridMatch = classList.match(
-    /(?:^|\s)(?:(?:lg|md|sm|xl):)?grid-cols-(\d+)(?:\s|$)/,
-  );
-  if (gridMatch) {
-    const count = parseInt(gridMatch[1]);
+  // Match ALL grid-cols occurrences; prefer the one matching the computed column count
+  const gridMatches = [...classList.matchAll(
+    /(?:^|\s)((?:(?:lg|md|sm|xl):)?grid-cols-(\d+))(?=\s|$)/g,
+  )];
+  if (gridMatches.length > 0) {
     for (const key of Object.keys(props)) {
       if (
         key === "grid-template-columns" ||
         key === "gridTemplateColumns"
       ) {
         const values = props[key].split(/\s+/).filter((v) => v.endsWith("px"));
-        if (values.length === count) {
+        // Try each grid-cols match, prefer the one whose count matches the values
+        let bestCount = 0;
+        for (const gm of gridMatches) {
+          const count = parseInt(gm[2]);
+          if (values.length === count) {
+            bestCount = count;
+            break;
+          }
+          // Also allow if all values are equal (fr units produce equal pixel columns)
           const first = parseFloat(values[0]);
           const allEqual = values.every(
             (v) => Math.abs(parseFloat(v) - first) < 2,
           );
-          if (allEqual) {
-            props[key] = `repeat(${count}, minmax(0, 1fr))`;
+          if (allEqual && values.length === count) {
+            bestCount = count;
+            break;
           }
+        }
+        // Fallback: use the last match (typically the largest breakpoint)
+        if (bestCount === 0 && gridMatches.length > 0) {
+          const last = gridMatches[gridMatches.length - 1];
+          const count = parseInt(last[2]);
+          const first = parseFloat(values[0]);
+          const allEqual = values.every(
+            (v) => Math.abs(parseFloat(v) - first) < 2,
+          );
+          if (allEqual && values.length >= count) {
+            bestCount = count;
+          }
+        }
+        if (bestCount > 0) {
+          props[key] = `repeat(${bestCount}, minmax(0, 1fr))`;
         }
       }
     }
