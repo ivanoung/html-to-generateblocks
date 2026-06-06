@@ -159,3 +159,65 @@ export interface FixtureReport {
   warnings: Warning[];
   manualVerification: ManualVerification;
 }
+
+// ── Style Transfer Pipeline ──────────────────────────────────
+
+/** Single color entry for generate_settings global_colors */
+export interface GpColorEntry {
+  name: string;
+  slug: string;
+  color: string;
+}
+
+/** Single typography entry for generate_settings typography array */
+export interface GpTypographyEntry {
+  selector: string;
+  customSelector: string;
+  fontFamily: string;
+  fontWeight: string;
+  textTransform: string;
+  textDecoration: string;
+  fontStyle: string;
+  fontSize: string;
+  fontSizeTablet: string;
+  fontSizeMobile: string;
+  lineHeight: string;
+  lineHeightTablet: string;
+  lineHeightMobile: string;
+  letterSpacing: string;
+  letterSpacingTablet: string;
+  letterSpacingMobile: string;
+  marginBottom: string;
+  marginBottomTablet: string;
+  marginBottomMobile: string;
+  marginBottomUnit: string;
+  module: string;
+  group: string;
+}
+
+/** Complete generate_settings shape for import */
+export interface ThemeSettingsOutput {
+  container_width?: number;
+  global_colors?: GpColorEntry[];
+  typography?: GpTypographyEntry[];
+  background_color?: string;
+  link_color?: string;
+  link_color_hover?: string;
+}
+
+/** Wrapper matching GP export format */
+export interface ThemeSettingsExport {
+  options: {
+    generate_settings: ThemeSettingsOutput;
+  };
+}
+
+/** Single global style entry for gblocks_styles import */
+export interface GlobalStyleEntry {
+  selector: string;
+  css: string;
+  data: Record<string, unknown>;
+}
+
+/** Layer 2 output file payload */
+export type GlobalStylesPayload = GlobalStyleEntry[];
