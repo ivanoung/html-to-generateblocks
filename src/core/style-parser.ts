@@ -10,7 +10,7 @@ import type { BlockStyles, StyleEntry } from "./types.js";
 
 /** Properties that have a style panel equivalent in GB and should
  *  appear in BOTH `styles` (camelCase) and `css` (kebab-case). */
-const STYLES_PROPERTIES = new Set([
+export const STYLES_PROPERTIES = new Set([
   "display",
   "position",
   "z-index",
