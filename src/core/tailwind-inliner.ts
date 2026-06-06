@@ -175,7 +175,20 @@ function applyReconstruction(style: string, classList: string): string {
     }
   }
 
+  // If element has no explicit sizing class, strip computed width/height
+  // (block elements fill their parent naturally — these are viewport artifacts)
+  if (!hasExplicitSizing(classList)) {
+    for (const key of ["width", "height"]) {
+      delete props[key];
+    }
+  }
+
   return mapToStyleString(props);
+}
+
+/** Check if class list has any explicit sizing class (w-, h-, min-w-, etc.) */
+function hasExplicitSizing(classList: string): boolean {
+  return /\b(?:(?:lg|md|sm|xl|2xl):)?(?:w-|h-|min-w-|min-h-|max-w-|max-h-)(?:\[|\d+|full|screen|auto|fit|min|max)/.test(classList);
 }
 
 function parseStyleToMap(style: string): Record<string, string> {
