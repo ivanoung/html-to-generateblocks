@@ -322,16 +322,6 @@ async function main(): Promise<void> {
 
     const output = await convert({ rawHtml, pageName, projectDir, resolveCss: args.includes("--resolve-css") });
 
-    // Pre-flight: warn if no <section> tags
-    const sectionCount = (rawHtml.match(/<section[\s>]/g) || []).length;
-    if (sectionCount === 0) {
-      console.log("");
-      console.log("⚠ Pre-flight: No <section> tags found in the HTML.");
-      console.log("  Each content block should be wrapped in a <section> for proper");
-      console.log("  Outer/Content container structure.");
-      console.log("  Add <section> wrappers and re-run for optimal output.\n");
-    }
-
     const outputPrefix = projectDir ? `output/${projectDir}/` : "output/";
     console.log(`\nConverted: ${projectDir ? projectDir + "/" : ""}${pageName}`);
     console.log(`  Output: ${outputPrefix}${pageName}.html`);

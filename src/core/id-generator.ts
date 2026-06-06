@@ -9,8 +9,6 @@ interface Counters {
   img: number;
   shape: number;
   core: number;
-  outer: number;
-  inner: number;
 }
 
 const counters: Counters = {
@@ -19,8 +17,6 @@ const counters: Counters = {
   img: 0,
   shape: 0,
   core: 0,
-  outer: 0,
-  inner: 0,
 };
 
 const PREFIXES: Record<string, string> = {
@@ -29,8 +25,6 @@ const PREFIXES: Record<string, string> = {
   img: "img",
   shape: "shape",
   core: "core",
-  outer: "outer",
-  inner: "inner",
 };
 
 export function resetIds(): void {
@@ -39,8 +33,6 @@ export function resetIds(): void {
   counters.img = 0;
   counters.shape = 0;
   counters.core = 0;
-  counters.outer = 0;
-  counters.inner = 0;
 }
 
 export function nextId(type: string): string {
