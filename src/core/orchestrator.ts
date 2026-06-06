@@ -15,6 +15,8 @@ import { compileTailwindCss } from "./tailwind-resolver.js";
 import { generateThemeSettingsPrompt } from "./theme-settings-extractor.js";
 import { generateGlobalStyles } from "./global-styles-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
+import { consolidateStyles } from "./class-consolidator.js";
+import type { GlobalStyleEntry } from "./class-consolidator.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
 
@@ -42,6 +44,7 @@ export async function convert(
   // Stage 0: Resolve Tailwind to inline CSS (if present)
   let rawHtml = input.rawHtml;
   const inlinerWarnings: { code: string; message: string }[] = [];
+  let consolidatedGlobalStyles: GlobalStyleEntry[] | undefined;
 
   if (usesTailwind(rawHtml)) {
     const inlined = await inlineTailwindStyles(rawHtml);
@@ -53,6 +56,13 @@ export async function convert(
     // Only use inlined output if it actually produced results
     if (inlined.elementCount > 0) {
       rawHtml = inlined.html;
+
+      // Consolidate structural styles into global classes
+      consolidatedGlobalStyles = consolidateStyles(
+        rawHtml,
+        inlined.responsiveOverrides,
+        inlined.stateStyles,
+      );
     }
   }
 
@@ -134,6 +144,15 @@ export async function convert(
     writeFileSync(
       resolve(outDir, `${input.pageName}-global-styles.json`),
       JSON.stringify(globalStylesManifest, null, 2) + "\n",
+      "utf-8",
+    );
+  }
+
+  // Consolidated global-styles.json (WordPress Global Styles format)
+  if (consolidatedGlobalStyles && consolidatedGlobalStyles.length > 0) {
+    writeFileSync(
+      resolve(outDir, "global-styles.json"),
+      JSON.stringify(consolidatedGlobalStyles, null, 2) + "\n",
       "utf-8",
     );
   }
