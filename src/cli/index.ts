@@ -10,7 +10,7 @@
 //   regression                 Check M1 fixtures against snapshots
 
 import { resolve, basename, extname } from "node:path";
-import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync } from "node:fs";
 import {
   runFixture, loadFixture, writeOutput,
   runFidelityFixture, isFidelityFixture,
@@ -18,6 +18,9 @@ import {
 } from "../runner/run-fixture.js";
 import type { Fixture, FixtureReport, ReportStatus } from "../core/types.js";
 import { convert } from "../core/orchestrator.js";
+import { inlineTailwindStyles, usesTailwind } from "../core/tailwind-inliner.js";
+import { resolveIconifyIcons } from "../core/iconify-resolver.js";
+import { checkContentLoss } from "../core/content-verifier.js";
 
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
 const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
@@ -335,10 +338,103 @@ async function main(): Promise<void> {
     const skipShared = args.includes("--skip-shared");
     const fullPath = resolve(process.cwd(), inputPath);
     if (!existsSync(fullPath)) {
-      console.error(`File not found: ${fullPath}`);
+      console.error(`File or directory not found: ${fullPath}`);
       process.exit(1);
     }
 
+    // ── Project mode (directory) ──────────────────────────
+    if (statSync(fullPath).isDirectory()) {
+      const files = readdirSync(fullPath).filter((f) => f.endsWith(".html")).sort();
+      if (files.length === 0) {
+        console.error(`No .html files found in ${fullPath}`);
+        process.exit(1);
+      }
+
+      // Derive project dir from input path
+      const relPath = fullPath.replace(process.cwd() + "/", "");
+      const inputsPrefix = "inputs/";
+      let projectDir: string | undefined;
+      if (relPath.startsWith(inputsPrefix)) {
+        projectDir = relPath.slice(inputsPrefix.length).replace(/\/$/, "");
+      }
+      const outputDir = projectDir ? `output/${projectDir}/` : "output/";
+
+      console.log(`\nProject mode: ${files.length} page(s) in ${projectDir || "."}/\n`);
+
+      // Stage 1: Concatenate all pages for shared Tailwind compilation
+      let combinedHtml = "";
+      const pageContents: { name: string; html: string }[] = [];
+      for (const f of files) {
+        const html = readFileSync(resolve(fullPath, f), "utf-8");
+        const name = basename(f, extname(f));
+        pageContents.push({ name, html });
+        combinedHtml += `<!-- page:${name} -->\n${html}\n`;
+      }
+
+      // Stage 2: Run Tailwind inliner on combined content
+      let inlinerCss = "";
+      if (usesTailwind(combinedHtml)) {
+        console.log("  Compiling Tailwind CSS from all pages...");
+        const compiled = await inlineTailwindStyles(combinedHtml);
+        for (const w of compiled.warnings.slice(0, 3)) {
+          console.log(`    [INLINER] ${w}`);
+        }
+        if (compiled.warnings.length > 3) {
+          console.log(`    ... and ${compiled.warnings.length - 3} more inliner warnings`);
+        }
+        inlinerCss = compiled.stylesCss;
+      }
+
+      // Stage 3: Resolve iconify icons on combined content
+      const iconifyResult = await resolveIconifyIcons(combinedHtml);
+      if (iconifyResult.failed.length > 0) {
+        console.log(`  Iconify: ${iconifyResult.failed.length} icon(s) could not be resolved`);
+      }
+
+      // Write shared styles.css (combined Tailwind + custom CSS from all pages)
+      // The first page's convert with skipInliner produces the custom CSS portion.
+      // We'll write the Tailwind CSS now and let the first page append custom CSS.
+      const outDir = resolve(process.cwd(), outputDir);
+      if (!existsSync(outDir)) {
+        const { mkdirSync } = await import("node:fs");
+        mkdirSync(outDir, { recursive: true });
+      }
+
+      // Stage 4: Convert each page with skipInliner=true
+      let firstPage = true;
+      for (const pc of pageContents) {
+        const output = await convert({
+          rawHtml: pc.html,
+          pageName: pc.name,
+          projectDir,
+          skipShared: !firstPage,  // shared files only from first page
+          skipInliner: true,       // CSS already compiled once for all pages
+        });
+
+        // On first page: prepend Tailwind CSS to styles.css
+        if (firstPage && inlinerCss) {
+          const cssPath = resolve(outDir, "styles.css");
+          const existing = existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "";
+          writeFileSync(cssPath, inlinerCss + "\n" + existing, "utf-8");
+        }
+
+        const lossCheck = checkContentLoss(pc.html, output.blockHtml);
+        const lossFlag = lossCheck.warning ? ` ⚠ LOSS ${Math.round(lossCheck.lossPercent)}%` : "";
+        console.log(`  ${output.report.overallStatus === "pass" ? "✓" : "✗"} ${pc.name}: ${output.report.blockCount} blocks, ${output.report.overallStatus}${lossFlag}`);
+        if (lossCheck.warning) {
+          console.log(`    [LOSS] ${lossCheck.warning}`);
+        }
+
+        firstPage = false;
+      }
+
+      console.log(`\n  Done. ${pageContents.length} page(s) converted.`);
+      console.log(`  Shared CSS: ${outputDir}styles.css`);
+      console.log("");
+      return;
+    }
+
+    // ── Single-page mode ──────────────────────────────────
     const rawHtml = readFileSync(fullPath, "utf-8");
 
     // Derive project dir and page name from input path

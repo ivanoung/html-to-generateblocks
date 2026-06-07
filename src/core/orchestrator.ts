@@ -59,16 +59,14 @@ export async function convert(
     compiledCss = compiled.stylesCss;
   }
 
-  // Stage 0.5: Resolve <iconify-icon> to inline SVG
-  if (!input.skipInliner) {
-    const iconifyResult = await resolveIconifyIcons(rawHtml);
-    rawHtml = iconifyResult.html;
-    if (iconifyResult.failed.length > 0) {
-      inlinerWarnings.push({
-        code: "ICONIFY",
-        message: `Could not resolve ${iconifyResult.failed.length} icon(s): ${iconifyResult.failed.join(", ")}`,
-      });
-    }
+  // Stage 0.5: Resolve <iconify-icon> to inline SVG (always run)
+  const iconifyResult = await resolveIconifyIcons(rawHtml);
+  rawHtml = iconifyResult.html;
+  if (iconifyResult.failed.length > 0) {
+    inlinerWarnings.push({
+      code: "ICONIFY",
+      message: `Could not resolve ${iconifyResult.failed.length} icon(s): ${iconifyResult.failed.join(", ")}`,
+    });
   }
 
   // Stage 1: Preprocess
