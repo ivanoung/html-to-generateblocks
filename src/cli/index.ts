@@ -4,7 +4,7 @@
 //   fixtures:list              List all available fixtures
 //   fixtures:run <name>        Run single fixture (M1 or fidelity)
 //   fixtures:run-all           Run all fixtures
-//   convert <input.html>       Convert HTML page to GB blocks
+//   convert <input.html|dir/>  Convert HTML page(s) to GB blocks
 //   validate <name>            Validate specific fixture output
 //   report:update <name>       Update manual verification in report
 //   regression                 Check M1 fixtures against snapshots
@@ -139,7 +139,7 @@ async function main(): Promise<void> {
     console.log("  fixtures:list              List all fixtures");
     console.log("  fixtures:run <name>        Run single fixture");
     console.log("  fixtures:run-all           Run all fixtures");
-    console.log("  convert <input.html>       Convert HTML page to GB blocks");
+    console.log("  convert <input.html|dir/>  Convert HTML page(s) to GB blocks");
     console.log("  regression                 Check M1 vs snapshots");
     process.exit(0);
   }
@@ -331,7 +331,7 @@ async function main(): Promise<void> {
   if (cmd === "convert") {
     const inputPath = args[1];
     if (!inputPath) {
-      console.error("Usage: convert <input.html> [--skip-shared]");
+      console.error("Usage: convert <input.html|dir/> [--skip-shared]");
       process.exit(1);
     }
 

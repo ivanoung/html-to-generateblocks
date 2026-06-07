@@ -148,11 +148,24 @@ npx tsx src/cli/index.ts fixtures:list
 npx tsx src/cli/index.ts regression
 ```
 
-### Convert an HTML page to blocks
+### Convert a project (all pages)
+
+```bash
+npx tsx src/cli/index.ts convert inputs/mino/
+```
+
+Compiles Tailwind CSS from ALL pages in the directory (union of all classes),
+writes shared `styles.css` once, then converts each page individually.
+Output goes to `output/mino/`.
+
+### Convert a single HTML page
 
 ```bash
 npx tsx src/cli/index.ts convert inputs/mino/index.html
 ```
+
+Use `--skip-shared` for subsequent pages if `styles.css` already exists from
+a project-mode run.
 
 Outputs go to `output/<project>/` with `.html` (blocks), `.report.json`,
 optional `-custom.css`, `-global-styles.json`, and `tailwind.css`.
