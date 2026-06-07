@@ -28,7 +28,7 @@ function textPreview($el: cheerio.Cheerio<any>): string {
 const INLINE_TAGS = new Set([
   "a", "abbr", "b", "br", "cite", "code", "data", "del", "dfn",
   "em", "i", "iconify-icon", "ins", "kbd", "mark", "q", "s",
-  "samp", "small", "span", "strong", "sub", "sup", "time", "u", "var", "wbr",
+  "samp", "small", "span", "strong", "sub", "sup", "svg", "time", "u", "var", "wbr",
 ]);
 
 /** Container tags that produce generateblocks/element when they have block children. */
@@ -107,8 +107,11 @@ export function walkElement(
     return [makeTextBlock($el, $, opts)];
   }
 
-  if (hasBlockChildren && hasTextOrInline) {
-    // Div with raw text + block children → hard fail (user must fix source)
+  // Note: only raw text nodes (hasMeaningfulText) trigger FIX_SOURCE here.
+  // Tagged inline elements (<a>, <span>, etc.) are convertible to text blocks
+  // and should NOT block decomposition of their parent.
+  if (hasBlockChildren && hasMeaningfulText) {
+    // Raw text mixed with block children → hard fail (user must fix source)
     if (tag === "div") {
       opts.hardFails.push({
         code: "FIX_SOURCE",
