@@ -179,14 +179,17 @@ function makeCoreHtmlBlock(
   $el: cheerio.Cheerio<any>,
   $: cheerio.CheerioAPI,
 ): Block {
-  // For wrapper divs (data-gb-wrap), return innerHTML (original wrapped element)
+  // Preserve the entire wrapper element as raw HTML, including its own
+  // attributes (style, class, etc.). Strip the data-gb-wrap marker.
+  const $clone = $el.clone();
+  $clone.removeAttr("data-gb-wrap");
   return {
     blockName: "core/html",
     uniqueId: nextId("core"),
     styles: {},
     css: "",
     innerBlocks: [],
-    html: stripHtmlComments($el.html()) || "",
+    html: stripHtmlComments($.html($clone)) || "",
   };
 }
 

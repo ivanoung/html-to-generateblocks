@@ -21,6 +21,7 @@ import { convert } from "../core/orchestrator.js";
 import { inlineTailwindStyles, usesTailwind } from "../core/tailwind-inliner.js";
 import { resolveIconifyIcons } from "../core/iconify-resolver.js";
 import { checkContentLoss } from "../core/content-verifier.js";
+import { compileTailwindOffline, extractTailwindConfig } from "../core/tailwind-resolver.js";
 
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
 const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
@@ -371,24 +372,23 @@ async function main(): Promise<void> {
         combinedHtml += `<!-- page:${name} -->\n${html}\n`;
       }
 
-      // Stage 2: Run Tailwind inliner on combined content
+      // Stage 2: Compile Tailwind CSS offline (CLI, no browser timeout)
       let inlinerCss = "";
-      if (usesTailwind(combinedHtml)) {
-        console.log("  Compiling Tailwind CSS from all pages...");
-        const compiled = await inlineTailwindStyles(combinedHtml);
-        for (const w of compiled.warnings.slice(0, 3)) {
-          console.log(`    [INLINER] ${w}`);
-        }
-        if (compiled.warnings.length > 3) {
-          console.log(`    ... and ${compiled.warnings.length - 3} more inliner warnings`);
-        }
-        inlinerCss = compiled.stylesCss;
-      }
+      const tailwindConfig = extractTailwindConfig(pageContents[0]?.html || "");
+      // Tailwind v3 --content needs a glob pattern, not individual file paths
+      const contentPattern = `${inputPath.replace(/\/$/, "")}/*.html`;
 
-      // Stage 3: Resolve iconify icons on combined content
-      const iconifyResult = await resolveIconifyIcons(combinedHtml);
-      if (iconifyResult.failed.length > 0) {
-        console.log(`  Iconify: ${iconifyResult.failed.length} icon(s) could not be resolved`);
+      if (tailwindConfig) {
+        console.log(`  Compiling Tailwind CSS from ${files.length} page(s) via CLI...`);
+        const result = compileTailwindOffline(tailwindConfig, [contentPattern], process.cwd());
+        if (result.error) {
+          console.log(`    [TW-ERROR] ${result.error}`);
+        } else {
+          inlinerCss = result.css;
+          console.log(`    ✓ Compiled (${(result.css.length / 1024).toFixed(1)} KB)`);
+        }
+      } else {
+        console.log("  No tailwind.config found — skipping CSS compilation");
       }
 
       // Write shared styles.css (combined Tailwind + custom CSS from all pages)
