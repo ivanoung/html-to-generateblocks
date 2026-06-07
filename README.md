@@ -77,6 +77,39 @@ the WordPress editor.
 
 ---
 
+## Pre-Conversion Checklist
+
+Before running `convert` on an HTML page, clean the source to avoid
+`FIX_SOURCE` hard fails. Run this prompt with your AI assistant:
+
+> Scan all HTML files. Find any element (section, article, aside, header,
+> main, div) where raw text sits at the same level as block children — i.e.,
+> text not wrapped in `<p>`, `<span>`, `<h1>`–`<h6>`, or other tags. For
+> each, wrap the bare text in the smallest appropriate tag: `<span>` for
+> short inline phrases, `<p>` for sentences and paragraphs. Do not touch
+> elements where all text is already properly wrapped. Show each change
+> as a diff before applying.
+
+### Marker System
+
+Add `data-gb-wrap="core-html"` to any element you want preserved as raw
+HTML in the output (not decomposed into GB blocks):
+
+```html
+<div data-gb-wrap="core-html">
+  <!-- This entire div stays as raw HTML in a core/html block -->
+  <custom-chart data-source="analytics"></custom-chart>
+  <script type="application/json">{"key": "value"}</script>
+</div>
+```
+
+### Iconify Icons
+
+`<iconify-icon>` elements are automatically resolved to inline SVGs during
+conversion via the [Iconify API](https://api.iconify.design). No manual
+action needed. If an icon can't be resolved (API downtime, invalid name),
+the converter falls back to wrapping it in a `core/html` block.
+
 ## Quick Start
 
 ### Prerequisites
