@@ -16,6 +16,7 @@ import { resolveIconifyIcons } from "./iconify-resolver.js";
 import { generateCustomizerSettings } from "./customizer-generator.js";
 import { analyzeSource, generateManualStepsReport } from "./manual-steps.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
+import { checkContentLoss } from "./content-verifier.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
 
@@ -96,6 +97,12 @@ export async function convert(
   // Stage 4: Serialize
   const html = serializeBlocks(walkResult.blocks);
   const blockCount = countBlocks(walkResult.blocks);
+
+  // Stage 4.5: Content-loss check
+  const lossCheck = checkContentLoss(input.rawHtml, html);
+  if (lossCheck.warning) {
+    allWarnings.push({ code: "LOSS", message: lossCheck.warning });
+  }
 
   // Stage 5: Validate
   const { hardFails: validatorHardFails, warnings: valWarnings } = validateBlocks(
