@@ -16,7 +16,6 @@ import { resolveIconifyIcons } from "./iconify-resolver.js";
 import { generateCustomizerSettings } from "./customizer-generator.js";
 import { analyzeSource, generateManualStepsReport } from "./manual-steps.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
-import type { GlobalStyleEntry } from "./class-consolidator.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
 

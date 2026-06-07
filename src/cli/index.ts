@@ -221,11 +221,7 @@ async function main(): Promise<void> {
     const raw = loadFixture(fp);
     let result: { report: FixtureReport; html: string };
 
-    if (isIRFixture(raw as any)) {
-      result = runIRFixture(raw as IRFixture);
-    } else {
-      result = runFixture(raw as Fixture);
-    }
+    result = runFixture(raw as Fixture);
 
     const r = result.report;
     console.log(`  Status: ${r.status}`);
