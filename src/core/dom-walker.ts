@@ -150,21 +150,23 @@ export function walkElement(
     return [makeCoreHtmlBlock($el, $)];
   }
 
-  // 6. Recurse into block-level children (skip inline)
-  if (block.innerBlocks !== undefined && hasBlockChildren) {
+  // 6. Recurse into all tag children (inline → text blocks, block → element blocks)
+  if (block.innerBlocks !== undefined) {
     $el.children().each((_, child) => {
       if (child.type !== "tag") return;
       const childTag = (child as any).name?.toLowerCase() || "";
       const $child = $(child);
 
+      // core-html wrappers stay as raw HTML
       if ($child.attr("data-gb-wrap") === "core-html") {
         block.innerBlocks!.push(...walkElement($child, $, opts));
         return;
       }
 
-      if (!INLINE_TAGS.has(childTag)) {
-        block.innerBlocks!.push(...walkElement($child, $, opts));
-      }
+      // All tagged children are processed — inline elements become
+      // text blocks, block elements become element/shape/media blocks.
+      // HTML comments are skipped (child.type !== "tag" guard above).
+      block.innerBlocks!.push(...walkElement($child, $, opts));
     });
   }
 
