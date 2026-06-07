@@ -298,12 +298,15 @@ function makeMediaBlock(
   if (width) htmlAttributes.width = width;
   if (height) htmlAttributes.height = height;
 
+  const globalClasses = extractGlobalClasses($el, opts);
+
   return {
     blockName: "generateblocks/media",
     uniqueId: nextId("img"),
     tagName: "img",
     styles,
     css,
+    globalClasses: globalClasses.length > 0 ? globalClasses : undefined,
     htmlAttributes,
     mediaId: 0,
     innerBlocks: [],
