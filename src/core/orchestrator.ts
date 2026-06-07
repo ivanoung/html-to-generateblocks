@@ -12,6 +12,7 @@ import { serializeBlocks, countBlocks } from "./serializer.js";
 import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
+import { resolveIconifyIcons } from "./iconify-resolver.js";
 import { generateCustomizerSettings } from "./customizer-generator.js";
 import { analyzeSource, generateManualStepsReport } from "./manual-steps.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
@@ -57,6 +58,16 @@ export async function convert(
     compiledCss = compiled.stylesCss;
   }
 
+  // Stage 0.5: Resolve <iconify-icon> to inline SVG
+  const iconifyResult = await resolveIconifyIcons(rawHtml);
+  rawHtml = iconifyResult.html;
+  if (iconifyResult.failed.length > 0) {
+    inlinerWarnings.push({
+      code: "ICONIFY",
+      message: `Could not resolve ${iconifyResult.failed.length} icon(s): ${iconifyResult.failed.join(", ")}`,
+    });
+  }
+
   // Stage 1: Preprocess
   const prepResult = preprocess(rawHtml);
 
@@ -85,10 +96,16 @@ export async function convert(
   const blockCount = countBlocks(walkResult.blocks);
 
   // Stage 5: Validate
-  const { hardFails, warnings: valWarnings } = validateBlocks(
+  const { hardFails: validatorHardFails, warnings: valWarnings } = validateBlocks(
     walkResult.blocks,
     html,
   );
+
+  // Merge walker hard fails with validator hard fails
+  const hardFails = [
+    ...validatorHardFails,
+    ...walkResult.hardFails,
+  ];
 
   // Build report
   const report = {
