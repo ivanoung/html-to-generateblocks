@@ -49,6 +49,7 @@ interface WalkerOptions {
   classNameToProperties: Map<string, BlockStyles>;
   collector: GlobalStylesCollector;
   warnings: string[];
+  hardFails: { code: string; message: string }[];
 }
 
 // ── Core walker ────────────────────────────────────────────
@@ -428,6 +429,7 @@ function extractGlobalClasses(
 export interface WalkResult {
   blocks: Block[];
   warnings: string[];
+  hardFails: { code: string; message: string }[];
 }
 
 export function walkDom(
@@ -436,9 +438,10 @@ export function walkDom(
   collector: GlobalStylesCollector,
 ): WalkResult {
   const warnings: string[] = [];
+  const hardFails: { code: string; message: string }[] = [];
   const $ = cheerio.load(`<div>${html}</div>`);
 
-  const opts: WalkerOptions = { classNameToProperties, collector, warnings };
+  const opts: WalkerOptions = { classNameToProperties, collector, warnings, hardFails };
   const blocks: Block[] = [];
 
   // Walk top-level children of the wrapper div only
@@ -453,5 +456,5 @@ export function walkDom(
     });
   }
 
-  return { blocks, warnings };
+  return { blocks, warnings, hardFails };
 }
