@@ -186,8 +186,14 @@ function makeCoreHtmlBlock(
     styles: {},
     css: "",
     innerBlocks: [],
-    html: $el.html() || "",
+    html: stripHtmlComments($el.html()) || "",
   };
+}
+
+/** Strip HTML comment nodes from a string of innerHTML/outerHTML. */
+function stripHtmlComments(html: string | null): string {
+  if (!html) return "";
+  return html.replace(/<!--[\s\S]*?-->/g, "");
 }
 
 function makeCoreHtmlFallback(
@@ -228,8 +234,8 @@ function makeTextBlock(
   const htmlAttributes = extractHtmlAttributes($el);
   const globalClasses = extractGlobalClasses($el, opts);
 
-  // Content is innerHTML (preserves inline formatting)
-  const content = $el.html() || $el.text() || "";
+  // Content is innerHTML (preserves inline formatting, strips comments)
+  const content = stripHtmlComments($el.html()) || $el.text() || "";
 
   return {
     blockName: "generateblocks/text",
@@ -335,7 +341,7 @@ function makeShapeBlock(
   return {
     blockName: "generateblocks/shape",
     uniqueId: nextId("shape"),
-    html: $.html($el),
+    html: stripHtmlComments($.html($el)),
     styles,
     css,
     innerBlocks: [],
