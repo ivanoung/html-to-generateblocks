@@ -14,6 +14,14 @@ import { nextId } from "./id-generator.js";
 import { parseStyleString } from "./style-parser.js";
 import type { GlobalStylesCollector } from "./global-styles-collector.js";
 
+// ── Helpers ────────────────────────────────────────────────
+
+/** Extract first 60 chars of text from element for error messages */
+function textPreview($el: cheerio.Cheerio<any>): string {
+  const text = ($el.text() || "").replace(/\s+/g, " ").trim();
+  return text.length > 60 ? text.substring(0, 60) + "…" : text;
+}
+
 // ── Tag classification ────────────────────────────────────
 
 /** Tags that stay as raw HTML in parent's content, never become blocks. */
@@ -100,6 +108,14 @@ export function walkElement(
   }
 
   if (hasBlockChildren && hasTextOrInline) {
+    // Div with raw text + block children → hard fail (user must fix source)
+    if (tag === "div") {
+      opts.hardFails.push({
+        code: "FIX_SOURCE",
+        message: `<div> contains raw text mixed with block children. Wrap bare text in <span> or <p>. "${textPreview($el)}"`,
+      });
+      return []; // skip the element — produce no blocks
+    }
     return makeCoreHtmlFallback($el, $, opts.warnings, tag);
   }
 
@@ -107,9 +123,17 @@ export function walkElement(
   //    Container tags always stay as element blocks (they're semantic wrappers)
   if (!hasBlockChildren && (hasMeaningfulText || hasInlineElements)) {
     if (SEMANTIC_CONTAINER_TAGS.has(tag)) {
-      // Container with only text/inline → core/html fallback (GB element blocks
-      // cannot contain raw text — recovery rules §5.3)
-      return makeCoreHtmlFallback($el, $, opts.warnings, tag);
+      // Hard-fail only for raw text (e.g. <section>Hello</section>).
+      // Inline elements like standalone <a> are valid — they produce text blocks.
+      if (hasMeaningfulText) {
+        opts.hardFails.push({
+          code: "FIX_SOURCE",
+          message: `<${tag}> contains raw text without a block wrapper. Wrap text in <p> or other block tag. "${textPreview($el)}"`,
+        });
+        return []; // skip the element — produce no blocks
+      }
+      // Inline elements only — produce text block from the container
+      return [makeTextBlock($el, $, opts)];
     }
     return [makeTextBlock($el, $, opts)];
   }
