@@ -25,6 +25,7 @@ export interface ConversionInput {
   projectDir?: string;
   resolveCss?: boolean;
   skipShared?: boolean;  // skip styles.css, customizer, manual-steps
+  skipInliner?: boolean; // skip Tailwind inliner + iconify resolver (CSS already compiled)
 }
 
 export interface ConversionOutput {
@@ -47,7 +48,7 @@ export async function convert(
   let compiledCss = "";
   let outputCss = "";
 
-  if (usesTailwind(rawHtml)) {
+  if (!input.skipInliner && usesTailwind(rawHtml)) {
     const compiled = await inlineTailwindStyles(rawHtml);
     if (compiled.warnings.length > 0) {
       inlinerWarnings.push(
@@ -58,13 +59,15 @@ export async function convert(
   }
 
   // Stage 0.5: Resolve <iconify-icon> to inline SVG
-  const iconifyResult = await resolveIconifyIcons(rawHtml);
-  rawHtml = iconifyResult.html;
-  if (iconifyResult.failed.length > 0) {
-    inlinerWarnings.push({
-      code: "ICONIFY",
-      message: `Could not resolve ${iconifyResult.failed.length} icon(s): ${iconifyResult.failed.join(", ")}`,
-    });
+  if (!input.skipInliner) {
+    const iconifyResult = await resolveIconifyIcons(rawHtml);
+    rawHtml = iconifyResult.html;
+    if (iconifyResult.failed.length > 0) {
+      inlinerWarnings.push({
+        code: "ICONIFY",
+        message: `Could not resolve ${iconifyResult.failed.length} icon(s): ${iconifyResult.failed.join(", ")}`,
+      });
+    }
   }
 
   // Stage 1: Preprocess
