@@ -31,14 +31,15 @@ function isSingleClassSelector(selector: string): boolean {
   // Only strip those NOT CSS-escaped (not preceded by \)
   const withoutPseudo = selector.replace(/((?<!\\):[a-zA-Z-]+)+$/, "");
 
-  // Remove CSS escaping for combinator detection
+  // Remove CSS escaping for combinator detection — replace escapes with
+  // the actual characters they represent (e.g., \: → :, \/ → /)
   const unescaped = withoutPseudo
-    .replace(/\\:/g, "")
-    .replace(/\\\//g, "")
-    .replace(/\\\[/g, "")
-    .replace(/\\\]/g, "")
-    .replace(/\\#/g, "")
-    .replace(/\\./g, "");
+    .replace(/\\:/g, ":")
+    .replace(/\\\//g, "/")
+    .replace(/\\\[/g, "[")
+    .replace(/\\\]/g, "]")
+    .replace(/\\#/g, "#")
+    .replace(/\\./g, ".");
 
   // Check for combinators or multiple selectors (commas, spaces, >, +, ~)
   if (/[,\s>+~]/.test(unescaped)) return false;
