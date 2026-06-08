@@ -46,11 +46,12 @@ describe("splitCss", () => {
     assert.ok(result.uniqueCss.includes("group-hover"), "class combinator rule should be in uniqueCss");
   });
 
-  it("extracts class rules from inside @media blocks", () => {
+  it("keeps @media blocks intact in uniqueCss", () => {
     const css = "@media(min-width:768px){.md\\:text-7xl{font-size:4.5rem}.md\\:flex{display:flex}}";
     const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 2);
-    assert.ok(result.globalStyles[0].css.includes("@media"), "CSS should preserve @media wrapper");
+    // Media blocks stay in unique CSS, not split into global styles
+    assert.strictEqual(result.globalStyles.length, 0);
+    assert.ok(result.uniqueCss.includes("@media"), "@media block should be in uniqueCss");
   });
 
   it("handles @keyframes — goes to uniqueCss", () => {

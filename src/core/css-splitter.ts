@@ -151,25 +151,10 @@ function walkRule(
         isSingleClassSelector(r.selectors![0]),
     );
 
-    if (allSingleClass && innerRules.length > 0) {
-      for (const r of innerRules) {
-        const selector = r.selectors![0];
-        const baseSelector = extractBaseSelector(selector);
-        const ruleCss = `${selector}{${(r.declarations || [])
-          .map((d) => `${d.property}:${d.value}`)
-          .join(";")}}`;
-        globalStyles.push({
-          name: classNameToName(baseSelector),
-          selector: baseSelector,
-          css: `${mediaQuery}{${ruleCss}}`,
-        });
-      }
-    } else {
-      // Media block with mixed/non-class rules — only add to unique CSS
-      // if it contains at least one non-element selector
-      if (!allSelectorsAreElements(innerRules)) {
-        uniqueCssParts.push(serializeRule(rule));
-      }
+    // Media blocks stay intact in unique CSS (responsive variants
+    // need their @media wrapper and shouldn't be split into global styles)
+    if (!allSelectorsAreElements(innerRules)) {
+      uniqueCssParts.push(serializeRule(rule));
     }
     return;
   }
