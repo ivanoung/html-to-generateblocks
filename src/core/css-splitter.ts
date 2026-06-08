@@ -196,8 +196,20 @@ export function splitCss(compiledCss: string): CssSplitResult {
     return { globalStyles: [], uniqueCss: compiledCss };
   }
 
+  // Deduplicate: merge entries with the same selector (e.g., .container
+  // appears at top-level and inside multiple @media breakpoints)
+  const merged = new Map<string, GlobalStyleEntry>();
+  for (const entry of globalStyles) {
+    const existing = merged.get(entry.selector);
+    if (existing) {
+      existing.css += entry.css;
+    } else {
+      merged.set(entry.selector, { ...entry });
+    }
+  }
+
   return {
-    globalStyles,
+    globalStyles: [...merged.values()],
     uniqueCss: uniqueCssParts.join(""),
   };
 }
