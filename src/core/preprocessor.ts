@@ -85,6 +85,9 @@ function scanHeadStyles($: cheerio.CheerioAPI): {
         if (Object.keys(parsed.styles).length > 0 || parsed.css) {
           classNameToProperties.set(className, parsed.styles);
         }
+        // Also emit as CSS rule so it lands in styles.css
+        // (in project mode with skipInliner, customCss is the only path to the output)
+        customCssParts.push(`${selector}{${properties}}`);
       } else {
         customCssParts.push(`${selector}{${properties}}`);
       }
