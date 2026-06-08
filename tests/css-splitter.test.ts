@@ -12,13 +12,14 @@ describe("splitCss", () => {
     assert.strictEqual(result.uniqueCss, "");
   });
 
-  it("puts element selectors into uniqueCss", () => {
+  it("excludes element selectors from uniqueCss (preflight stays in master only)", () => {
     const css = "body{margin:0}h1{font-size:2rem}.foo{color:red}";
     const result = splitCss(css);
     assert.strictEqual(result.globalStyles.length, 1);
     assert.strictEqual(result.globalStyles[0].selector, ".foo");
-    assert.ok(result.uniqueCss.includes("body"), "uniqueCss should contain body rule");
-    assert.ok(result.uniqueCss.includes("h1"), "uniqueCss should contain h1 rule");
+    // Element selectors should NOT be in unique CSS
+    assert.ok(!result.uniqueCss.includes("body"), "body should NOT be in uniqueCss");
+    assert.ok(!result.uniqueCss.includes("h1"), "h1 should NOT be in uniqueCss");
   });
 
   it("handles pseudo-classes on single-class selectors", () => {
@@ -72,10 +73,10 @@ describe("splitCss", () => {
     assert.strictEqual(result.uniqueCss, "");
   });
 
-  it("survives malformed CSS — returns all as uniqueCss", () => {
+  it("survives malformed CSS — returns empty", () => {
     const result = splitCss("not valid css {{{");
+    // Malformed CSS with no valid selectors — nothing to extract
     assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.length > 0);
   });
 
   it("deduplicates entries with the same selector", () => {

@@ -18,6 +18,29 @@ export interface CssSplitResult {
 }
 
 /**
+ * Check if a selector is an element/universal selector (preflight reset).
+ * These must load before utility classes and should not go into unique CSS.
+ * Matches: *, body, h1, h1,h2,h3, :host, ::backdrop, [type=search], etc.
+ * Does NOT match: .class, .class:pseudo, #id, [attr] on its own context
+ */
+function isElementOrUniversalSelector(selector: string): boolean {
+  const trimmed = selector.trim();
+  // Universal selector or pseudo-element on universal
+  if (/^\*|^::backdrop|^:host/.test(trimmed)) return true;
+  // Element selectors (start with a letter)
+  if (/^[a-zA-Z]/.test(trimmed)) return true;
+  // Attribute-only selectors on elements: [type=search], [type=button], etc.
+  if (/^\[.*\]$/.test(trimmed)) return true;
+  // Vendor-prefixed pseudo-elements: ::-webkit-*, ::-moz-*
+  if (/^::?-webkit-|^::?-moz-|^::?-ms-/.test(trimmed)) return true;
+  // Multi-selector: if there are commas, check each part
+  if (trimmed.includes(",")) {
+    return trimmed.split(",").some((p) => isElementOrUniversalSelector(p));
+  }
+  return false;
+}
+
+/**
  * Check if a CSS selector is a single class selector.
  * Matches: .foo, .foo\:bar, .foo\:bar:hover
  * Does NOT match: tag selectors, pseudo-elements (::), multi-selectors (a,b),
@@ -142,7 +165,11 @@ function walkRule(
         });
       }
     } else {
-      uniqueCssParts.push(serializeRule(rule));
+      // Media block with mixed/non-class rules — only add to unique CSS
+      // if it contains at least one non-element selector
+      if (!allSelectorsAreElements(innerRules)) {
+        uniqueCssParts.push(serializeRule(rule));
+      }
     }
     return;
   }
@@ -162,7 +189,9 @@ function walkRule(
           ? `${parentMediaQuery}{${ruleCss}}`
           : ruleCss,
       });
-    } else {
+    } else if (!selectors.every((s) => isElementOrUniversalSelector(s))) {
+      // Only add to unique CSS if not all selectors are element/universal
+      // (preflight resets stay in master only, not in styles-unique.css)
       const serialized = parentMediaQuery
         ? `${parentMediaQuery}{${serializeRule(r)}}`
         : serializeRule(r);
@@ -173,6 +202,16 @@ function walkRule(
 
   // Other types: keyframes, font-face, charset, etc. — always unique
   uniqueCssParts.push(serializeRule(rule));
+}
+
+/** Check if all rules in an array have only element/universal selectors */
+function allSelectorsAreElements(rules: css.Rule[]): boolean {
+  if (rules.length === 0) return true;
+  return rules.every((r) => {
+    if (r.type !== "rule") return false;
+    const sels = r.selectors || [];
+    return sels.length > 0 && sels.every((s) => isElementOrUniversalSelector(s));
+  });
 }
 
 /**
