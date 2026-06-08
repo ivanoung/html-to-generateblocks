@@ -12,6 +12,12 @@ export interface TailwindCompileResult {
   error?: string;
 }
 
+export interface ConfigWarning {
+  type: "single_value_color";
+  color: string;
+  missingClasses: string[];
+}
+
 /**
  * Compile Tailwind CSS offline using the Tailwind v3 CLI.
  * No headless browser — fast, scalable to any page count.
@@ -83,4 +89,45 @@ export function extractTailwindConfig(rawHtml: string): string | null {
   // Remove trailing commas (invalid in CJS module.exports)
   config = config.replace(/,(\s*[}\]])/g, "$1");
   return config;
+}
+
+/**
+ * Validate a tailwind config for patterns known to cause missing CSS.
+ * Returns warnings for colors defined as single values where the HTML
+ * uses shade variants (e.g., slate: "#334155" but HTML has bg-slate-100).
+ */
+export function validateTailwindConfig(
+  configJson: string,
+  allClassNames: string[],
+): ConfigWarning[] {
+  const warnings: ConfigWarning[] = [];
+
+  // Extract colors from config using regex (config is JS, not strict JSON)
+  // Match patterns like: colorName: "#hex" or colorName: '#hex'
+  const colorMatches = configJson.matchAll(
+    /(\w+)\s*:\s*["'](#[a-fA-F0-9]{3,8})["']\s*[,}]/g,
+  );
+
+  for (const m of colorMatches) {
+    const colorName = m[1];
+
+    // Skip well-known Tailwind colors that likely have full palettes
+    // (we're only checking user-defined single-value overrides)
+
+    // Check if any HTML class references a shade variant of this color
+    const shadePattern = new RegExp(
+      `(?:bg|text|border|ring|outline|placeholder|caret|accent|fill|stroke|shadow|decoration|divide|from|via|to)-${colorName}-\\d+`,
+    );
+    const missing = allClassNames.filter((c) => shadePattern.test(c));
+
+    if (missing.length > 0) {
+      warnings.push({
+        type: "single_value_color",
+        color: colorName,
+        missingClasses: [...new Set(missing)].slice(0, 20),
+      });
+    }
+  }
+
+  return warnings;
 }

@@ -21,7 +21,7 @@ import { convert } from "../core/orchestrator.js";
 import { inlineTailwindStyles, usesTailwind } from "../core/tailwind-inliner.js";
 import { resolveIconifyIcons } from "../core/iconify-resolver.js";
 import { checkContentLoss } from "../core/content-verifier.js";
-import { compileTailwindOffline, extractTailwindConfig } from "../core/tailwind-resolver.js";
+import { compileTailwindOffline, extractTailwindConfig, validateTailwindConfig } from "../core/tailwind-resolver.js";
 
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
 const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
@@ -386,6 +386,23 @@ async function main(): Promise<void> {
         } else {
           inlinerCss = result.css;
           console.log(`    ✓ Compiled (${(result.css.length / 1024).toFixed(1)} KB)`);
+        }
+
+        // Validate config for known patterns (e.g., single-value colors missing shade variants)
+        const allPageClasses = new Set<string>();
+        for (const pc of pageContents) {
+          const classMatches = pc.html.match(/class="([^"]*)"/g) || [];
+          for (const m of classMatches) {
+            const cls = m.replace(/class="([^"]*)"/, "$1");
+            cls.split(/\s+/).forEach((c) => c && allPageClasses.add(c));
+          }
+        }
+        const configWarnings = validateTailwindConfig(tailwindConfig, [...allPageClasses]);
+        for (const w of configWarnings) {
+          if (w.type === "single_value_color") {
+            console.log(`    [WARN] Color "${w.color}" is a single hex value but ${w.missingClasses.length} shade variant classes are used`);
+            console.log(`           → Define "${w.color}" as an object with shades (50-950) instead of a single hex`);
+          }
         }
       } else {
         console.log("  No tailwind.config found — skipping CSS compilation");
