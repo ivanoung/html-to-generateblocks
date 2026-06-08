@@ -94,22 +94,31 @@ export function generateManualStepsReport(steps: ManualSteps): string {
   lines.push("   \"Attempt Recovery\" prompt.");
   lines.push("");
 
+  // Global Styles
+  lines.push(`${next + 1}. IMPORT GLOBAL STYLES`);
+  lines.push("   Import setup/global-styles.json into GenerateBlocks →");
+  lines.push("   Global Styles. This covers most utility classes.");
+  lines.push("");
+
   // CSS
-  lines.push(`${next + 1}. ADD STYLES.CSS`);
-  lines.push("   Paste styles.css into Appearance → Customize →");
-  lines.push("   Additional CSS.");
+  lines.push(`${next + 2}. ADD REMAINING CSS`);
+  lines.push("   Paste setup/styles-unique.css into Appearance →");
+  lines.push("   Customize → Additional CSS for non-class styles");
+  lines.push("   (preflight, keyframes, element selectors).");
+  lines.push("   Tip: styles.css at the project root is the complete");
+  lines.push("   master fallback if you prefer a single file.");
   lines.push("");
 
   // Customizer
-  lines.push(`${next + 2}. IMPORT CUSTOMIZER SETTINGS`);
-  lines.push("   Import customizer-import.json via Appearance →");
+  lines.push(`${next + 3}. IMPORT CUSTOMIZER SETTINGS`);
+  lines.push("   Import setup/customizer-import.json via Appearance →");
   lines.push("   Customize → Import/Export (or a plugin like");
   lines.push("   \"Customizer Export/Import\").");
   lines.push("");
 
   // Iconify
   if (steps.hasIconify) {
-    lines.push(`${next + 3}. ICONIFY ICONS`);
+    lines.push(`${next + 4}. ICONIFY ICONS`);
     lines.push("   The original uses <iconify-icon> web components.");
     lines.push("   Option A: Enqueue the Iconify script:");
     steps.externalScripts.filter((s) => s.includes("iconify")).forEach((s) => {
@@ -122,7 +131,7 @@ export function generateManualStepsReport(steps: ManualSteps): string {
 
   // Images
   if (steps.externalImages.length > 0) {
-    const stepNum = steps.hasIconify ? next + 4 : next + 3;
+    const stepNum = steps.hasIconify ? next + 5 : next + 4;
     lines.push(`${stepNum}. REPLACE EXTERNAL IMAGES (${steps.externalImages.length} total)`);
     steps.externalImages.slice(0, 5).forEach((url) => {
       lines.push(`   - ${url.substring(0, 70)}${url.length > 70 ? "..." : ""}`);
