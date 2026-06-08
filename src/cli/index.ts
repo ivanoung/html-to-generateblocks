@@ -10,7 +10,7 @@
 //   regression                 Check M1 fixtures against snapshots
 
 import { resolve, basename, extname } from "node:path";
-import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync } from "node:fs";
 import {
   runFixture, loadFixture, writeOutput,
   runFidelityFixture, isFidelityFixture,
@@ -22,6 +22,7 @@ import { inlineTailwindStyles, usesTailwind } from "../core/tailwind-inliner.js"
 import { resolveIconifyIcons } from "../core/iconify-resolver.js";
 import { checkContentLoss } from "../core/content-verifier.js";
 import { compileTailwindOffline, extractTailwindConfig, validateTailwindConfig } from "../core/tailwind-resolver.js";
+import { splitCss } from "../core/css-splitter.js";
 
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
 const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
@@ -445,8 +446,33 @@ async function main(): Promise<void> {
         firstPage = false;
       }
 
+      // After all pages: split styles.css into setup/ folder
+      const cssPath = resolve(outDir, "styles.css");
+      if (existsSync(cssPath)) {
+        const setupDir = resolve(outDir, "setup");
+        mkdirSync(setupDir, { recursive: true });
+
+        const fullCss = readFileSync(cssPath, "utf-8");
+        const split = splitCss(fullCss);
+        writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(split.globalStyles, null, 2) + "\n", "utf-8");
+        writeFileSync(resolve(setupDir, "styles-unique.css"), split.uniqueCss + "\n", "utf-8");
+
+        // Move customizer-import.json and manual-steps.txt into setup/
+        const srcCustomizer = resolve(outDir, "customizer-import.json");
+        const srcManual = resolve(outDir, "manual-steps.txt");
+        if (existsSync(srcCustomizer)) {
+          writeFileSync(resolve(setupDir, "customizer-import.json"), readFileSync(srcCustomizer, "utf-8"));
+          unlinkSync(srcCustomizer);
+        }
+        if (existsSync(srcManual)) {
+          writeFileSync(resolve(setupDir, "manual-steps.txt"), readFileSync(srcManual, "utf-8"));
+          unlinkSync(srcManual);
+        }
+      }
+
       console.log(`\n  Done. ${pageContents.length} page(s) converted.`);
-      console.log(`  Shared CSS: ${outputDir}styles.css`);
+      console.log(`  Setup:       ${outputDir}setup/`);
+      console.log(`  Master CSS:  ${outputDir}styles.css`);
       console.log("");
       return;
     }
