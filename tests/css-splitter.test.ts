@@ -38,11 +38,12 @@ describe("splitCss", () => {
   });
 
   it("puts multi-selector rules into uniqueCss", () => {
-    const css = "h1,h2,h3{font-weight:bold}*,:after,:before{box-sizing:border-box}";
+    const css = "h1,h2,h3{font-weight:bold}*,:after,:before{box-sizing:border-box}.group:hover .group-hover\\:text-primary{color:red}";
     const result = splitCss(css);
+    // Element multi-selectors are excluded (preflight stays in master only)
+    // Class-based combinator rules go to unique CSS
     assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("h1,h2,h3"));
-    assert.ok(result.uniqueCss.includes("*,:after,:before"));
+    assert.ok(result.uniqueCss.includes("group-hover"), "class combinator rule should be in uniqueCss");
   });
 
   it("extracts class rules from inside @media blocks", () => {

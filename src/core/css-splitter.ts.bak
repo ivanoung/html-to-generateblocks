@@ -67,8 +67,8 @@ function isSingleClassSelector(selector: string): boolean {
   // Check for combinators or multiple selectors (commas, spaces, >, +, ~)
   if (/[,\s>+~]/.test(unescaped)) return false;
 
-  // Must be a class selector: starts with ., no combinators, no pseudo-elements
-  return /^\.[^,\s>+~]+$/.test(withoutPseudo) && !withoutPseudo.includes("::");
+  // Must be a class selector: starts with . then word chars with optional \: escaping
+  return /^\.[a-zA-Z_-][\w-]*(\\:[a-zA-Z_-][\w-]*)*$/.test(withoutPseudo);
 }
 
 /**
