@@ -88,6 +88,53 @@ function classNameToName(className: string): string {
     .join(" ");
 }
 
+// ── WordPress-safe selector conversion ──────────────────────
+
+/**
+ * Convert a CSS-escaped class selector to a WordPress-safe format.
+ * Uses [class~="..."] attribute selectors to avoid backslash characters
+ * that WordPress wp_unslash() strips from post meta.
+ *
+ * Only converts selectors that actually contain CSS escapes.
+ * Pseudo-classes are split and placed outside the attribute selector.
+ * Non-class selectors (elements, pseudo-elements) are returned unchanged.
+ */
+function toSafeCssSelector(selector: string): string {
+  // Only convert class selectors that have CSS escapes
+  if (!selector.startsWith(".") || !/[\\]:\[\/]/.test(selector)) {
+    return selector;
+  }
+
+  // Extract pseudo-classes from the end of the selector
+  // Matches trailing :pseudo chains like :hover, :focus, :nth-child(2)
+  const pseudoMatch = selector.match(/^(\.[\s\S]+?)((?::[a-zA-Z-]+(?:\([^)]*\))?)+)$/);
+  const base = pseudoMatch ? pseudoMatch[1] : selector;
+  const pseudo = pseudoMatch ? pseudoMatch[2] : "";
+
+  // Unescape the class portion: strip leading dot, then remove backslash escapes
+  const rawClass = base
+    .replace(/^\./, "")
+    .replace(/\\(.)/g, "$1");
+
+  // Sanitize internal double quotes (shouldn't exist, but safe)
+  const safeClass = rawClass.replace(/"/g, '\\"');
+
+  return `[class~="${safeClass}"]${pseudo}`;
+}
+
+/**
+ * Sanitize a CSS selector for the WordPress admin label (gb_style_selector).
+ * Replaces CSS escape sequences with hyphens since WordPress strips backslashes.
+ * Only used for the selector field in GlobalStyleEntry — not for actual CSS.
+ */
+function sanitizeSelector(selector: string): string {
+  return selector
+    .replace(/\\:/g, "-")
+    .replace(/\\\[/g, "-")
+    .replace(/\\\]/g, "")
+    .replace(/\\\//g, "-");
+}
+
 // ── CSS serialization ───────────────────────────────────────
 
 /**
@@ -104,7 +151,9 @@ function serializeRule(rule: css.Rule | css.Media): string {
 
   if (rule.type === "rule") {
     const r = rule as css.Rule;
-    const selector = (r.selectors || []).join(",");
+    const selector = (r.selectors || [])
+      .map((s) => toSafeCssSelector(s))
+      .join(",");
     const declarations = (r.declarations || [])
       .map((d) => `${d.property}:${d.value}`)
       .join(";");
@@ -248,7 +297,7 @@ function walkRule(
         const baseSelector = extractBaseSelector(selector);
         globalStyles.push({
           name: classNameToName(baseSelector),
-          selector: baseSelector,
+          selector: sanitizeSelector(baseSelector),
           css: serializeRule(wrappedMedia),
         });
       } else {
@@ -280,7 +329,7 @@ function walkRule(
       const baseSelector = extractBaseSelector(selector);
       globalStyles.push({
         name: classNameToName(baseSelector),
-        selector: baseSelector,
+        selector: sanitizeSelector(baseSelector),
         css: serializeRule(r),
       });
       return;
@@ -300,7 +349,7 @@ function walkRule(
       const baseSelector = extractBaseSelector(selector);
       globalStyles.push({
         name: classNameToName(baseSelector),
-        selector: baseSelector,
+        selector: sanitizeSelector(baseSelector),
         css: serializeRule(r),
       });
     } else {
