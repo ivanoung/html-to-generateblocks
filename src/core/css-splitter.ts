@@ -46,11 +46,16 @@ function isSingleClassSelector(selector: string): boolean {
     .replace(/\\#/g, "#")
     .replace(/\\\./g, ".");
 
-  // Reject functional pseudo-classes (contains parentheses) and compound class selectors
-  // (contains a dot after the leading dot, or a colon in the base).
+  // Reject functional pseudo-classes (parentheses), combinators, and multi-selectors.
+  // Compound class selectors are caught by the second-dot check below.
+  // Unescaped colons are caught by the separate colon guard.
   const baseOnly = withoutPseudo.replace(/([^\\]|^)(:[a-zA-Z-]+)+$/, "$1");
-  if (/[,\s>+~:.()]/.test(baseOnly)) return false;
+  if (/[,\s>+~()]/.test(baseOnly)) return false;
   if (baseOnly.indexOf(".", 1) !== -1) return false;
+  // Reject unescaped colons in the base selector — these are pseudo-classes
+  // that were not stripped (e.g., :nth-child(2), .foo:not(.bar)).
+  // Escaped colons (\:) from variant class names (e.g., .md\:text-7xl) are allowed.
+  if (/(?:^|[^\\]):/.test(baseOnly)) return false;
 
   return /^\.[^,\s>+~]+$/.test(withoutPseudo) && !withoutPseudo.includes("::");
 }

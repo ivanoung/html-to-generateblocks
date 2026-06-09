@@ -150,5 +150,25 @@ export function generateManualStepsReport(steps: ManualSteps): string {
     lines.push("");
   }
 
+  // CSS Load Order (WPCodeBox guidance)
+  lines.push("============================================");
+  lines.push("  CSS LOAD ORDER — WPCodeBox Configuration");
+  lines.push("============================================");
+  lines.push("");
+  lines.push("For correct frontend specificity, load CSS in this order:");
+  lines.push("");
+  lines.push("1. styles-unique.css → WPCodeBox snippet");
+  lines.push("   Hook: Frontend Header (wp_head)");
+  lines.push("   Priority: 10");
+  lines.push("   Contains: backgrounds, effects, colors, preflight, keyframes");
+  lines.push("");
+  lines.push("2. global-styles.json → GB Pro > Global Styles > Import");
+  lines.push("   WordPress loads these at priority 20 automatically.");
+  lines.push("   Contains: structural layout + typography classes");
+  lines.push("");
+  lines.push("3. styles.css → Keep as master fallback");
+  lines.push("   Paste into Additional CSS for complete coverage if needed.");
+  lines.push("");
+
   return lines.join("\n");
 }
