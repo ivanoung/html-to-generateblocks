@@ -139,16 +139,20 @@ export async function convert(
     : OUTPUT_DIR;
   mkdirSync(outDir, { recursive: true });
 
+  // Page outputs go into pages/ subfolder
+  const pagesDir = resolve(outDir, "pages");
+  mkdirSync(pagesDir, { recursive: true });
+
   // Block markup
   writeFileSync(
-    resolve(outDir, `${input.pageName}.html`),
+    resolve(pagesDir, `${input.pageName}.html`),
     html,
     "utf-8",
   );
 
   // Report
   writeFileSync(
-    resolve(outDir, `${input.pageName}.report.json`),
+    resolve(pagesDir, `${input.pageName}.report.json`),
     JSON.stringify(report, null, 2) + "\n",
     "utf-8",
   );

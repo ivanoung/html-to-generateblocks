@@ -468,11 +468,16 @@ async function main(): Promise<void> {
           writeFileSync(resolve(setupDir, "manual-steps.txt"), readFileSync(srcManual, "utf-8"));
           unlinkSync(srcManual);
         }
+
+        // Copy styles.css to pages/ for easy access
+        const pagesDir = resolve(outDir, "pages");
+        writeFileSync(resolve(pagesDir, "styles.css"), fullCss);
+        unlinkSync(cssPath);
       }
 
       console.log(`\n  Done. ${pageContents.length} page(s) converted.`);
+      console.log(`  Pages:       ${outputDir}pages/`);
       console.log(`  Setup:       ${outputDir}setup/`);
-      console.log(`  Master CSS:  ${outputDir}styles.css`);
       console.log("");
       return;
     }
