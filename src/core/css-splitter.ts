@@ -46,7 +46,11 @@ function isSingleClassSelector(selector: string): boolean {
     .replace(/\\#/g, "#")
     .replace(/\\\./g, ".");
 
-  if (/[,\s>+~]/.test(unescaped)) return false;
+  // Reject functional pseudo-classes (contains parentheses) and compound class selectors
+  // (contains a dot after the leading dot, or a colon in the base).
+  const baseOnly = withoutPseudo.replace(/([^\\]|^)(:[a-zA-Z-]+)+$/, "$1");
+  if (/[,\s>+~:.()]/.test(baseOnly)) return false;
+  if (baseOnly.indexOf(".", 1) !== -1) return false;
 
   return /^\.[^,\s>+~]+$/.test(withoutPseudo) && !withoutPseudo.includes("::");
 }
@@ -115,6 +119,25 @@ function serializeRule(rule: css.Rule | css.Media): string {
     return `@keyframes ${kf.name}{${keyframesCss}}`;
   }
 
+  if (rule.type === "font-face") {
+    const ff = rule as css.FontFace;
+    const declarations = (ff.declarations || [])
+      .map((d) => `${d.property}:${d.value}`)
+      .join(";");
+    return `@font-face{${declarations}${declarations ? ";" : ""}}`;
+  }
+
+  if (rule.type === "supports") {
+    const sup = rule as css.Supports;
+    const innerCss = (sup.rules || [])
+      .map((r) => serializeRule(r as css.Rule))
+      .join("");
+    return `@supports ${sup.supports}{${innerCss}}`;
+  }
+
+  // Other at-rules: charset, import, namespace, page, etc.
+  // Return empty string — these are typically stripped during preprocessing
+  // and should not appear in compiled Tailwind output.
   return "";
 }
 
@@ -124,8 +147,11 @@ function serializeRule(rule: css.Rule | css.Media): string {
  * Classify a rule's declarations. Returns "uc" if ANY declaration
  * has a UC-only property or an unrecognized property. Returns "gs"
  * only if ALL properties are in the GS-eligible set.
+ * Empty rules (no declarations) default to UC to avoid noise.
  */
 function classifyDeclarations(declarations: css.Declaration[]): "gs" | "uc" {
+  if (declarations.length === 0) return "uc";
+
   for (const decl of declarations) {
     if (!decl.property) continue;
     const prop = decl.property.toLowerCase().trim();
@@ -174,6 +200,16 @@ function walkRule(
         // Pseudo-elements always UC
         if ((r.selectors || []).some((s) => s.includes("::"))) {
           ucChildren.push(r);
+          continue;
+        }
+
+        // Custom class names from style blocks get priority — skip property check
+        if (
+          (r.selectors || []).length === 1 &&
+          isSingleClassSelector(r.selectors![0]) &&
+          customClassNames.has(getClassName(r.selectors![0]))
+        ) {
+          gsChildren.push(r);
           continue;
         }
 
