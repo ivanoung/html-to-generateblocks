@@ -1,10 +1,18 @@
 // ── CSS Splitter ───────────────────────────────────────────
 //
 // Parses compiled CSS and splits into:
-// - globalStyles: only custom CSS classes (from <style> blocks) — design tokens
-// - uniqueCss: everything else (all Tailwind utilities, preflight, keyframes, etc.)
+// - globalStyles: structural + typography class rules (editor preview fidelity)
+// - uniqueCss: backgrounds, effects, colors, preflight, element selectors, keyframes
+//
+// Classification is property-based. Any rule with a UC-only property
+// goes entirely to uniqueCss. Rules with only GS-eligible properties
+// and a single-class selector become Global Style entries.
+// @media blocks are recursed into so responsive variants get
+// individual classification with their media wrapper preserved.
+// Unrecognized properties default to UC (safe fallback).
 
 import css from "css";
+import { GS_ELIGIBLE_PROPERTIES, UC_ONLY_PROPERTIES } from "./types.js";
 
 export interface GlobalStyleEntry {
   name: string;
@@ -16,6 +24,8 @@ export interface CssSplitResult {
   globalStyles: GlobalStyleEntry[];
   uniqueCss: string;
 }
+
+// ── Selector helpers (unchanged from original) ──────────────
 
 /**
  * Check if a CSS selector is a single class selector.
@@ -50,12 +60,9 @@ function extractBaseSelector(selector: string): string {
 
 /**
  * Get the unescaped class name (no dot, no escapes).
- * .py-2\\.5 → py-2\\.5 (keeping the backslash for the CSS escape)
- * Actually we want the raw name: .blueprint-bg → blueprint-bg
  */
 function getClassName(selector: string): string {
   const base = extractBaseSelector(selector);
-  // Remove leading dot and unescape CSS special chars
   return base
     .replace(/^\./, "")
     .replace(/\\(.)/g, "$1");
@@ -71,6 +78,8 @@ function classNameToName(className: string): string {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
+
+// ── CSS serialization ───────────────────────────────────────
 
 /**
  * Serialize a CSS rule AST node back to a CSS string.
@@ -109,10 +118,38 @@ function serializeRule(rule: css.Rule | css.Media): string {
   return "";
 }
 
+// ── Property classification ─────────────────────────────────
+
+/**
+ * Classify a rule's declarations. Returns "uc" if ANY declaration
+ * has a UC-only property or an unrecognized property. Returns "gs"
+ * only if ALL properties are in the GS-eligible set.
+ */
+function classifyDeclarations(declarations: css.Declaration[]): "gs" | "uc" {
+  for (const decl of declarations) {
+    if (!decl.property) continue;
+    const prop = decl.property.toLowerCase().trim();
+
+    if (UC_ONLY_PROPERTIES.has(prop)) return "uc";
+    if (GS_ELIGIBLE_PROPERTIES.has(prop)) continue;
+
+    // Unrecognized property → safe fallback to UC
+    return "uc";
+  }
+  return "gs";
+}
+
+// ── Rule walking ────────────────────────────────────────────
+
 /**
  * Walk a CSS rule and classify it.
- * Custom classes (from <style> blocks) → globalStyles.
- * Everything else → uniqueCss.
+ *
+ * Logic:
+ * - Pseudo-elements (::) → UC regardless of properties
+ * - @media blocks → recurse into children, classify each individually
+ * - Custom class name (from style blocks) + single class → GS (priority bypass)
+ * - All declarations GS-eligible + single class selector → GS
+ * - Everything else → UC
  */
 function walkRule(
   rule: css.Rule | css.Media,
@@ -121,9 +158,64 @@ function walkRule(
   customClassNames: Set<string>,
 ): void {
   if (rule.type === "media") {
-    // Media blocks always go to uniqueCss (responsive variants
-    // need their @media wrapper)
-    uniqueCssParts.push(serializeRule(rule));
+    // Recurse into @media children. Each child is classified individually.
+    // GS-eligible children get the @media wrapper in their css field.
+    // UC children get the @media wrapper in uniqueCssParts.
+    const media = rule as css.Media;
+    const children = media.rules || [];
+
+    const gsChildren: css.Rule[] = [];
+    const ucChildren: css.Rule[] = [];
+
+    for (const child of children) {
+      if (child.type === "rule") {
+        const r = child as css.Rule;
+
+        // Pseudo-elements always UC
+        if ((r.selectors || []).some((s) => s.includes("::"))) {
+          ucChildren.push(r);
+          continue;
+        }
+
+        const classification = classifyDeclarations(
+          (r.declarations || []) as css.Declaration[],
+        );
+
+        if (classification === "gs") {
+          gsChildren.push(r);
+        } else {
+          ucChildren.push(r);
+        }
+      } else {
+        // Nested @media, keyframes, etc. → serialize and treat as UC
+        ucChildren.push(child as css.Rule);
+      }
+    }
+
+    // Serialize UC children with @media wrapper
+    if (ucChildren.length > 0) {
+      const wrappedMedia: css.Media = { ...media, rules: ucChildren };
+      uniqueCssParts.push(serializeRule(wrappedMedia));
+    }
+
+    // Create GS entries for GS children with @media wrapper
+    for (const child of gsChildren) {
+      const selectors = child.selectors || [];
+      if (selectors.length === 1 && isSingleClassSelector(selectors[0])) {
+        const wrappedMedia: css.Media = { ...media, rules: [child] };
+        const selector = selectors[0];
+        const baseSelector = extractBaseSelector(selector);
+        globalStyles.push({
+          name: classNameToName(baseSelector),
+          selector: baseSelector,
+          css: serializeRule(wrappedMedia),
+        });
+      } else {
+        // Multi-selector or non-class inside @media → UC
+        const wrappedMedia: css.Media = { ...media, rules: [child] };
+        uniqueCssParts.push(serializeRule(wrappedMedia));
+      }
+    }
     return;
   }
 
@@ -131,6 +223,13 @@ function walkRule(
     const r = rule as css.Rule;
     const selectors = r.selectors || [];
 
+    // Pseudo-elements always UC
+    if (selectors.some((s) => s.includes("::"))) {
+      uniqueCssParts.push(serializeRule(r));
+      return;
+    }
+
+    // Custom class names from style blocks get priority — skip property check
     if (
       selectors.length === 1 &&
       isSingleClassSelector(selectors[0]) &&
@@ -138,14 +237,32 @@ function walkRule(
     ) {
       const selector = selectors[0];
       const baseSelector = extractBaseSelector(selector);
-      const ruleCss = serializeRule(r);
       globalStyles.push({
         name: classNameToName(baseSelector),
         selector: baseSelector,
-        css: ruleCss,
+        css: serializeRule(r),
+      });
+      return;
+    }
+
+    // Property-based classification
+    const classification = classifyDeclarations(
+      (r.declarations || []) as css.Declaration[],
+    );
+
+    if (
+      classification === "gs" &&
+      selectors.length === 1 &&
+      isSingleClassSelector(selectors[0])
+    ) {
+      const selector = selectors[0];
+      const baseSelector = extractBaseSelector(selector);
+      globalStyles.push({
+        name: classNameToName(baseSelector),
+        selector: baseSelector,
+        css: serializeRule(r),
       });
     } else {
-      // Everything else goes to uniqueCss
       uniqueCssParts.push(serializeRule(r));
     }
     return;
@@ -155,12 +272,17 @@ function walkRule(
   uniqueCssParts.push(serializeRule(rule));
 }
 
+// ── Main entry point ────────────────────────────────────────
+
 /**
- * Split compiled CSS into globalStyles (custom classes only) and uniqueCss (everything else).
+ * Split compiled CSS into globalStyles (structural + typography classes)
+ * and uniqueCss (backgrounds, effects, colors, preflight, keyframes, etc.).
  *
- * @param compiledCss   The full compiled CSS
- * @param customClassNames  Set of unescaped class names (no dot) that are custom
- *                          design tokens from the source <style> blocks.
+ * @param compiledCss     The full compiled CSS
+ * @param customClassNames Set of unescaped class names (no dot) that are
+ *                         custom design tokens from source style blocks.
+ *                         These bypass property checks and always go to GS
+ *                         if they are a single class selector.
  */
 export function splitCss(
   compiledCss: string,
