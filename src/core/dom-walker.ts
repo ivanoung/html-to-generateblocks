@@ -34,7 +34,7 @@ const INLINE_TAGS = new Set([
 /** Container tags that produce generateblocks/element when they have block children. */
 const CONTAINER_TAGS = new Set([
   "div", "section", "article", "aside", "header", "main",
-  "ul", "ol", "li", "dl", "dt", "dd", "figure",
+  "ul", "ol", "li", "dl", "dt", "dd", "figure", "nav", "footer",
 ]);
 
 /** Semantic containers that MUST stay as element blocks (recovery forbidden if text). */
@@ -399,7 +399,9 @@ function makeBlockByTag(
   }
 
   if (CONTAINER_TAGS.has(tag)) {
-    return makeElementBlock($el, $, tag, opts);
+    // Map nav and footer to section for WordPress compatibility
+    const outputTag = (tag === "nav" || tag === "footer") ? "section" : tag;
+    return makeElementBlock($el, $, outputTag, opts);
   }
 
   return null; // unrecognized
