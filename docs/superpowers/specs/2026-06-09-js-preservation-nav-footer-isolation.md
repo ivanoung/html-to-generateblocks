@@ -2,11 +2,13 @@
 
 > **Status:** Design approved — ready for implementation plan
 
-**Goal:** Preserve all JavaScript from source pages (external references + inline content), isolate nav/footer from the index page into separate fully-converted components, and reorganize output into a three-folder structure: `setup/`, `components/`, `pages/`.
+**Goal:** Preserve all JavaScript from source pages into a single `setup/global.js`, isolate nav/footer from the index page into fully-converted components, and reorganize output into `setup/`, `components/`, `pages/`.
 
-**Architecture:** A new `script-extractor.ts` module extracts and classifies `<script>` tags before the preprocessor strips them. The nav/footer are captured from the DOM before stripping and run through the full conversion pipeline. The CLI orchestrates the new folder structure and wires everything together.
+**Architecture:** A new `script-extractor.ts` module extracts all `<script>` tags before the preprocessor strips them and writes them to `setup/global.js`. The nav/footer are captured from the DOM before stripping and run through the full conversion pipeline. The CLI orchestrates the new folder structure.
 
-**Tech Stack:** TypeScript, cheerio (existing), Node.js fs/fetch
+**Key decision:** All JS goes to one file — no per-page split, no nav/footer JS isolation. This avoids animation breakage from script classification errors, load-order issues, and GB wrapper DOM changes. Load `global.js` on every page unconditionally.
+
+**Tech Stack:** TypeScript, cheerio (existing), Node.js fs
 
 ---
 
@@ -15,7 +17,7 @@
 ```
 output/mino/
   setup/
-    global.js                 ← scripts shared across ALL pages
+    global.js                 ← ALL scripts (external refs + inline content from every page, deduplicated)
     global-styles.json        ← class-based rules for GB import
     styles-unique.css         ← non-class CSS (keyframes, media queries, etc.)
     customizer-import.json    ← GeneratePress customizer settings
@@ -24,18 +26,14 @@ output/mino/
     nav/
       nav.html                ← nav as GB blocks (full pipeline)
       nav.report.json
-      nav.js                  ← nav-specific scripts (if any)
     footer/
-      footer.html
+      footer.html             ← footer as GB blocks (full pipeline)
       footer.report.json
-      footer.js
   pages/
     styles.css                ← master CSS (complete fallback)
     index.html                ← page GB blocks
-    index.js                  ← page-specific scripts
     index.report.json
     blog.html
-    blog.js
     blog.report.json
     ...
 ```
@@ -46,48 +44,45 @@ output/mino/
 
 ### Extraction
 
-All `<script>` tags are collected from each source page before the preprocessor strips them. Both external (`<script src="...">`) and inline (`<script>...</script>`) are captured.
+All `<script>` tags are collected from every source page before the preprocessor strips them. Both external (`<script src="...">`) and inline (`<script>...</script>`) are captured.
 
-### Classification (cross-page comparison)
+The minimum viable extractor — no classification, no per-page files:
 
-| Condition | Destination |
-|---|---|
-| Script appears on ALL pages | `setup/global.js` |
-| Script appears on some pages only | `pages/{pagename}.js` |
-
-- **Inline scripts:** compared by content after trimming whitespace
-- **External scripts:** compared by `src` URL (exact match)
-- Scripts are output in source order
+1. Walk every source page
+2. Collect all `<script>` tags (external by `src`, inline by `textContent`)
+3. Deduplicate: same `src` URL → skip duplicate; same inline content → skip duplicate
+4. Write all to `setup/global.js`
 
 ### JS File Format
 
 ```javascript
 // === External Scripts ===
 // Enqueue in functions.php or add via WPCode snippet plugin:
-//   Original: <script src="https://cdn.tailwindcss.com"></script>
-//   WP: wp_enqueue_script('tailwind-cdn', 'https://cdn.tailwindcss.com', [], null, true);
 //
-//   Original: <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
-//   WP: wp_enqueue_script('iconify', 'https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js', [], '1.0.7', true);
+//   <script src="https://cdn.tailwindcss.com"></script>
+//   wp_enqueue_script('tailwind-cdn', 'https://cdn.tailwindcss.com', [], null, true);
+//
+//   <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+//   wp_enqueue_script('iconify', 'https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js', [], '1.0.7', true);
 
 // === Inline Scripts ===
 
-// -- From index.html (shared) --
-(function() {
+// -- From index.html --
+document.addEventListener('DOMContentLoaded', function() {
   // preserved inline content
-})();
+});
+
+// -- From fast-seo.html --
+new Splide('.splide', { ... }).mount();
 ```
 
-- External scripts: comment with original tag + `wp_enqueue_script` suggestion
-- Inline scripts: content preserved as-is, preceded by source comment
-- Handle: `src` attribute for `script` named `iconify-icon` (don't enqueue twice if already in manual-steps)
+- External: comment block with original tag + `wp_enqueue_script` suggestion
+- Inline: content as-is, preceded by source page comment
+- Deduplication: by normalized content (trimmed) for inline, by `src` URL for external
 
 ### Nav/Footer JS
 
-Scripts found inside `<nav>` or `<footer>` HTML during extraction are treated as component-specific:
-- `<script>` tags inside nav → `components/nav/nav.js`
-- `<script>` tags inside footer → `components/footer/footer.js`
-- These are NOT included in page-level or global JS (they belong to the component)
+Scripts inside `<nav>` or `<footer>` are included in `global.js` along with everything else. No separate component JS files. This avoids breaking scroll-triggered animations and other cross-element JS that spans nav + page content.
 
 ---
 
@@ -95,30 +90,36 @@ Scripts found inside `<nav>` or `<footer>` HTML during extraction are treated as
 
 ### Source
 
-Extracted from the **index/home page** only (first page in project, assumed representative).
+Extracted from the **index/home page** only. Assumed representative for the entire site.
 
 ### Extraction
 
-Before the preprocessor's `STRIP_TAGS` logic removes `<nav>` and `<footer>`, their inner HTML is captured using cheerio. The full HTML snippet (including the tag itself) is saved for pipeline processing.
+Before the preprocessor's `STRIP_TAGS` logic removes `<nav>` and `<footer>`, their inner HTML is captured using cheerio. The original `<nav>`/`<footer>` wrapper is preserved in the captured HTML.
 
 ### Processing
 
-Each component runs through the full pipeline independently:
+Each component runs through the full conversion pipeline independently:
 
 1. **Preprocess** — strip scripts/links, resolve iconify, scan styles
 2. **DOM walk** — convert HTML elements to GB blocks
 3. **Serialize** — produce block markup
 4. **Validate** — check for issues
 
-The component is treated as a standalone page for conversion purposes. The Tailwind and custom CSS are already handled by the shared `styles.css` / `global-styles.json` — components just reference those.
+The shared `styles.css` / `global-styles.json` / `global.js` already provide CSS and JS — components just reference them.
 
-### Scripts
+### Output
 
-Any `<script>` tags inside the nav/footer HTML are extracted and output to the component's `.js` file. These are NOT included in global or page-level JS.
+```
+components/
+  nav/
+    nav.html          ← GB block markup
+    nav.report.json   ← conversion report
+  footer/
+    footer.html
+    footer.report.json
+```
 
-### Manual Steps
-
-Updated to reference `components/nav/nav.html` and `components/footer/footer.html` instead of "rebuild manually."
+No `.js` files for components — all JS in `setup/global.js`.
 
 ---
 
@@ -131,7 +132,6 @@ All page-level outputs move from `output/mino/` root into `output/mino/pages/`:
 | `index.html` | `output/mino/index.html` | `output/mino/pages/index.html` |
 | `index.report.json` | `output/mino/index.report.json` | `output/mino/pages/index.report.json` |
 | `styles.css` | `output/mino/styles.css` | `output/mino/pages/styles.css` |
-| Page JS files | (new) | `output/mino/pages/{name}.js` |
 
 ---
 
@@ -139,61 +139,74 @@ All page-level outputs move from `output/mino/` root into `output/mino/pages/`:
 
 ### New: `src/core/script-extractor.ts`
 
-- `extractScripts(html: string): ScriptEntry[]` — parse all `<script>` from HTML
-- `classifyScripts(allPages: Map<string, ScriptEntry[]>): { global: ScriptEntry[], perPage: Map<string, ScriptEntry[]> }` — cross-page comparison
-- `formatJsFile(scripts: ScriptEntry[]): string` — produce .js file content
-- `ScriptEntry` type: `{ type: 'external' | 'inline', src?: string, content: string, sourcePage: string }`
+```typescript
+export interface ScriptEntry {
+  type: 'external' | 'inline';
+  src?: string;        // external only
+  content: string;     // inline: the script text; external: the src URL
+  sourcePage: string;  // which page it came from
+}
+
+export function extractScripts(html: string, pageName: string): ScriptEntry[];
+export function deduplicateScripts(allScripts: ScriptEntry[]): ScriptEntry[];
+export function formatGlobalJs(scripts: ScriptEntry[]): string;
+```
 
 ### Modify: `src/core/preprocessor.ts`
 
-- Before stripping nav/footer, extract and return their HTML
+- Before stripping nav/footer, extract their HTML
 - New fields in `PreprocessResult`:
-  - `navHtml: string | null`
-  - `footerHtml: string | null`
+  ```typescript
+  navHtml: string | null;
+  footerHtml: string | null;
+  ```
 
 ### Modify: `src/core/orchestrator.ts`
 
-- `ConversionInput` gains optional `scripts: ScriptEntry[]` and `outputJsPath: string`
-- Write `.js` file alongside `.html` for each page
-- `styles.css` writes to `pages/` subfolder
+- Writing paths use `pages/` subfolder for page outputs
+- `styles.css` writes to `pages/` instead of project root
 
 ### Modify: `src/cli/index.ts`
 
-- Project mode: extract all scripts → classify → write `setup/global.js`
-- Per-page: extract page scripts → write `pages/{name}.js`
-- Extract nav/footer from index page → run full `convert()` → write to `components/`
-- Update all output paths to `pages/` subfolder
-- Update console output messages
+- Project mode:
+  1. Extract all scripts from all pages → deduplicate → write `setup/global.js`
+  2. Extract nav/footer from first page → run `convert()` → write to `components/`
+  3. Convert each page → write to `pages/`
+- Update all console output messages
+- Single-page mode also writes to `pages/` (consistent structure)
 
 ### Modify: `src/core/manual-steps.ts`
 
-- Reference `components/nav/nav.html` and `components/footer/footer.html`
-- Add step about `setup/global.js` and page `.js` files
-- Add WPCode/plugin suggestion for JS
+- Step for `components/nav/nav.html` and `components/footer/footer.html`
+- Step for `setup/global.js` — enqueue or use WPCode
+- Remove old "rebuild nav/footer manually" steps
 
 ---
 
 ## Error Handling
 
-- Page with no scripts → skip .js file creation (no empty file)
-- Nav/footer not present in source → skip component folder creation
-- Single page in project → all scripts go to `setup/global.js` (no per-page comparison needed)
+- Page with no scripts → skip script extraction for that page, global.js still generated from remaining pages
+- Nav/footer not present in source → skip component folder, no error
+- Single page in project → no deduplication needed, all scripts go to global.js
+- Empty global.js → skip file creation (don't write empty file)
 
 ## Testing
 
-- Unit test: `script-extractor` with sample HTML containing inline and external scripts
-- Unit test: cross-page classification logic
-- Fixture regression: `fixtures:run-all` — confirm no existing output breaks
-- Manual: run `convert inputs/mino/` and verify new folder structure
+- Unit test: `extractScripts` with inline + external scripts
+- Unit test: `deduplicateScripts` with duplicate inline + external entries
+- Unit test: `formatGlobalJs` output format
+- Fixture regression: `fixtures:run-all` — output paths changed, update snapshot expectations
+- Manual: `convert inputs/mino/` → verify folder structure
 
 ## Scope Boundaries
 
 **In scope:**
-- Script extraction, classification, and .js file generation
-- Nav/footer isolation with full pipeline conversion
+- Script extraction + deduplication → `setup/global.js`
+- Nav/footer isolation → `components/` with full pipeline conversion
 - Pages folder reorganization
 
 **Out of scope:**
-- Auto-enqueueing scripts in WordPress (manual step)
-- Smart detection of which page's nav/footer to use (always index page)
-- Combining nav/footer into a single template part (separate feature)
+- Per-page JS files
+- Component-specific JS files
+- Auto-enqueueing in WordPress
+- Nav/footer smart detection across pages
