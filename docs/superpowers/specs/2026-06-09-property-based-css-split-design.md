@@ -99,7 +99,7 @@ These properties, if present anywhere in a rule's declarations, force the entire
 - `background-repeat`
 - `background-attachment`
 - `background-clip`, `background-origin`
-- `background` (shorthand — treated as UC-only unless value is a simple color; see shorthand handling below)
+- `background` (shorthand — always UC-only regardless of value)
 - `background-blend-mode`
 
 **Effects**
@@ -145,11 +145,7 @@ These properties, if present anywhere in a rule's declarations, force the entire
 
 ### Background Shorthand Handling
 
-The `background` shorthand property is a special case. Its classification depends on the value:
-
-- If the value contains `url(`, `linear-gradient`, `radial-gradient`, `conic-gradient`, `repeating-`, or a comma (multi-layer) → **UC-only**
-- If the value is a simple color (hex, rgb, hsl, or named color) → treat as `background-color` → **GS-eligible**
-- All other values → **UC-only** (safe default)
+The `background` shorthand property is always **UC-only** regardless of value. This is consistent with `background-color` being UC-only. No special value inspection is needed — any rule containing `background` goes to styles-unique.css.
 
 ---
 
@@ -256,13 +252,12 @@ export function splitCss(
 ```
 
 **Key changes from current implementation:**
-1. Remove `isSingleClassSelector()` — still used but classification is no longer selector-driven
-2. Add `classifyDeclarations(declarations)` — checks each property against UC_ONLY / GS_ELIGIBLE
-3. Add `isBackgroundShorthandValueSafe(value)` — determines if `background` shorthand is a simple color
-4. `walkRule()` now recurses into `@media` children and classifies each individually
-5. `walkRule()` preserves `@media` wrapper when building GlobalStyleEntry.css for responsive classes
-6. Pseudo-element detection (`::`) continues to force UC
-7. Custom class names from `<style>` blocks still receive priority treatment (they can bypass property checks if they're known custom design tokens)
+1. `isSingleClassSelector()` — kept but classification is no longer selector-driven
+2. Add `classifyDeclarations(declarations)` — checks each declaration property against UC_ONLY / GS_ELIGIBLE
+3. `walkRule()` now recurses into `@media` children, classifying each individually
+4. `walkRule()` preserves `@media` wrapper when building GlobalStyleEntry.css for responsive classes
+5. Pseudo-element detection (`::`) continues to force UC
+6. Custom class names from `<style>` blocks still receive priority treatment (bypass property checks)
 
 ### Modify: `src/core/types.ts`
 
@@ -311,7 +306,6 @@ The `splitCss()` function signature remains compatible. Custom class names are s
 **In scope:**
 - Property-based classification replacing selector-pattern-based classification in `css-splitter.ts`
 - `@media` block recursion for responsive variant classification
-- `background` shorthand value inspection
 - Property set constants in `types.ts`
 - Unit tests for all classification scenarios
 - WPCodeBox load order documentation in `manual-steps.txt`
