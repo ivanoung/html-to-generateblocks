@@ -8,6 +8,7 @@
 // pass through to blocks as-is.
 
 import { chromium, type Browser, type Page } from "playwright";
+import { extractTailwindConfig } from "./tailwind-resolver.js";
 
 // ── Detection ──────────────────────────────────────────
 
@@ -35,6 +36,47 @@ export interface InlinerResult {
 // ── Main Entry Point ────────────────────────────────────
 
 export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResult> {
+  return compileWithPlaywright(rawHtml);
+}
+
+/**
+ * Compile Tailwind CSS from multiple pages by concatenating body content
+ * and loading in a headless browser with Tailwind CDN.
+ */
+export async function inlineTailwindMultiPage(
+  pageHtmls: string[],
+  pageNames: string[],
+): Promise<InlinerResult> {
+  const warnings: string[] = [];
+
+  // Extract body content from each page
+  const bodyParts = pageHtmls.map((html, i) => {
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    const body = bodyMatch ? bodyMatch[1] : html;
+    return `<!-- page:${pageNames[i]} -->\n${body}`;
+  });
+  const combinedBody = bodyParts.join("\n");
+
+  // Extract tailwind config from first page
+  const configJson = extractTailwindConfig(pageHtmls[0]) || "{}";
+
+  // Build CDN document
+  const cdnDoc = `<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = ${configJson}</script>
+</head><body>
+${combinedBody}
+</body></html>`;
+
+  return compileWithPlaywright(cdnDoc);
+}
+
+// ── Shared Playwright Compilation ──────────────────────
+
+async function compileWithPlaywright(html: string): Promise<InlinerResult> {
   const warnings: string[] = [];
   let browser: Browser | null = null;
 
@@ -43,7 +85,7 @@ export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResu
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
 
-    await page.setContent(rawHtml, { waitUntil: "networkidle" });
+    await page.setContent(html, { waitUntil: "networkidle" });
 
     try {
       await page.waitForFunction(
@@ -52,7 +94,7 @@ export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResu
           if (!el || !(el instanceof HTMLElement)) return false;
           return window.getComputedStyle(el).paddingTop !== "0px";
         },
-        { timeout: 10000 },
+        { timeout: 15000 },
       );
     } catch {
       warnings.push("Tailwind CDN did not compile within timeout");
@@ -71,7 +113,7 @@ export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResu
       document.querySelectorAll("[class]").forEach((el) => {
         const cls = (el as Element).className;
         if (typeof cls === "string") {
-          cls.split(/\s+/).filter(c => c.length > 0).forEach(c => classNames.add(c));
+          cls.split(/\s+/).filter((c: string) => c.length > 0).forEach((c: string) => classNames.add(c));
         }
       });
 
@@ -82,14 +124,14 @@ export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResu
     });
 
     return {
-      html: rawHtml,  // Return original HTML unchanged
+      html,
       stylesCss: payload.css,
       classNames: payload.classNames,
       warnings,
     };
   } catch (err: any) {
     warnings.push(`Tailwind compiler failed: ${err.message}`);
-    return { html: rawHtml, stylesCss: "", classNames: [], warnings };
+    return { html, stylesCss: "", classNames: [], warnings };
   } finally {
     if (browser) await browser.close();
   }

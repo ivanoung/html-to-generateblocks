@@ -18,7 +18,7 @@ import {
 } from "../runner/run-fixture.js";
 import type { Fixture, FixtureReport, ReportStatus } from "../core/types.js";
 import { convert } from "../core/orchestrator.js";
-import { inlineTailwindStyles, usesTailwind } from "../core/tailwind-inliner.js";
+import { inlineTailwindStyles, usesTailwind, inlineTailwindMultiPage } from "../core/tailwind-inliner.js";
 import { resolveIconifyIcons } from "../core/iconify-resolver.js";
 import { checkContentLoss } from "../core/content-verifier.js";
 import { compileTailwindOffline, extractTailwindConfig, validateTailwindConfig } from "../core/tailwind-resolver.js";
@@ -381,23 +381,23 @@ async function main(): Promise<void> {
       }
       const uniqueScripts = deduplicateScripts(allScripts);
 
-      // Stage 2: Compile Tailwind CSS offline (CLI, no browser timeout)
+      // Stage 2: Compile Tailwind CSS via CDN (Playwright, live DOM)
       let inlinerCss = "";
       const tailwindConfig = extractTailwindConfig(pageContents[0]?.html || "");
-      // Tailwind v3 --content needs a glob pattern, not individual file paths
-      const contentPattern = `${inputPath.replace(/\/$/, "")}/*.html`;
 
       if (tailwindConfig) {
-        console.log(`  Compiling Tailwind CSS from ${files.length} page(s) via CLI...`);
-        const result = compileTailwindOffline(tailwindConfig, [contentPattern], process.cwd());
-        if (result.error) {
-          console.log(`    [TW-ERROR] ${result.error}`);
-        } else {
-          inlinerCss = result.css;
-          console.log(`    ✓ Compiled (${(result.css.length / 1024).toFixed(1)} KB)`);
+        console.log(`  Compiling Tailwind CSS from ${files.length} page(s) via CDN...`);
+        const compiled = await inlineTailwindMultiPage(
+          pageContents.map((pc) => pc.html),
+          pageContents.map((pc) => pc.name),
+        );
+        if (compiled.warnings.length > 0) {
+          for (const w of compiled.warnings) console.log(`    [WARN] ${w}`);
         }
+        inlinerCss = compiled.stylesCss;
+        console.log(`    ✓ Compiled (${(compiled.stylesCss.length / 1024).toFixed(1)} KB)`);
 
-        // Validate config for known patterns (e.g., single-value colors missing shade variants)
+        // Validate config for known patterns
         const allPageClasses = new Set<string>();
         for (const pc of pageContents) {
           const classMatches = pc.html.match(/class="([^"]*)"/g) || [];
