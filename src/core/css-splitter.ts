@@ -132,7 +132,8 @@ function sanitizeSelector(selector: string): string {
     .replace(/\\:/g, "-")
     .replace(/\\\[/g, "-")
     .replace(/\\\]/g, "")
-    .replace(/\\\//g, "-");
+    .replace(/\\\//g, "-")
+    .replace(/\\%/g, "%");
 }
 
 // ── CSS serialization ───────────────────────────────────────
