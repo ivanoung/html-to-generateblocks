@@ -165,11 +165,17 @@ export function preprocess(rawHtml: string, skipStripNavFooter?: boolean): Prepr
     }
   });
 
-  // 5. Extract cleaned HTML (body contents)
+  // 5. Extract cleaned HTML with body classes preserved
+  const bodyClasses = $("body").attr("class") || "";
   const bodyHtml = $("body").html() || "";
+  // Wrap body content in a div that carries the body's classes
+  // so the DOM walker preserves blueprint-bg, font-sans, etc.
+  const html = bodyClasses
+    ? `<div class="${bodyClasses}">${bodyHtml}</div>`
+    : bodyHtml;
 
   return {
-    html: bodyHtml,
+    html,
     classNameToProperties,
     customCss,
     tailwindConfig,
