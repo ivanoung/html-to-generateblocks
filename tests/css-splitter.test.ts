@@ -22,12 +22,13 @@ describe("splitCss", () => {
     assert.ok(result.uniqueCss.includes("h1"), "h1 should be in uniqueCss");
   });
 
-  it("handles pseudo-classes on single-class selectors", () => {
+  it("puts pseudo-class selectors into uniqueCss (conservative — not safe for GS)", () => {
     const css = ".hover\\:bg-seafoam:hover{background-color:#93FFD8}";
     const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".hover\\:bg-seafoam");
-    assert.ok(result.globalStyles[0].css.includes(":hover"), "CSS should preserve pseudo-class");
+    // Pseudo-classes (:hover) are NOT safe for GS import (wp_kses_post may alter them)
+    assert.strictEqual(result.globalStyles.length, 0);
+    assert.ok(result.uniqueCss.includes(":hover"), "pseudo-class rule should be in uniqueCss");
+    assert.ok(result.uniqueCss.includes("background-color"), "CSS declaration should be preserved");
   });
 
   it("puts pseudo-element selectors into uniqueCss", () => {

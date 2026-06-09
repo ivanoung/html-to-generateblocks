@@ -108,6 +108,27 @@ function serializeRule(rule: css.Rule | css.Media): string {
 }
 
 /**
+ * Check if a CSS selector is a "plain" single class selector —
+ * no pseudo-classes, no opacity modifiers, no arbitrary values.
+ * These are the safest entries for GB Global Styles import.
+ */
+function isPlainClassSelector(selector: string): boolean {
+  if (!isSingleClassSelector(selector)) return false;
+
+  // No opacity modifiers (slash in selector — e.g., .text-seafoam\/80)
+  if (/\//.test(selector)) return false;
+
+  // No arbitrary values (brackets — e.g., .text-\[#e2e8f0\])
+  if (/\[/.test(selector)) return false;
+
+  // No pseudo-classes (:hover, :focus, :active, :checked, etc.)
+  // Check for a non-escaped colon before a pseudo-class name
+  if (/[^\\]:/.test(selector)) return false;
+
+  return true;
+}
+
+/**
  * Walk a CSS rule and classify it.
  */
 function walkRule(
@@ -128,24 +149,19 @@ function walkRule(
     const r = rule as css.Rule;
     const selectors = r.selectors || [];
 
-    if (selectors.length === 1 && isSingleClassSelector(selectors[0])) {
+    if (selectors.length === 1 && isPlainClassSelector(selectors[0])) {
       const selector = selectors[0];
       const baseSelector = extractBaseSelector(selector);
       const ruleCss = serializeRule(r);
       globalStyles.push({
         name: classNameToName(baseSelector),
         selector: baseSelector,
-        css: parentMediaQuery
-          ? `${parentMediaQuery}{${ruleCss}}`
-          : ruleCss,
+        css: ruleCss,
       });
     } else {
-      // All non-single-class rules go to uniqueCss (preflight, combinators,
-      // multi-selectors, pseudo-elements, etc.)
-      const serialized = parentMediaQuery
-        ? `${parentMediaQuery}{${serializeRule(r)}}`
-        : serializeRule(r);
-      uniqueCssParts.push(serialized);
+      // Everything else goes to uniqueCss (pseudo-classes, combinators,
+      // multi-selectors, pseudo-elements, opacity modifiers, arbitrary values)
+      uniqueCssParts.push(serializeRule(r));
     }
     return;
   }
