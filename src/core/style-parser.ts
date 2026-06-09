@@ -99,6 +99,7 @@ export const STYLES_PROPERTIES = new Set([
   "object-position",
 
   // background (from GB bgOptions panel)
+  "background-image",
   "background-size",
   "background-position",
   "background-repeat",
@@ -336,6 +337,7 @@ export function parseStyleString(raw: string | undefined | null): ParsedStyles {
  */
 export const CUSTOM_CAMEL_MAP: Record<string, string> = {
   "background-color": "backgroundColor",
+  "background-image": "backgroundImage",
   "border-radius": "borderRadius",
   "border-top-left-radius": "borderTopLeftRadius",
   "border-top-right-radius": "borderTopRightRadius",
