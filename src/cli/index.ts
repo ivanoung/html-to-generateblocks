@@ -462,7 +462,16 @@ async function main(): Promise<void> {
         mkdirSync(setupDir, { recursive: true });
 
         const fullCss = readFileSync(cssPath, "utf-8");
-        const split = splitCss(fullCss);
+
+        // Collect custom class names from the source <style> blocks
+        const { extractCustomClassNames } = await import("../core/preprocessor.js");
+        const customClassNames = extractCustomClassNames(pageContents[0].html);
+        for (let i = 1; i < pageContents.length; i++) {
+          const names = extractCustomClassNames(pageContents[i].html);
+          names.forEach((n) => customClassNames.add(n));
+        }
+
+        const split = splitCss(fullCss, customClassNames);
         writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(split.globalStyles, null, 2) + "\n", "utf-8");
         writeFileSync(resolve(setupDir, "styles-unique.css"), split.uniqueCss + "\n", "utf-8");
 

@@ -3,6 +3,27 @@
 // Prepares raw HTML for the DOM walker:
 //   1. Strip <nav>, <footer>, <script>, <link>
 //   2. Wrap <form>, body <style>, standalone <iconify-icon> in
+
+import * as cheerio from "cheerio";
+
+/**
+ * Extract custom class names from <style> blocks in HTML.
+ * Returns unescaped class names (no dot prefix).
+ */
+export function extractCustomClassNames(html: string): Set<string> {
+  const classNames = new Set<string>();
+  const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+  let styleMatch;
+  while ((styleMatch = styleRegex.exec(html)) !== null) {
+    const css = styleMatch[1];
+    const classRegex = /^\.([a-zA-Z_-][\w-]*)\s*\{/gm;
+    let classMatch;
+    while ((classMatch = classRegex.exec(css)) !== null) {
+      classNames.add(classMatch[1]);
+    }
+  }
+  return classNames;
+}
 //      <div data-gb-wrap="core-html"> markers
 //   3. Scan <head> <style> blocks → classNameToProperties map
 //      + customCss string (pseudo-classes, keyframes, vendor prefixes)
@@ -58,7 +79,7 @@ function isCssCompatible(ruleSelector: string, ruleProperties: string): boolean 
  * - classNameToProperties: simple class definitions suitable for GB globalClasses
  * - customCss: everything else
  */
-function scanHeadStyles($: cheerio.CheerioAPI): {
+export function scanHeadStyles($: cheerio.CheerioAPI): {
   classNameToProperties: Map<string, BlockStyles>;
   customCss: string;
 } {

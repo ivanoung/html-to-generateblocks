@@ -1,8 +1,8 @@
 // ── CSS Splitter ───────────────────────────────────────────
 //
 // Parses compiled CSS and splits into:
-// - globalStyles: single-class rules suitable for GB Global Styles import
-// - uniqueCss: everything else (preflight, element selectors, keyframes, etc.)
+// - globalStyles: only custom CSS classes (from <style> blocks) — design tokens
+// - uniqueCss: everything else (all Tailwind utilities, preflight, keyframes, etc.)
 
 import css from "css";
 
@@ -24,15 +24,10 @@ export interface CssSplitResult {
  *   combinators (a b, a>b, a+b, a~b)
  */
 function isSingleClassSelector(selector: string): boolean {
-  // Check for pseudo-elements (::before, ::after, ::-webkit-*, etc.)
   if (/::/.test(selector)) return false;
 
-  // Strip trailing pseudo-classes (:hover, :focus, :active, :first-child, etc.)
-  // but only if the colon is NOT CSS-escaped (not preceded by backslash)
   const withoutPseudo = selector.replace(/([^\\]|^)(:[a-zA-Z-]+)+$/, "$1");
 
-  // Remove CSS escaping for combinator detection — replace escapes with
-  // the actual characters they represent (e.g., \: → :, \/ → /)
   const unescaped = withoutPseudo
     .replace(/\\:/g, ":")
     .replace(/\\\//g, "/")
@@ -41,25 +36,33 @@ function isSingleClassSelector(selector: string): boolean {
     .replace(/\\#/g, "#")
     .replace(/\\\./g, ".");
 
-  // Check for combinators or multiple selectors (commas, spaces, >, +, ~)
   if (/[,\s>+~]/.test(unescaped)) return false;
 
-  // Must be a class selector: starts with ., no combinators, no pseudo-elements
   return /^\.[^,\s>+~]+$/.test(withoutPseudo) && !withoutPseudo.includes("::");
 }
 
 /**
- * Extract the base class name (without pseudo-classes) for the selector field.
- * .hover\:bg-seafoam:hover → .hover\:bg-seafoam
+ * Extract the base class name (without pseudo-classes).
  */
 function extractBaseSelector(selector: string): string {
-  // Only strip pseudo-classes NOT CSS-escaped
   return selector.replace(/([^\\]|^)(:[a-zA-Z-]+)+$/, "$1");
 }
 
 /**
- * Convert a kebab-case class name to Title Case for human-readable name.
- * pt-32 → Pt 32, bg-primary → Bg Primary
+ * Get the unescaped class name (no dot, no escapes).
+ * .py-2\\.5 → py-2\\.5 (keeping the backslash for the CSS escape)
+ * Actually we want the raw name: .blueprint-bg → blueprint-bg
+ */
+function getClassName(selector: string): string {
+  const base = extractBaseSelector(selector);
+  // Remove leading dot and unescape CSS special chars
+  return base
+    .replace(/^\./, "")
+    .replace(/\\(.)/g, "$1");
+}
+
+/**
+ * Convert a kebab-case class name to Title Case.
  */
 function classNameToName(className: string): string {
   const clean = className.replace(/^\./, "").replace(/(:[a-zA-Z-]+)+$/, "");
@@ -90,7 +93,6 @@ function serializeRule(rule: css.Rule | css.Media): string {
     return `${selector}{${declarations}${declarations ? ";" : ""}}`;
   }
 
-  // keyframes, font-face, etc.
   if (rule.type === "keyframes") {
     const kf = rule as css.KeyFrames;
     const keyframesCss = (kf.keyframes || [])
@@ -108,39 +110,19 @@ function serializeRule(rule: css.Rule | css.Media): string {
 }
 
 /**
- * Check if a CSS selector is a "plain" single class selector —
- * no pseudo-classes, no opacity modifiers, no arbitrary values.
- * These are the safest entries for GB Global Styles import.
- */
-function isPlainClassSelector(selector: string): boolean {
-  if (!isSingleClassSelector(selector)) return false;
-
-  // No opacity modifiers (slash in selector — e.g., .text-seafoam\/80)
-  if (/\//.test(selector)) return false;
-
-  // No arbitrary values (brackets — e.g., .text-\[#e2e8f0\])
-  if (/\[/.test(selector)) return false;
-
-  // No pseudo-classes (:hover, :focus, :active, :checked, etc.)
-  // Check for a non-escaped colon before a pseudo-class name
-  if (/[^\\]:/.test(selector)) return false;
-
-  return true;
-}
-
-/**
  * Walk a CSS rule and classify it.
+ * Custom classes (from <style> blocks) → globalStyles.
+ * Everything else → uniqueCss.
  */
 function walkRule(
   rule: css.Rule | css.Media,
-  parentMediaQuery: string | null,
   globalStyles: GlobalStyleEntry[],
   uniqueCssParts: string[],
+  customClassNames: Set<string>,
 ): void {
   if (rule.type === "media") {
-    const media = rule as css.Media;
-    // Media blocks stay intact in uniqueCss (responsive variants
-    // need their @media wrapper and can't go into global-styles.json)
+    // Media blocks always go to uniqueCss (responsive variants
+    // need their @media wrapper)
     uniqueCssParts.push(serializeRule(rule));
     return;
   }
@@ -149,7 +131,11 @@ function walkRule(
     const r = rule as css.Rule;
     const selectors = r.selectors || [];
 
-    if (selectors.length === 1 && isPlainClassSelector(selectors[0])) {
+    if (
+      selectors.length === 1 &&
+      isSingleClassSelector(selectors[0]) &&
+      customClassNames.has(getClassName(selectors[0]))
+    ) {
       const selector = selectors[0];
       const baseSelector = extractBaseSelector(selector);
       const ruleCss = serializeRule(r);
@@ -159,8 +145,7 @@ function walkRule(
         css: ruleCss,
       });
     } else {
-      // Everything else goes to uniqueCss (pseudo-classes, combinators,
-      // multi-selectors, pseudo-elements, opacity modifiers, arbitrary values)
+      // Everything else goes to uniqueCss
       uniqueCssParts.push(serializeRule(r));
     }
     return;
@@ -171,11 +156,19 @@ function walkRule(
 }
 
 /**
- * Split compiled CSS into globalStyles (single-class rules) and uniqueCss (everything else).
+ * Split compiled CSS into globalStyles (custom classes only) and uniqueCss (everything else).
+ *
+ * @param compiledCss   The full compiled CSS
+ * @param customClassNames  Set of unescaped class names (no dot) that are custom
+ *                          design tokens from the source <style> blocks.
  */
-export function splitCss(compiledCss: string): CssSplitResult {
+export function splitCss(
+  compiledCss: string,
+  customClassNames?: Set<string>,
+): CssSplitResult {
   const globalStyles: GlobalStyleEntry[] = [];
   const uniqueCssParts: string[] = [];
+  const customSet = customClassNames ?? new Set<string>();
 
   if (!compiledCss.trim()) {
     return { globalStyles: [], uniqueCss: "" };
@@ -186,14 +179,13 @@ export function splitCss(compiledCss: string): CssSplitResult {
     const rules = ast.stylesheet?.rules || [];
 
     for (const rule of rules) {
-      walkRule(rule as css.Rule | css.Media, null, globalStyles, uniqueCssParts);
+      walkRule(rule as css.Rule | css.Media, globalStyles, uniqueCssParts, customSet);
     }
   } catch {
     return { globalStyles: [], uniqueCss: compiledCss };
   }
 
-  // Deduplicate: merge entries with the same selector (e.g., .container
-  // appears at top-level and inside multiple @media breakpoints)
+  // Deduplicate: merge entries with the same selector
   const merged = new Map<string, GlobalStyleEntry>();
   for (const entry of globalStyles) {
     const existing = merged.get(entry.selector);
