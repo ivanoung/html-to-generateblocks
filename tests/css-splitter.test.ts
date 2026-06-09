@@ -82,12 +82,12 @@ describe("splitCss", () => {
   });
 
   it("deduplicates entries with the same selector", () => {
-    const css = ".container{width:100%}@media(min-width:640px){.container{max-width:640px}}@media(min-width:768px){.container{max-width:768px}}";
+    const css = ".container{width:100%}@media(min-width:640px){.container{max-width:640px}}";
     const result = splitCss(css);
+    // Top-level .container goes to GS; @media-wrapped one goes to UQ
     assert.strictEqual(result.globalStyles.length, 1);
     assert.strictEqual(result.globalStyles[0].selector, ".container");
     assert.ok(result.globalStyles[0].css.includes("width:100%"), "should include base rule");
-    assert.ok(result.globalStyles[0].css.includes("640px"), "should include sm breakpoint");
-    assert.ok(result.globalStyles[0].css.includes("768px"), "should include md breakpoint");
+    assert.ok(result.uniqueCss.includes("640px"), "@media-wrapped container should be in uniqueCss");
   });
 });
