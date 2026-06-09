@@ -10,7 +10,7 @@
 //   regression                 Check M1 fixtures against snapshots
 
 import { resolve, basename, extname } from "node:path";
-import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, rmdirSync } from "node:fs";
 import {
   runFixture, loadFixture, writeOutput,
   runFidelityFixture, isFidelityFixture,
@@ -23,6 +23,7 @@ import { resolveIconifyIcons } from "../core/iconify-resolver.js";
 import { checkContentLoss } from "../core/content-verifier.js";
 import { compileTailwindOffline, extractTailwindConfig, validateTailwindConfig } from "../core/tailwind-resolver.js";
 import { splitCss } from "../core/css-splitter.js";
+import { extractScripts, deduplicateScripts, formatGlobalJs } from "../core/script-extractor.js";
 
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
 const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
@@ -373,6 +374,13 @@ async function main(): Promise<void> {
         combinedHtml += `<!-- page:${name} -->\n${html}\n`;
       }
 
+      // Stage 1.5: Extract all scripts for global.js
+      const allScripts = [];
+      for (const pc of pageContents) {
+        allScripts.push(...extractScripts(pc.html, pc.name));
+      }
+      const uniqueScripts = deduplicateScripts(allScripts);
+
       // Stage 2: Compile Tailwind CSS offline (CLI, no browser timeout)
       let inlinerCss = "";
       const tailwindConfig = extractTailwindConfig(pageContents[0]?.html || "");
@@ -448,8 +456,9 @@ async function main(): Promise<void> {
 
       // After all pages: split styles.css into setup/ folder
       const cssPath = resolve(outDir, "styles.css");
+      const setupDir = resolve(outDir, "setup");
+      const pagesDir = resolve(outDir, "pages");
       if (existsSync(cssPath)) {
-        const setupDir = resolve(outDir, "setup");
         mkdirSync(setupDir, { recursive: true });
 
         const fullCss = readFileSync(cssPath, "utf-8");
@@ -470,9 +479,65 @@ async function main(): Promise<void> {
         }
 
         // Copy styles.css to pages/ for easy access
-        const pagesDir = resolve(outDir, "pages");
         writeFileSync(resolve(pagesDir, "styles.css"), fullCss);
         unlinkSync(cssPath);
+      }
+
+      // Write global.js with all scripts
+      if (uniqueScripts.length > 0) {
+        writeFileSync(resolve(setupDir, "global.js"), formatGlobalJs(uniqueScripts), "utf-8");
+      }
+
+      // Convert nav and footer components from the index page
+      const firstPageHtml = pageContents[0]?.html || "";
+      const { preprocess } = await import("../core/preprocessor.js");
+      const prepResult = preprocess(firstPageHtml);
+
+      if (prepResult.navHtml) {
+        console.log(`  Converting nav component...`);
+        const navDir = resolve(outDir, "components", "nav");
+        mkdirSync(navDir, { recursive: true });
+        const navDoc = `<!DOCTYPE html><html><head></head><body>${prepResult.navHtml}</body></html>`;
+        await convert({
+          rawHtml: navDoc,
+          pageName: "nav",
+          projectDir: projectDir ? `${projectDir}/components/nav` : undefined,
+          skipShared: true,
+          skipInliner: true,
+        });
+        // Flatten: components/nav/pages/nav.html → components/nav/nav.html
+        const nestedPages = resolve(navDir, "pages");
+        if (existsSync(nestedPages)) {
+          for (const f of readdirSync(nestedPages)) {
+            writeFileSync(resolve(navDir, f), readFileSync(resolve(nestedPages, f)));
+            unlinkSync(resolve(nestedPages, f));
+          }
+          rmdirSync(nestedPages);
+        }
+        console.log(`    ✓ nav converted`);
+      }
+
+      if (prepResult.footerHtml) {
+        console.log(`  Converting footer component...`);
+        const footerDir = resolve(outDir, "components", "footer");
+        mkdirSync(footerDir, { recursive: true });
+        const footerDoc = `<!DOCTYPE html><html><head></head><body>${prepResult.footerHtml}</body></html>`;
+        await convert({
+          rawHtml: footerDoc,
+          pageName: "footer",
+          projectDir: projectDir ? `${projectDir}/components/footer` : undefined,
+          skipShared: true,
+          skipInliner: true,
+        });
+        const nestedPages = resolve(footerDir, "pages");
+        if (existsSync(nestedPages)) {
+          for (const f of readdirSync(nestedPages)) {
+            writeFileSync(resolve(footerDir, f), readFileSync(resolve(nestedPages, f)));
+            unlinkSync(resolve(nestedPages, f));
+          }
+          rmdirSync(nestedPages);
+        }
+        console.log(`    ✓ footer converted`);
       }
 
       console.log(`\n  Done. ${pageContents.length} page(s) converted.`);
