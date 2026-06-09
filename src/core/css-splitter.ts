@@ -101,15 +101,15 @@ function classNameToName(className: string): string {
  */
 function toSafeCssSelector(selector: string): string {
   // Only convert class selectors that have CSS escapes
-  if (!selector.startsWith(".") || !/[\\]:\[\/]/.test(selector)) {
+  if (!selector.startsWith(".") || !/[\\:\[\]\/]/.test(selector)) {
     return selector;
   }
 
-  // Extract pseudo-classes from the end of the selector
-  // Matches trailing :pseudo chains like :hover, :focus, :nth-child(2)
-  const pseudoMatch = selector.match(/^(\.[\s\S]+?)((?::[a-zA-Z-]+(?:\([^)]*\))?)+)$/);
-  const base = pseudoMatch ? pseudoMatch[1] : selector;
-  const pseudo = pseudoMatch ? pseudoMatch[2] : "";
+  // Use existing helper to split pseudo-classes from the base selector.
+  // extractBaseSelector correctly handles CSS-escaped colons (e.g. .md\:flex)
+  // and only strips real pseudo-classes at the END of the selector.
+  const base = extractBaseSelector(selector);
+  const pseudo = selector.slice(base.length);
 
   // Unescape the class portion: strip leading dot, then remove backslash escapes
   const rawClass = base
@@ -140,11 +140,11 @@ function sanitizeSelector(selector: string): string {
 /**
  * Serialize a CSS rule AST node back to a CSS string.
  */
-function serializeRule(rule: css.Rule | css.Media): string {
+function serializeRule(rule: css.Rule | css.Media, safe = false): string {
   if (rule.type === "media") {
     const media = rule as css.Media;
     const innerCss = (media.rules || [])
-      .map((r) => serializeRule(r as css.Rule))
+      .map((r) => serializeRule(r as css.Rule, safe))
       .join("");
     return `@media ${media.media}{${innerCss}}`;
   }
@@ -152,7 +152,7 @@ function serializeRule(rule: css.Rule | css.Media): string {
   if (rule.type === "rule") {
     const r = rule as css.Rule;
     const selector = (r.selectors || [])
-      .map((s) => toSafeCssSelector(s))
+      .map((s) => safe ? toSafeCssSelector(s) : s)
       .join(",");
     const declarations = (r.declarations || [])
       .map((d) => `${d.property}:${d.value}`)
@@ -298,7 +298,7 @@ function walkRule(
         globalStyles.push({
           name: classNameToName(baseSelector),
           selector: sanitizeSelector(baseSelector),
-          css: serializeRule(wrappedMedia),
+          css: serializeRule(wrappedMedia, true),
         });
       } else {
         // Multi-selector or non-class inside @media → UC
@@ -330,7 +330,7 @@ function walkRule(
       globalStyles.push({
         name: classNameToName(baseSelector),
         selector: sanitizeSelector(baseSelector),
-        css: serializeRule(r),
+        css: serializeRule(r, true),
       });
       return;
     }
@@ -350,7 +350,7 @@ function walkRule(
       globalStyles.push({
         name: classNameToName(baseSelector),
         selector: sanitizeSelector(baseSelector),
-        css: serializeRule(r),
+        css: serializeRule(r, true),
       });
     } else {
       uniqueCssParts.push(serializeRule(r));

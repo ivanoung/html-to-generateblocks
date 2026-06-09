@@ -140,7 +140,7 @@ describe("splitCss — property-based classification", () => {
     const css = "@media(min-width:768px){.md\\:flex{display:flex}}";
     const result = splitCss(css);
     assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".md\\:flex");
+    assert.strictEqual(result.globalStyles[0].selector, ".md-flex");
     assert.ok(result.globalStyles[0].css.includes("@media"));
     assert.ok(result.globalStyles[0].css.includes("display:flex"));
   });
@@ -149,7 +149,7 @@ describe("splitCss — property-based classification", () => {
     const css = "@media(min-width:768px){.md\\:text-7xl{font-size:4.5rem;line-height:1}}";
     const result = splitCss(css);
     assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".md\\:text-7xl");
+    assert.strictEqual(result.globalStyles[0].selector, ".md-text-7xl");
     assert.ok(result.globalStyles[0].css.includes("@media"));
   });
 
@@ -165,7 +165,7 @@ describe("splitCss — property-based classification", () => {
     const css = "@media(min-width:768px){.md\\:flex{display:flex}.md\\:shadow{box-shadow:0 2px 4px rgba(0,0,0,0.1)}}";
     const result = splitCss(css);
     assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".md\\:flex");
+    assert.strictEqual(result.globalStyles[0].selector, ".md-flex");
     assert.ok(result.uniqueCss.includes("md\\:shadow"));
   });
 
@@ -321,5 +321,94 @@ describe("splitCss — property-based classification", () => {
     const names = result.globalStyles.map((s) => s.name);
     assert.ok(names.some((n) => n.includes("Pt") && n.includes("32")), "should name pt-32");
     assert.ok(names.some((n) => n.includes("Md") && n.includes("7xl")), "should name md:7xl");
+  });
+
+  // ── WordPress-safe selector conversion ─────────────────────
+
+  it("simple class: selector unchanged, css unchanged", () => {
+    const css = ".flex{display:flex}";
+    const result = splitCss(css);
+    assert.strictEqual(result.globalStyles.length, 1);
+    assert.strictEqual(result.globalStyles[0].selector, ".flex");
+    assert.strictEqual(result.globalStyles[0].css, ".flex{display:flex;}");
+  });
+
+  it("responsive variant: selector sanitized, css uses attribute selector", () => {
+    const css = ".md\\:flex{display:flex}";
+    const result = splitCss(css);
+    assert.strictEqual(result.globalStyles.length, 1);
+    assert.strictEqual(result.globalStyles[0].selector, ".md-flex");
+    assert.strictEqual(result.globalStyles[0].css, '[class~="md:flex"]{display:flex;}');
+  });
+
+  it("arbitrary value brackets: selector sanitized, css uses attribute selector", () => {
+    const css = ".w-\\[600px\\]{width:600px}";
+    const result = splitCss(css);
+    assert.strictEqual(result.globalStyles.length, 1);
+    assert.strictEqual(result.globalStyles[0].selector, ".w--600px");
+    assert.strictEqual(result.globalStyles[0].css, '[class~="w-[600px]"]{width:600px;}');
+  });
+
+  it("fraction slash: selector sanitized, css uses attribute selector", () => {
+    const css = ".w-1\\/2{width:50%}";
+    const result = splitCss(css);
+    assert.strictEqual(result.globalStyles.length, 1);
+    assert.strictEqual(result.globalStyles[0].selector, ".w-1-2");
+    assert.strictEqual(result.globalStyles[0].css, '[class~="w-1/2"]{width:50%;}');
+  });
+
+  it("pseudo-class preserved outside attribute selector", () => {
+    const css = ".hover\\:flex:hover{display:flex}";
+    const result = splitCss(css);
+    assert.strictEqual(result.globalStyles.length, 1);
+    assert.strictEqual(result.globalStyles[0].selector, ".hover-flex");
+    assert.strictEqual(result.globalStyles[0].css, '[class~="hover:flex"]:hover{display:flex;}');
+  });
+
+  it("responsive variant inside @media: selector sanitized, css uses attribute selector", () => {
+    const css = "@media(min-width:768px){.lg\\:flex{display:flex}}";
+    const result = splitCss(css);
+    assert.strictEqual(result.globalStyles.length, 1);
+    assert.strictEqual(result.globalStyles[0].selector, ".lg-flex");
+    assert.ok(result.globalStyles[0].css.includes("@media"));
+    assert.ok(result.globalStyles[0].css.includes('[class~="lg:flex"]'));
+  });
+
+  it("multiple simple classes unchanged", () => {
+    const css = ".flex{display:flex}.grid{display:grid}.pt-32{padding-top:8rem}";
+    const result = splitCss(css);
+    assert.strictEqual(result.globalStyles.length, 3);
+    assert.strictEqual(result.globalStyles[0].selector, ".flex");
+    assert.strictEqual(result.globalStyles[1].selector, ".grid");
+    assert.strictEqual(result.globalStyles[2].selector, ".pt-32");
+  });
+
+  it("mixed: escaped and simple classes in separate rules", () => {
+    const css = ".flex{display:flex}.md\\:flex{display:flex}";
+    const result = splitCss(css);
+    assert.strictEqual(result.globalStyles.length, 2);
+    const simple = result.globalStyles.find(s => s.selector === ".flex");
+    assert.ok(simple);
+    const escaped = result.globalStyles.find(s => s.selector === ".md-flex");
+    assert.ok(escaped);
+    assert.strictEqual(escaped.css, '[class~="md:flex"]{display:flex;}');
+  });
+
+  it("selector field deduplication works with sanitized selectors", () => {
+    const css = ".md\\:flex{display:flex}.md\\:flex{width:100%}";
+    const result = splitCss(css);
+    assert.strictEqual(result.globalStyles.length, 1);
+    assert.strictEqual(result.globalStyles[0].selector, ".md-flex");
+    assert.ok(result.globalStyles[0].css.includes("display:flex"));
+    assert.ok(result.globalStyles[0].css.includes("width:100%"));
+  });
+
+  it("custom class with escapes: selector sanitized, css converted", () => {
+    const css = ".my\\:custom{display:flex}";
+    const custom = new Set(["my:custom"]);
+    const result = splitCss(css, custom);
+    assert.strictEqual(result.globalStyles.length, 1);
+    assert.strictEqual(result.globalStyles[0].selector, ".my-custom");
+    assert.strictEqual(result.globalStyles[0].css, '[class~="my:custom"]{display:flex;}');
   });
 });
