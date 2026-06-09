@@ -18,6 +18,8 @@ export interface PreprocessResult {
   customCss: string;
   tailwindConfig: string | null;
   warnings: string[];
+  navHtml: string | null;
+  footerHtml: string | null;
 }
 
 // Tags to strip entirely
@@ -117,6 +119,12 @@ export function preprocess(rawHtml: string): PreprocessResult {
 
   const $ = cheerio.load(rawHtml);
 
+  // 0.5. Capture nav and footer HTML before stripping
+  const navEl = $("nav").first();
+  const navHtml = navEl.length > 0 ? $.html(navEl) : null;
+  const footerEl = $("footer").first();
+  const footerHtml = footerEl.length > 0 ? $.html(footerEl) : null;
+
   // 1. Strip nav, footer, script, link
   STRIP_TAGS.forEach((tag) => {
     const count = $(tag).length;
@@ -163,5 +171,7 @@ export function preprocess(rawHtml: string): PreprocessResult {
     customCss,
     tailwindConfig,
     warnings,
+    navHtml,
+    footerHtml,
   };
 }
