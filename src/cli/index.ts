@@ -491,7 +491,7 @@ async function main(): Promise<void> {
       // Convert nav and footer components from the index page
       const firstPageHtml = pageContents[0]?.html || "";
       const { preprocess } = await import("../core/preprocessor.js");
-      const prepResult = preprocess(firstPageHtml);
+      const prepResult = preprocess(firstPageHtml, true);
 
       if (prepResult.navHtml) {
         console.log(`  Converting nav component...`);
@@ -504,6 +504,7 @@ async function main(): Promise<void> {
           projectDir: projectDir ? `${projectDir}/components/nav` : undefined,
           skipShared: true,
           skipInliner: true,
+          skipStripNavFooter: true,
         });
         // Flatten: components/nav/pages/nav.html → components/nav/nav.html
         const nestedPages = resolve(navDir, "pages");
@@ -528,6 +529,7 @@ async function main(): Promise<void> {
           projectDir: projectDir ? `${projectDir}/components/footer` : undefined,
           skipShared: true,
           skipInliner: true,
+          skipStripNavFooter: true,
         });
         const nestedPages = resolve(footerDir, "pages");
         if (existsSync(nestedPages)) {

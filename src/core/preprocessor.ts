@@ -111,7 +111,7 @@ function isStandaloneIcon($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): boo
   return !INLINE_TAGS.has(parentTag) && parentTag !== "";
 }
 
-export function preprocess(rawHtml: string): PreprocessResult {
+export function preprocess(rawHtml: string, skipStripNavFooter?: boolean): PreprocessResult {
   const warnings: string[] = [];
 
   // 0. Extract tailwind config BEFORE cheerio strips <script>
@@ -126,7 +126,10 @@ export function preprocess(rawHtml: string): PreprocessResult {
   const footerHtml = footerEl.length > 0 ? $.html(footerEl) : null;
 
   // 1. Strip nav, footer, script, link
-  STRIP_TAGS.forEach((tag) => {
+  const tagsToStrip = skipStripNavFooter
+    ? new Set(["script", "link"])
+    : STRIP_TAGS;
+  tagsToStrip.forEach((tag) => {
     const count = $(tag).length;
     if (count > 0) {
       warnings.push(`Stripped ${count} <${tag}> element(s)`);

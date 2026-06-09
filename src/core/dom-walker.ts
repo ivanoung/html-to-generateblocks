@@ -477,6 +477,7 @@ export function walkDom(
   html: string,
   classNameToProperties: Map<string, BlockStyles>,
   collector: GlobalStylesCollector,
+  allowNavFooter?: boolean,
 ): WalkResult {
   const warnings: string[] = [];
   const hardFails: { code: string; message: string }[] = [];
@@ -490,7 +491,8 @@ export function walkDom(
   if ($wrapper.length > 0) {
     $wrapper.children().each((_, el) => {
       const tag = (el as any).name?.toLowerCase() || "";
-      if (tag === "nav" || tag === "footer" || tag === "script" || tag === "style") return;
+      if (!allowNavFooter && (tag === "nav" || tag === "footer")) return;
+      if (tag === "script" || tag === "style") return;
 
       const $el = $(el);
       blocks.push(...walkElement($el, $, opts));

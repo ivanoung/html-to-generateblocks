@@ -27,6 +27,7 @@ export interface ConversionInput {
   resolveCss?: boolean;
   skipShared?: boolean;  // skip styles.css, customizer, manual-steps
   skipInliner?: boolean; // skip Tailwind inliner + iconify resolver (CSS already compiled)
+  skipStripNavFooter?: boolean; // skip stripping nav/footer (for component conversion)
 }
 
 export interface ConversionOutput {
@@ -70,7 +71,7 @@ export async function convert(
   }
 
   // Stage 1: Preprocess
-  const prepResult = preprocess(rawHtml);
+  const prepResult = preprocess(rawHtml, input.skipStripNavFooter);
 
   // Stage 2: Register class definitions in collector
   const collector = new GlobalStylesCollector(input.pageName);
@@ -83,6 +84,7 @@ export async function convert(
     prepResult.html,
     prepResult.classNameToProperties,
     collector,
+    input.skipStripNavFooter,
   );
 
   // Collect all warnings
