@@ -12,14 +12,14 @@ describe("splitCss", () => {
     assert.strictEqual(result.uniqueCss, "");
   });
 
-  it("excludes element selectors from uniqueCss (preflight stays in master only)", () => {
+  it("includes element selectors in uniqueCss (preflight resets go with unique CSS)", () => {
     const css = "body{margin:0}h1{font-size:2rem}.foo{color:red}";
     const result = splitCss(css);
     assert.strictEqual(result.globalStyles.length, 1);
     assert.strictEqual(result.globalStyles[0].selector, ".foo");
-    // Element selectors should NOT be in unique CSS
-    assert.ok(!result.uniqueCss.includes("body"), "body should NOT be in uniqueCss");
-    assert.ok(!result.uniqueCss.includes("h1"), "h1 should NOT be in uniqueCss");
+    // Element selectors SHOULD be in uniqueCss since they include preflight resets
+    assert.ok(result.uniqueCss.includes("body"), "body should be in uniqueCss");
+    assert.ok(result.uniqueCss.includes("h1"), "h1 should be in uniqueCss");
   });
 
   it("handles pseudo-classes on single-class selectors", () => {
@@ -40,10 +40,11 @@ describe("splitCss", () => {
   it("puts multi-selector rules into uniqueCss", () => {
     const css = "h1,h2,h3{font-weight:bold}*,:after,:before{box-sizing:border-box}.group:hover .group-hover\\:text-primary{color:red}";
     const result = splitCss(css);
-    // Element multi-selectors are excluded (preflight stays in master only)
     // Class-based combinator rules go to unique CSS
+    // Element multi-selectors also go to uniqueCss (no more exclusion)
     assert.strictEqual(result.globalStyles.length, 0);
     assert.ok(result.uniqueCss.includes("group-hover"), "class combinator rule should be in uniqueCss");
+    assert.ok(result.uniqueCss.includes("h1,h2,h3"), "element multi-selector should be in uniqueCss");
   });
 
   it("keeps @media blocks intact in uniqueCss", () => {
@@ -82,12 +83,11 @@ describe("splitCss", () => {
   });
 
   it("deduplicates entries with the same selector", () => {
-    const css = ".container{width:100%}@media(min-width:640px){.container{max-width:640px}}";
+    const css = ".container{width:100%}.container{max-width:1600px}";
     const result = splitCss(css);
-    // Top-level .container goes to GS; @media-wrapped one goes to UQ
     assert.strictEqual(result.globalStyles.length, 1);
     assert.strictEqual(result.globalStyles[0].selector, ".container");
-    assert.ok(result.globalStyles[0].css.includes("width:100%"), "should include base rule");
-    assert.ok(result.uniqueCss.includes("640px"), "@media-wrapped container should be in uniqueCss");
+    assert.ok(result.globalStyles[0].css.includes("width:100%"), "should include first rule");
+    assert.ok(result.globalStyles[0].css.includes("max-width:1600px"), "should include second rule");
   });
 });
