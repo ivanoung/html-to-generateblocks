@@ -19,8 +19,10 @@ export function analyzeSource(html: string): ManualSteps {
   const fontMatch = html.match(/fonts\.googleapis\.com\/css2\?family=([^"'\s]+)/);
   if (fontMatch) {
     fontMatch[1].split("&").forEach((f) => {
-      if (f.startsWith("family=")) {
-        fonts.push(decodeURIComponent(f.replace("family=", "")));
+      // The first entry is the value of ?family=, subsequent entries have family= prefix
+      const name = f.startsWith("family=") ? f.replace("family=", "") : f;
+      if (name && !name.startsWith("display=") && !name.startsWith("subset=")) {
+        fonts.push(decodeURIComponent(name));
       }
     });
   }
