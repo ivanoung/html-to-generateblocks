@@ -15,7 +15,7 @@ import { validateBlocks } from "../core/validator.js";
 import { convert } from "../core/orchestrator.js";
 import type { ConversionOutput } from "../core/orchestrator.js";
 
-const OUTPUT_DIR = resolve(process.cwd(), "output");
+const OUTPUT_DIR = resolve(process.cwd(), "fixtures", "output");
 
 export interface RunResult {
   fixture: Fixture | FidelityFixture;
