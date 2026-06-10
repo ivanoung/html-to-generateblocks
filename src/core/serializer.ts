@@ -5,6 +5,7 @@
 // rendered HTML with correct class patterns.
 
 import type { Block } from "./types.js";
+import { mapStylesToGbAttributes } from "./gb-attribute-mapper.js";
 
 // ── CSS formatting ────────────────────────────────────────────
 
@@ -58,8 +59,12 @@ function buildElementAttrs(block: Block): Record<string, unknown> {
   attrs.uniqueId = block.uniqueId;
   attrs.tagName = block.tagName ?? "div";
 
-  const stylesEmpty = !block.styles || Object.keys(block.styles).length === 0;
-  attrs.styles = stylesEmpty ? {} : block.styles;
+  // Promote inline styles to GB top-level attributes (backgrounds, colors, gradients)
+  const { gbAttrs, remainingStyles } = mapStylesToGbAttributes(block.styles || {});
+  Object.assign(attrs, gbAttrs);
+
+  const stylesEmpty = !remainingStyles || Object.keys(remainingStyles).length === 0;
+  attrs.styles = stylesEmpty ? {} : remainingStyles;
   attrs.css = formatCss(block, block.css || "");
 
   if (block.globalClasses && block.globalClasses.length > 0) {
