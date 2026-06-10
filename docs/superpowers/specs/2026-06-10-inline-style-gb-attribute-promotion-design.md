@@ -116,8 +116,8 @@ HTML: <div style="background-color:#fff;background-image:url(hero.jpg);padding:6
 
 ## Error Handling
 
-- **Missing URL in background-image:** If the value doesn't match `url("...")`, leave it in `remainingStyles` and emit a warning
-- **Unparseable gradient:** If `background` value isn't a recognizable `linear-gradient(...)`, leave it in `remainingStyles` and emit a warning
+- **Missing URL in background-image:** If the value doesn't match `url("...")`, leave it in `remainingStyles` silently (property stays in `styles`/`css` fallback, same behavior as before this change)
+- **Unparseable gradient:** If `background` value isn't a recognizable `linear-gradient(...)`, leave it in `remainingStyles` silently (same fallback)
 - **Empty styles:** If all properties were promoted, `remainingStyles` is `{}` — the serializer already handles empty styles correctly
 - **No crash path:** The mapper is a pure transformation; any unhandled property stays in `remainingStyles` and falls through to the existing `styles`/`css` behavior
 
