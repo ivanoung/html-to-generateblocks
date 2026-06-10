@@ -5,13 +5,11 @@ WordPress paste-ready GenerateBlocks & Core block markup, validates against
 known "Attempt Recovery" rules, and writes files for manual verification in
 the WordPress editor.
 
-> **Status:** Intent-based style transfer pipeline — 18 fixtures (5 M1, 6
-> fidelity, 6 preprocessor/dom-walk, 1 tailwind-inliner) verified across
-> GenerateBlocks Element/Text/Media/Shape + WordPress Core fallbacks.
-> The `convert` command processes full HTML pages (e.g. `inputs/mino/index.html`)
-> with automatic Tailwind CSS resolution: compiled CSS rules are parsed from
-> `document.styleSheets`, mapped to elements by class name, and consolidated
-> into reusable Global Styles classes. No browser defaults, no noise.
+> **Status:** Property-based CSS split — 524 structural + typography classes
+> auto-extracted into `global-styles.json` for editor preview fidelity.
+> Backgrounds, effects, and colors stay in `styles-unique.css` (Additional CSS).
+> WordPress-safe `[class~="..."]` attribute selectors prevent backslash
+> corruption from `wp_unslash()`. 59 tests pass. Verified working on live site.
 
 ---
 
@@ -342,13 +340,38 @@ Walks the preprocessed HTML DOM, mapping elements to blocks by tag name:
 
 ### Convert command output (`output/<projectDir>/`)
 
-- **`<pageName>.html`** — paste-ready WordPress block markup with section wrapper pattern
-- **`<pageName>.report.json`** — validation report with `overallStatus`, `blockCount`, `hardFails`
-- **`global-styles.json`** — WordPress Global Styles JSON: consolidated reusable classes
-  with responsive `@media` overrides and `&:hover`/`&:focus` state blocks
-- **`custom.css`** — Tailwind Preflight/reset, `@keyframes`, `::-webkit-*` vendor prefixes,
-  body-level rules
-- **`<pageName>-global-styles.json`** — legacy class→properties manifest
+```
+output/mino/
+├── pages/
+│   ├── index.html              # GB block markup (paste into editor)
+│   ├── index.report.json       # Validation report
+│   ├── blog.html
+│   ├── ...
+│   └── styles.css              # Master CSS fallback (complete)
+├── setup/
+│   ├── global-styles.json      # Structural + typography → GB Global Styles import
+│   ├── styles-unique.css       # Backgrounds, effects, colors → WPCodeBox snippet
+│   ├── customizer-import.json  # Colors, typography → Customizer import
+│   ├── global.js               # Extracted JS → WPCodeBox snippet
+│   └── manual-steps.txt        # Post-conversion checklist
+└── components/
+    ├── nav/
+    │   └── nav.html            # Extracted navigation block
+    └── footer/
+        └── footer.html         # Extracted footer block
+```
+
+**CSS Split Architecture:**
+
+| File | Content | WordPress Delivery |
+|---|---|---|
+| `global-styles.json` | Structural layout + typography (~524 classes) | GB Pro → Global Styles → Import (priority 20) |
+| `styles-unique.css` | Backgrounds, effects, colors, preflight, keyframes | WPCodeBox snippet, `wp_head` priority 10 |
+| `pages/styles.css` | Complete master CSS (all utilities) | Additional CSS fallback |
+
+**WordPress-Safe Selectors:** Selectors with CSS special characters (`:`, `[`, `]`, `/`)
+are converted to `[class~="..."]` attribute selectors to survive WordPress `wp_unslash()`
+backslash stripping. Admin labels (the `selector` field) use hyphen-replaced safe names.
 
 ### Report status values
 
