@@ -160,7 +160,7 @@ export function expandGlobalStyles(jsonPath: string): string {
   }
   if (!Array.isArray(entries)) return "";
   return entries
-    .map((e) => `${e.selector} { ${e.css} }`)
+    .map((e) => e.css)
     .join("\n");
 }
 
