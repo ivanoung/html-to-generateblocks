@@ -9,7 +9,7 @@
 //   report:update <name>       Update manual verification in report
 //   regression                 Check M1 fixtures against snapshots
 
-import { resolve, basename, extname } from "node:path";
+import { resolve, basename, extname, dirname } from "node:path";
 import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, rmdirSync } from "node:fs";
 import {
   runFixture, loadFixture, writeOutput,
@@ -143,6 +143,8 @@ async function main(): Promise<void> {
     console.log("  fixtures:run <name>        Run single fixture");
     console.log("  fixtures:run-all           Run all fixtures");
     console.log("  convert <input.html|dir/>  Convert HTML page(s) to GB blocks");
+    console.log("  render <output-dir|file>   Render GB output as standalone HTML");
+    console.log("  compare <src> <out-dir>    Screenshot diff source vs rendered");
     console.log("  regression                 Check M1 vs snapshots");
     process.exit(0);
   }
@@ -606,6 +608,48 @@ async function main(): Promise<void> {
       console.log(`  Styles CSS: ${outputPrefix}styles.css (${lines} rules)`);
     }
     console.log("");
+    return;
+  }
+
+  // ── render ─────────────────────────────────────────────
+  if (cmd === "render") {
+    const { renderStandalone } = await import("../core/renderer.js");
+    const targetPath = resolve(process.cwd(), args[1] || "output/");
+    const sourceIdx = args.indexOf("--source");
+    const sourcePath = sourceIdx >= 0 && args[sourceIdx + 1]
+      ? resolve(process.cwd(), args[sourceIdx + 1]) : undefined;
+    const noJs = args.includes("--no-js");
+    const sourceHtml = sourcePath && existsSync(sourcePath) ? readFileSync(sourcePath, "utf-8") : undefined;
+
+    if (existsSync(targetPath) && statSync(targetPath).isFile() && targetPath.endsWith(".html")) {
+      // Single page render
+      const pageName = basename(targetPath, ".html");
+      const projectDir = resolve(dirname(targetPath), "..");
+      const html = renderStandalone(projectDir, pageName, sourceHtml, !noJs);
+      const outPath = resolve(dirname(targetPath), `${pageName}.rendered.html`);
+      writeFileSync(outPath, html, "utf-8");
+      console.log(`Rendered: ${outPath}`);
+    } else if (existsSync(targetPath) && statSync(targetPath).isDirectory()) {
+      // Directory: render all pages
+      const pagesDir = resolve(targetPath, "pages");
+      if (!existsSync(pagesDir)) {
+        console.error(`No pages/ directory found in ${targetPath}`);
+        process.exit(1);
+      }
+      const pageFiles = readdirSync(pagesDir).filter(f =>
+        f.endsWith(".html") && !f.endsWith(".rendered.html")
+      );
+      for (const file of pageFiles) {
+        const pageName = basename(file, ".html");
+        const html = renderStandalone(targetPath, pageName, sourceHtml, !noJs);
+        const outPath = resolve(pagesDir, `${pageName}.rendered.html`);
+        writeFileSync(outPath, html, "utf-8");
+        console.log(`Rendered: ${outPath}`);
+      }
+    } else {
+      console.error(`Target not found: ${targetPath}`);
+      process.exit(1);
+    }
     return;
   }
 
