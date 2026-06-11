@@ -387,8 +387,14 @@ export function splitCss(
     return { globalStyles: [], uniqueCss: "" };
   }
 
+  // Strip @import rules before parsing — the css npm package cannot handle
+  // url() values containing semicolons or ampersands (common in Google Fonts
+  // URLs). The parser splits them into malformed rules that leak garbage text.
+  // Matches: @import url(...); @import url('...'); @import url("..."); @import "...";
+  const sanitized = compiledCss.replace(/@import\s+(?:url\(["']?[^"')]+["']?\)|["'][^"']+["'])\s*;?/gi, "");
+
   try {
-    const ast = css.parse(compiledCss, { silent: true });
+    const ast = css.parse(sanitized, { silent: true });
     const rules = ast.stylesheet?.rules || [];
 
     for (const rule of rules) {
