@@ -13,7 +13,7 @@ describe("captureFullPage", () => {
       throw new Error(`Fixture not found: ${FIXTURE_HTML}. Run render command first.`);
     }
 
-    const outPath = resolve(process.cwd(), "fixtures/verify/good-simple-output/verify/source.png");
+    const outPath = resolve(process.cwd(), "fixtures/verify/tmp/screenshotter-test.png");
     const result = await captureFullPage(FIXTURE_HTML, outPath, { width: 1440, height: 900 });
 
     assert.ok(existsSync(outPath), "screenshot file should exist");
