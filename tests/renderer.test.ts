@@ -63,7 +63,7 @@ describe("renderStandalone", () => {
   const FIXTURE_DIR = resolve(process.cwd(), "fixtures/verify/good-simple-output");
 
   it("produces valid HTML document from GB output", () => {
-    const html = renderStandalone(FIXTURE_DIR, "index");
+    const html = renderStandalone(FIXTURE_DIR, "good-simple");
     // Must start with doctype
     assert.ok(html.startsWith("<!DOCTYPE html>"), "should start with <!DOCTYPE html>");
     // Must contain rendered content (no block delimiters)
@@ -75,20 +75,20 @@ describe("renderStandalone", () => {
   });
 
   it("injects inline styles from GB attributes when css is empty", () => {
-    const html = renderStandalone(FIXTURE_DIR, "index");
+    const html = renderStandalone(FIXTURE_DIR, "good-simple");
     // The header section has backgroundColor:#f7f7f7 but css is empty
     // It should appear as an inline style
     assert.ok(html.includes("background-color"), "should inject derived background-color");
   });
 
   it("strips all block delimiter comments", () => {
-    const html = renderStandalone(FIXTURE_DIR, "index");
+    const html = renderStandalone(FIXTURE_DIR, "good-simple");
     const comments = html.match(/<!--\s*wp:/g);
     assert.strictEqual(comments, null, "should have zero block delimiters");
   });
 
   it("wraps in proper HTML document structure", () => {
-    const html = renderStandalone(FIXTURE_DIR, "index");
+    const html = renderStandalone(FIXTURE_DIR, "good-simple");
     assert.ok(html.includes("<head>"), "should have <head>");
     assert.ok(html.includes("<body>"), "should have <body>");
     assert.ok(html.includes("</html>"), "should close with </html>");

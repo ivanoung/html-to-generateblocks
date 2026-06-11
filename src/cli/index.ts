@@ -653,6 +653,33 @@ async function main(): Promise<void> {
     return;
   }
 
+  // ── compare ─────────────────────────────────────────────
+  if (cmd === "compare") {
+    const { runCompare } = await import("./compare.js");
+    const sourcePath = resolve(process.cwd(), args[1] || "");
+    const outputDir = resolve(process.cwd(), args[2] || "");
+    const viewportArg = args.includes("--viewport") ? args[args.indexOf("--viewport") + 1] : "1440x900";
+    const waitArg = args.includes("--wait") ? parseInt(args[args.indexOf("--wait") + 1]) : undefined;
+    const thresholdArg = args.includes("--threshold") ? parseFloat(args[args.indexOf("--threshold") + 1]) : undefined;
+    const golden = args.includes("--golden");
+    const viewportParts = viewportArg.split("x");
+
+    if (!sourcePath || !outputDir) {
+      console.error("Usage: compare <source.html> <output-dir> [--viewport WxH] [--wait N] [--threshold N] [--golden]");
+      process.exit(1);
+    }
+
+    await runCompare({
+      sourcePath,
+      outputDir,
+      viewport: { width: parseInt(viewportParts[0]), height: parseInt(viewportParts[1]) },
+      waitMs: waitArg,
+      threshold: thresholdArg,
+      golden,
+    });
+    return;
+  }
+
   // ── Unknown command ───────────────────────────────────────
   console.error(`Unknown command: ${cmd}`);
   console.error("Available: fixtures:list, fixtures:run, fixtures:run-all, convert, validate, report:update, regression");
