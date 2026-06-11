@@ -4,7 +4,7 @@ import { existsSync, unlinkSync } from "node:fs";
 import { captureFullPage } from "../src/core/screenshotter.js";
 import { resolve } from "node:path";
 
-const FIXTURE_HTML = resolve(process.cwd(), "fixtures/verify/good-simple-output/pages/index.rendered.html");
+const FIXTURE_HTML = resolve(process.cwd(), "fixtures/verify/good-simple-output/pages/good-simple.rendered.html");
 
 describe("captureFullPage", () => {
   it("captures a full-page screenshot as PNG", async () => {

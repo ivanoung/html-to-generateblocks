@@ -4,3 +4,4 @@ dist/
 .worktrees/
 *.Zone.Identifier
 *.rendered.html
+fixtures/verify/tmp/
