@@ -13,6 +13,8 @@ export interface ParsedBlock {
   rawJson: string;
   innerHtml: string;
   fullMatch: string;
+  startIndex: number;
+  endIndex: number;
 }
 
 /**
@@ -22,7 +24,6 @@ export interface ParsedBlock {
  */
 export function parseBlockDelimiters(raw: string): ParsedBlock[] {
   const results: ParsedBlock[] = [];
-  // Match <!-- wp:blockname {json} -->
   const openerRegex = /<!--\s*wp:([a-z]+\/[a-z-]+)\s+(\{.*?\})\s*-->/g;
   let match: RegExpExecArray | null;
 
@@ -37,9 +38,34 @@ export function parseBlockDelimiters(raw: string): ParsedBlock[] {
       attrs = {};
     }
 
-    // Find the closing delimiter
+    // Find the MATCHING close tag, accounting for nested blocks of the same type
+    const openTag = `<!-- wp:${blockName}`;
     const closeTag = `<!-- /wp:${blockName} -->`;
-    const closeIdx = raw.indexOf(closeTag, match.index + match[0].length);
+    let depth = 1;
+    let searchPos = match.index + match[0].length;
+    let closeIdx = -1;
+
+    while (depth > 0 && searchPos < raw.length) {
+      const nextOpen = raw.indexOf(openTag, searchPos);
+      const nextClose = raw.indexOf(closeTag, searchPos);
+
+      if (nextClose === -1) break; // no matching close tag
+
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        // Found another opener before the closer — nested block
+        depth++;
+        searchPos = nextOpen + openTag.length;
+      } else {
+        // Found a closer
+        depth--;
+        if (depth === 0) {
+          closeIdx = nextClose;
+        }
+        searchPos = nextClose + closeTag.length;
+      }
+    }
+
+    const endIdx = closeIdx !== -1 ? closeIdx + closeTag.length : match.index + match[0].length;
     const innerHtml = closeIdx !== -1
       ? raw.slice(match.index + match[0].length, closeIdx)
       : "";
@@ -49,9 +75,9 @@ export function parseBlockDelimiters(raw: string): ParsedBlock[] {
       attrs,
       rawJson,
       innerHtml,
-      fullMatch: closeIdx !== -1
-        ? raw.slice(match.index, closeIdx + closeTag.length)
-        : match[0],
+      fullMatch: raw.slice(match.index, endIdx),
+      startIndex: match.index,
+      endIndex: endIdx,
     });
   }
 
@@ -150,6 +176,13 @@ function buildStyleAttr(styles: Record<string, string>): string {
 }
 
 /**
+ * Escape special regex characters in a string.
+ */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * Extract font <link> tags from source HTML for injection into rendered page.
  */
 function extractFontLinks(sourceHtml: string): string {
@@ -189,42 +222,37 @@ export function renderStandalone(
     ? readFileSync(resolve(setupDir, "styles-unique.css"), "utf-8") : "";
   const globalStylesCss = expandGlobalStyles(resolve(setupDir, "global-styles.json"));
 
-  // Parse blocks
+  // Phase 1: Strip all block delimiters using regex.
+  // Remove opener comments (<!-- wp:blockname {...} -->) and closer
+  // comments (<!-- /wp:blockname -->). The inner HTML remains intact.
   const blocks = parseBlockDelimiters(rawBlocks);
+  let stripped = rawBlocks
+    .replace(/<!--\s*wp:[a-z]+\/[a-z-]+\s+\{.*?\}\s*-->/g, "")
+    .replace(/<!--\s*\/wp:[a-z]+\/[a-z-]+\s*-->/g, "");
 
-  // Build rendered HTML: replace each block delimiter with the inner HTML,
-  // injecting derived inline styles
-  let rendered = rawBlocks;
+  // Phase 2: Inject inline styles derived from GB attributes onto elements
+  // (re-parse after stripping since positions changed, or use a simpler approach)
+  // For now: scan for gb-element-{id} class and inject derived styles
   for (const block of blocks) {
     const derived = deriveCssFromAttrs(block.attrs);
-
-    // If css string is non-empty, we inject it as a <style> tag (not inline)
-    // For now, derived styles go on the element itself
-    if (Object.keys(derived).length > 0) {
-      const styleStr = buildStyleAttr(derived);
-      if (styleStr) {
-        // Insert style attribute into the first HTML tag in innerHtml
-        const tagMatch = block.innerHtml.match(/<(\w+)([^>]*)>/);
-        if (tagMatch) {
-          const tagName = tagMatch[1];
-          const existingAttrs = tagMatch[2];
-          const hasStyle = /style\s*=\s*["']/.test(existingAttrs);
-          let newAttrs: string;
-          if (hasStyle) {
-            newAttrs = existingAttrs.replace(/(style\s*=\s*["'])([^"']*)(["'])/, (_, prefix, val, suffix) => {
-              return `${prefix}${val};${styleStr}${suffix}`;
-            });
-          } else {
-            newAttrs = `${existingAttrs} style="${styleStr}"`;
-          }
-          const newTag = `<${tagName}${newAttrs}>`;
-          block.innerHtml = block.innerHtml.replace(tagMatch[0], newTag);
-        }
+    if (Object.keys(derived).length === 0) continue;
+    const styleStr = buildStyleAttr(derived);
+    if (!styleStr) continue;
+    // Find element with this block's unique class
+    const uniqueId = block.attrs.uniqueId as string;
+    if (!uniqueId) continue;
+    const classPattern = new RegExp(`(<(\\w+)([^>]*class="[^"]*\\bgb-${escapeRegExp(block.blockName.split('/')[1])}-${escapeRegExp(uniqueId)}\\b[^"]*")([^>]*))>`, 'g');
+    const match = classPattern.exec(stripped);
+    if (match) {
+      const hasStyle = /style\s*=\s*["']/.test(match[0]);
+      let newTag: string;
+      if (hasStyle) {
+        newTag = match[0].replace(/(style\s*=\s*["'])([^"']*)(["'])/, `$1$2;${styleStr}$3`);
+      } else {
+        newTag = match[0].replace(/>$/, ` style="${styleStr}">`);
       }
+      stripped = stripped.replace(match[0], newTag);
     }
-
-    // Replace the full block match (delimiter + innerHTML + closing delimiter) with just innerHTML
-    rendered = rendered.replace(block.fullMatch, block.innerHtml);
   }
 
   // Extract font links if source provided
@@ -254,7 +282,7 @@ ${stylesCss}
   </style>
 </head>
 <body>
-${rendered}
+${stripped}
 ${jsScript}
 </body>
 </html>`;
