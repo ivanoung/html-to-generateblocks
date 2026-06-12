@@ -89,17 +89,14 @@ export function formatGlobalJs(scripts: ScriptEntry[]): string {
 
   if (externals.length > 0) {
     lines.push("// === External Scripts ===");
-    lines.push(
-      "// Enqueue in functions.php or add via WPCode snippet plugin:",
-    );
+    lines.push("// These are loaded as <script> tags directly.");
+    lines.push("// For proper WP integration, enqueue in functions.php:");
     lines.push("//");
     for (const s of externals) {
       const handle = slugFromUrl(s.src!);
-      lines.push(`//   <script src="${s.src}"></script>`);
-      lines.push(
-        `//   wp_enqueue_script('${handle}', '${s.src}', [], null, true);`,
-      );
-      lines.push("//");
+      lines.push(`document.write('<script src="${s.src}"><\\/script>');`);
+      lines.push(`//   wp_enqueue_script('${handle}', '${s.src}', [], null, true);`);
+      lines.push("");
     }
     lines.push("");
   }
