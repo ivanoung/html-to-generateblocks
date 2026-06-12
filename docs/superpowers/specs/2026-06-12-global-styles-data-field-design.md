@@ -140,6 +140,17 @@ New:
 - Frontend rendering: **unchanged** — all CSS still loads, just through different channels
 - Editor experience: Global Styles that exist are now fully editable
 
+### Trade-off: split vs reject
+
+An alternative considered was to **split** mixed rules — send GB-mappable
+properties to Global Styles and unmappable ones to `styles-unique.css` under
+the same selector. While CSS cascade would handle this correctly (no property
+overlap), it creates **partially editable** global styles — the user sees
+the visual effect of `box-sizing:border-box` but can't touch it in the editor.
+This is worse than demoting the class entirely. **We choose D (reject entire
+rule): the invariant "every Global Style is 100% editable" is more valuable
+than squeezing a few extra entries out of mixed-property rules.**
+
 ## Test Fixture
 
 A minimal HTML page in `output/global-style-investigation/`:
