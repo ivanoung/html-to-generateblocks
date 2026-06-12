@@ -74,12 +74,34 @@ function toCamelCase(prop: string): string {
 }
 
 /**
+ * Split a CSS value on top-level whitespace only, keeping
+ * parentheses-enclosed expressions (calc, rgb, var, etc.) intact.
+ */
+function splitTopLevel(value: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const ch of value) {
+    if (ch === "(") { depth++; current += ch; }
+    else if (ch === ")") { depth--; current += ch; }
+    else if (/\s/.test(ch) && depth === 0) {
+      if (current) parts.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+/**
  * Expand CSS shorthand property:value pairs into individual
  * longhand entries. Returns an array of [camelCaseKey, value] tuples.
  * Unrecognized shorthands are returned as-is (single entry).
  */
 function expandShorthand(prop: string, value: string): Array<[string, string]> {
-  const parts = value.split(/\s+/);
+  const parts = splitTopLevel(value);
   const sides = ["Top", "Right", "Bottom", "Left"] as const;
 
   switch (prop) {
@@ -112,7 +134,7 @@ function expandShorthand(prop: string, value: string): Array<[string, string]> {
     case "border": {
       // border: [width] [style] [color]
       const widthParts = parts.filter((p) =>
-        /^\d/.test(p) || ["thin", "medium", "thick"].includes(p)
+        /^\d/.test(p) || ["thin", "medium", "thick"].includes(p.toLowerCase())
       );
       const styleParts = parts.filter((p) =>
         ["none", "hidden", "dotted", "dashed", "solid", "double",
@@ -142,6 +164,12 @@ function expandShorthand(prop: string, value: string): Array<[string, string]> {
         ["borderTopWidth", parts[0]], ["borderBottomWidth", parts[0]],
         ["borderRightWidth", parts[1]], ["borderLeftWidth", parts[1]],
       ];
+      if (parts.length === 3) return [
+        ["borderTopWidth", parts[0]],
+        ["borderRightWidth", parts[1]],
+        ["borderBottomWidth", parts[2]],
+        ["borderLeftWidth", parts[1]],
+      ];
       return sides.map((s, i) =>
         [`border${s}Width`, parts[i] ?? parts[0]] as [string, string]
       );
@@ -163,6 +191,10 @@ function expandShorthand(prop: string, value: string): Array<[string, string]> {
       if (parts.length === 2) return [
         ["borderTopLeftRadius", parts[0]], ["borderTopRightRadius", parts[1]],
         ["borderBottomRightRadius", parts[0]], ["borderBottomLeftRadius", parts[1]],
+      ];
+      if (parts.length === 3) return [
+        ["borderTopLeftRadius", parts[0]], ["borderTopRightRadius", parts[1]],
+        ["borderBottomRightRadius", parts[2]], ["borderBottomLeftRadius", parts[1]],
       ];
       return [
         ["borderTopLeftRadius", parts[0] ?? "0"],
@@ -191,6 +223,10 @@ function expandShorthand(prop: string, value: string): Array<[string, string]> {
       if (parts.length === 2) return [
         ["top", parts[0]], ["bottom", parts[0]],
         ["right", parts[1]], ["left", parts[1]],
+      ];
+      if (parts.length === 3) return [
+        ["top", parts[0]], ["right", parts[1]],
+        ["bottom", parts[2]], ["left", parts[1]],
       ];
       return sides.map((s, i) =>
         [s.toLowerCase(), parts[i] ?? parts[0]] as [string, string]
