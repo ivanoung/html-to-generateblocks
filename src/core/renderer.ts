@@ -263,6 +263,25 @@ export function renderStandalone(
     ? `<script>\n${readFileSync(resolve(setupDir, "global.js"), "utf-8")}\n</script>`
     : "";
 
+  // Inject nav/footer components if available (for fair visual comparison)
+  const componentsDir = resolve(outputDir, "components");
+  let navHtml = "";
+  let footerHtml = "";
+  
+  const navPath = resolve(componentsDir, "nav", "nav.html");
+  if (existsSync(navPath)) {
+    navHtml = readFileSync(navPath, "utf-8")
+      .replace(/<!--\s*wp:[a-z]+\/[a-z-]+\s+\{.*?\}\s*-->/g, "")
+      .replace(/<!--\s*\/wp:[a-z]+\/[a-z-]+\s*-->/g, "");
+  }
+  
+  const footerPath = resolve(componentsDir, "footer", "footer.html");
+  if (existsSync(footerPath)) {
+    footerHtml = readFileSync(footerPath, "utf-8")
+      .replace(/<!--\s*wp:[a-z]+\/[a-z-]+\s+\{.*?\}\s*-->/g, "")
+      .replace(/<!--\s*\/wp:[a-z]+\/[a-z-]+\s*-->/g, "");
+  }
+
   // Assemble full document
   return `<!DOCTYPE html>
 <html lang="en">
@@ -282,7 +301,9 @@ ${stylesCss}
   </style>
 </head>
 <body>
+${navHtml}
 ${stripped}
+${footerHtml}
 ${jsScript}
 </body>
 </html>`;

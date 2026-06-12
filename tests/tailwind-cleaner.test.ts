@@ -3,24 +3,30 @@ import assert from "node:assert";
 import { cleanTailwindSource } from "../src/core/tailwind-cleaner.js";
 
 describe("cleanTailwindSource", () => {
-  it("wraps bare text nodes inside div with span (< 60 chars)", () => {
+  it("warns about bare text nodes instead of wrapping them", () => {
     const input = '<div>Hello world</div>';
     const result = cleanTailwindSource(input);
-    assert.ok(result.html.includes("<span>Hello world</span>"), "bare text should be wrapped in span for <60 chars");
+    assert.ok(result.warnings.length > 0, "should produce warning for bare text");
+    assert.ok(result.warnings.some(w => w.includes("Hello world")), "warning should mention the text");
+    // HTML should NOT be modified
+    assert.ok(result.html.includes(">Hello world<"), "HTML should not be modified");
+    assert.ok(!result.html.includes("<span>"), "should not wrap in span");
   });
 
-  it("wraps longer bare text in <p> (>= 60 chars)", () => {
-    const longText = "This is a much longer piece of text that should be wrapped in a paragraph tag instead of a span because it exceeds sixty characters in length";
-    const input = `<div>${longText}</div>`;
+  it("warns about empty divs instead of removing them", () => {
+    const input = '<div></div><section>content</section>';
     const result = cleanTailwindSource(input);
-    assert.ok(result.html.includes(`<p>${longText}</p>`), "longer text should be wrapped in <p>");
+    assert.ok(result.warnings.some(w => w.includes("Empty")), "should warn about empty div");
+    // Empty div should remain (but may have data-gb-path injected)
+    assert.ok(result.html.includes('<div'), "empty div should remain in HTML");
+    assert.ok(result.html.includes("content"), "section should remain");
   });
 
   it("does not touch already-wrapped text", () => {
     const input = '<section><p>Already wrapped</p></section>';
     const result = cleanTailwindSource(input);
-    // The <p> gets data-gb-path injected but the content is unchanged
     assert.ok(result.html.includes("Already wrapped</p>"), "already-wrapped text preserved");
+    assert.strictEqual(result.warnings.length, 0, "no warnings for wrapped text");
   });
 
   it("injects data-gb-path on target elements", () => {
@@ -28,20 +34,5 @@ describe("cleanTailwindSource", () => {
     const result = cleanTailwindSource(input);
     assert.ok(result.html.includes('data-gb-path="section#hero"'), "section should get path with id");
     assert.ok(result.html.includes('data-gb-path="h1:nth-of-type(1)"'), "h1 should get fallback path");
-  });
-
-  it("strips empty div elements", () => {
-    const input = '<div></div><section>content</section>';
-    const result = cleanTailwindSource(input);
-    assert.ok(!result.html.includes('<div></div>'), "empty div should be removed");
-    assert.ok(result.html.includes("content"), "section should remain");
-  });
-
-  it("does not inject data-gb-path on wrapper spans created by cleaner", () => {
-    const input = '<div>bare text</div>';
-    const result = cleanTailwindSource(input);
-    // The div gets a path, but the wrapper span should NOT
-    const spansWithPath = (result.html.match(/<span[^>]*data-gb-path/g) || []).length;
-    assert.strictEqual(spansWithPath, 0, "wrapper spans should not have data-gb-path");
   });
 });

@@ -34,7 +34,7 @@ export function cleanTailwindSource(rawHtml: string): CleanResult {
     });
   });
 
-  // Step 2: Wrap bare text nodes in block-level elements
+  // Step 2: Detect bare text nodes (WARNING only, no transformation)
   $("*").each((_, el) => {
     const tag = (el as any).tagName?.toLowerCase();
     if (!tag || !BLOCK_TAGS.has(tag)) return;
@@ -42,23 +42,18 @@ export function cleanTailwindSource(rawHtml: string): CleanResult {
     for (const child of childNodes) {
       if (child.type === "text") {
         const text = ((child as any).data || "").trim();
-        if (text.length === 0) {
-          $(child).remove();
-          continue;
-        }
-        const wrapper = text.length < 60 ? "<span>" : "<p>";
-        const closeTag = wrapper.replace("<", "</");
-        $(child).replaceWith(`${wrapper}${text}${closeTag}`);
+        if (text.length === 0) continue;
+        warnings.push(`Bare text in <${tag}>: "${text.slice(0, 40)}${text.length > 40 ? "..." : ""}" — consider wrapping in <p> or <span>`);
       }
     }
   });
 
-  // Step 3: Strip empty divs
+  // Step 3: Detect empty divs (WARNING only, no removal)
   $("div").each((_, el) => {
     const $el = $(el);
     const html = $el.html();
     if (!html || html.trim().length === 0) {
-      $el.remove();
+      warnings.push(`Empty <div> detected — consider removing from source`);
     }
   });
 
