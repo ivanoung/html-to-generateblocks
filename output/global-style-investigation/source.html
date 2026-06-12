@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Global Style Investigation</title>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#f0f4ff', 500: '#3b5de7', 700: '#1e3ba0' },
+            surface: '#ffffff',
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 font-sans">
+  <div class="max-w-6xl mx-auto px-4 py-16">
+    <!-- Outer wrapper -->
+    <div class="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+      <!-- Inner container with two-column grid -->
+      <div class="grid grid-cols-2 gap-8">
+        <!-- Box 1 -->
+        <div class="bg-brand-50 rounded-xl p-6">
+          <h2 class="text-2xl font-bold text-brand-700 mb-3">First Column</h2>
+          <p class="text-gray-600 text-base leading-relaxed">This is the first paragraph. It describes something interesting in the left column.</p>
+        </div>
+        <!-- Box 2 -->
+        <div class="bg-brand-50 rounded-xl p-6">
+          <h2 class="text-2xl font-bold text-brand-700 mb-3">Second Column</h2>
+          <p class="text-gray-600 text-base leading-relaxed">This is the second paragraph. It describes something equally interesting in the right column.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
