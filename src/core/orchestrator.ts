@@ -5,6 +5,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import * as cheerio from "cheerio";
 import { preprocess } from "./preprocessor.js";
 import { walkDom } from "./dom-walker.js";
 import { GlobalStylesCollector } from "./global-styles-collector.js";
@@ -12,6 +13,9 @@ import { serializeBlocks, countBlocks } from "./serializer.js";
 import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
+import { cleanTailwindSource } from "./tailwind-cleaner.js";
+import { classifyStyles } from "./style-classifier.js";
+import { extractTailwindConfig } from "./tailwind-resolver.js";
 import { resolveIconifyIcons } from "./iconify-resolver.js";
 import { generateCustomizerSettings } from "./customizer-generator.js";
 import { analyzeSource, generateManualStepsReport } from "./manual-steps.js";
@@ -49,15 +53,56 @@ export async function convert(
   const inlinerWarnings: { code: string; message: string }[] = [];
   let compiledCss = "";
   let outputCss = "";
+  let classifiedInlineStyles: Record<string, Record<string, string>> | undefined;
 
-  if (!input.skipInliner && usesTailwind(rawHtml)) {
-    const compiled = await inlineTailwindStyles(rawHtml);
-    if (compiled.warnings.length > 0) {
+  // Stage 0a: Clean Tailwind source (structural fixes + data-gb-path injection)
+  // Runs even when skipInliner is true — we still need computed styles
+  if (usesTailwind(input.rawHtml)) {
+    const cleanResult = cleanTailwindSource(rawHtml);
+    rawHtml = cleanResult.html;
+    if (cleanResult.warnings.length > 0) {
       inlinerWarnings.push(
-        ...compiled.warnings.map((m) => ({ code: "INLINER", message: m })),
+        ...cleanResult.warnings.map((m) => ({ code: "CLEANER", message: m })),
       );
     }
-    compiledCss = compiled.stylesCss;
+  }
+
+  // Stage 0b: Compile Tailwind CSS + capture computed styles
+  // Compilation respects skipInliner; computed styles ALWAYS captured for Tailwind pages
+  if (usesTailwind(rawHtml)) {
+    if (!input.skipInliner) {
+      const compiled = await inlineTailwindStyles(rawHtml);
+      if (compiled.warnings.length > 0) {
+        inlinerWarnings.push(
+          ...compiled.warnings.map((m) => ({ code: "INLINER", message: m })),
+        );
+      }
+      compiledCss = compiled.stylesCss;
+
+      if (Object.keys(compiled.computedStyles).length > 0) {
+        const configStr = extractTailwindConfig(input.rawHtml);
+        let config = null;
+        if (configStr) {
+          try { config = JSON.parse(configStr); } catch { /* JS-style config, not JSON */ }
+        }
+        const classified = classifyStyles(compiled.computedStyles, config);
+        classifiedInlineStyles = classified.inlineStyles;
+      }
+    } else {
+      // skipInliner: CSS already compiled, but we still need computed styles.
+      // Load page in Playwright (no Tailwind CDN needed, already in HTML as <style>)
+      const compiled = await inlineTailwindStyles(rawHtml);
+      compiledCss = compiled.stylesCss;
+      if (Object.keys(compiled.computedStyles).length > 0) {
+        const configStr = extractTailwindConfig(input.rawHtml);
+        let config = null;
+        if (configStr) {
+          try { config = JSON.parse(configStr); } catch { /* JS-style config, not JSON */ }
+        }
+        const classified = classifyStyles(compiled.computedStyles, config);
+        classifiedInlineStyles = classified.inlineStyles;
+      }
+    }
   }
 
   // Stage 0.5: Resolve <iconify-icon> to inline SVG (always run)
@@ -73,6 +118,30 @@ export async function convert(
   // Stage 1: Preprocess
   const prepResult = preprocess(rawHtml, input.skipStripNavFooter);
 
+  // Apply classified inline styles as style="..." attributes before DOM walk
+  let processedHtml = prepResult.html;
+  if (classifiedInlineStyles && Object.keys(classifiedInlineStyles).length > 0) {
+    const $ = cheerio.load(processedHtml, { decodeEntities: false, xmlMode: false });
+    $("[data-gb-path]").each((_, el) => {
+      const path = $(el).attr("data-gb-path");
+      if (!path || !classifiedInlineStyles[path]) return;
+      const props = classifiedInlineStyles[path];
+      const styleEntries: string[] = [];
+      for (const [k, v] of Object.entries(props)) {
+        const cssProp = k.replace(/[A-Z]/g, (m: string) => "-" + m.toLowerCase());
+        styleEntries.push(`${cssProp}:${v}`);
+      }
+      const existingStyle = $(el).attr("style") || "";
+      $(el).attr("style", existingStyle ? `${existingStyle};${styleEntries.join(";")}` : styleEntries.join(";"));
+      // Remove data-gb-path (internal marker, not needed past this point)
+      $(el).removeAttr("data-gb-path");
+    });
+    processedHtml = $.html();
+    // Extract body content (cheerio wraps in <html><head></head><body>...)
+    const bodyMatch = processedHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    if (bodyMatch) processedHtml = bodyMatch[1];
+  }
+
   // Stage 2: Register class definitions in collector
   const collector = new GlobalStylesCollector(input.pageName);
   prepResult.classNameToProperties.forEach((styles, className) => {
@@ -81,7 +150,7 @@ export async function convert(
 
   // Stage 3: DOM walk
   const walkResult = walkDom(
-    prepResult.html,
+    processedHtml,
     prepResult.classNameToProperties,
     collector,
     input.skipStripNavFooter,

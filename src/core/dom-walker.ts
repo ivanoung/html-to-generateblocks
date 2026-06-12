@@ -480,6 +480,7 @@ export function walkDom(
   classNameToProperties: Map<string, BlockStyles>,
   collector: GlobalStylesCollector,
   allowNavFooter?: boolean,
+  inlineStyles?: Record<string, Record<string, string>>,
 ): WalkResult {
   const warnings: string[] = [];
   const hardFails: { code: string; message: string }[] = [];
