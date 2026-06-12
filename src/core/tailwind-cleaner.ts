@@ -25,7 +25,9 @@ export function cleanTailwindSource(rawHtml: string): CleanResult {
         path = `${tag}#${id}`;
       } else if (classes) {
         const firstClass = classes.split(/\s+/)[0];
-        path = `${tag}.${firstClass}`;
+        const key = `${tag}.${firstClass}`;
+        pathCounters[key] = (pathCounters[key] || 0) + 1;
+        path = `${tag}.${firstClass}.${pathCounters[key] - 1}`;
       } else {
         pathCounters[tag] = (pathCounters[tag] || 0) + 1;
         path = `${tag}:nth-of-type(${pathCounters[tag]})`;
