@@ -29,7 +29,8 @@ export function usesTailwind(html: string): boolean {
 export interface InlinerResult {
   html: string;
   stylesCss: string;
-  classNames: string[];  // all class names found in the page
+  classNames: string[];
+  computedStyles: Record<string, Record<string, string>>;
   warnings: string[];
 }
 
@@ -123,15 +124,53 @@ async function compileWithPlaywright(html: string): Promise<InlinerResult> {
       };
     });
 
+    // Capture computed styles for elements with data-gb-path
+    const computedPayload = await page.evaluate(() => {
+      const CAPTURED_PROPERTIES = [
+        "display", "flexDirection", "gap",
+        "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+        "marginTop", "marginRight", "marginBottom", "marginLeft",
+        "fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing",
+        "textAlign", "textTransform", "color",
+        "backgroundColor", "backgroundImage", "backgroundSize",
+        "backgroundPosition", "backgroundRepeat",
+        "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+        "borderTopColor", "borderRightColor", "borderBottomColor", "borderLeftColor",
+        "borderTopLeftRadius", "borderTopRightRadius",
+        "borderBottomRightRadius", "borderBottomLeftRadius",
+        "opacity", "boxShadow",
+      ];
+
+      const result: Record<string, Record<string, string>> = {};
+      document.querySelectorAll("[data-gb-path]").forEach((el) => {
+        const path = el.getAttribute("data-gb-path");
+        if (!path) return;
+        const computed = window.getComputedStyle(el);
+        const props: Record<string, string> = {};
+        for (const prop of CAPTURED_PROPERTIES) {
+          const cssProp = prop.replace(/[A-Z]/g, m => "-" + m.toLowerCase());
+          const val = computed.getPropertyValue(cssProp);
+          if (val && val !== "none" && val !== "normal" && val !== "rgba(0, 0, 0, 0)" && val !== "0px") {
+            props[prop] = val;
+          }
+        }
+        if (Object.keys(props).length > 0) {
+          result[path] = props;
+        }
+      });
+      return result;
+    });
+
     return {
       html,
       stylesCss: payload.css,
       classNames: payload.classNames,
+      computedStyles: computedPayload,
       warnings,
     };
   } catch (err: any) {
     warnings.push(`Tailwind compiler failed: ${err.message}`);
-    return { html, stylesCss: "", classNames: [], warnings };
+    return { html, stylesCss: "", classNames: [], computedStyles: {}, warnings };
   } finally {
     if (browser) await browser.close();
   }
