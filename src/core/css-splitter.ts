@@ -18,11 +18,193 @@ export interface GlobalStyleEntry {
   name: string;
   selector: string;
   css: string;
+  data?: Record<string, unknown>;
 }
 
 export interface CssSplitResult {
   globalStyles: GlobalStyleEntry[];
   uniqueCss: string;
+}
+
+// ── GB Editor Panel Property Allowlist ──────────────────────
+//
+// These are the camelCase property keys that GenerateBlocks'
+// editor panels read from gb_style_data. Only properties in
+// this set can survive editor round-trips. Any CSS declaration
+// that maps to a key outside this set causes the entire rule
+// to be demoted to styles-unique.css.
+
+const GB_DATA_PROPERTIES: ReadonlySet<string> = new Set([
+  // Layout & sizing
+  "display", "position", "zIndex", "overflow", "overflowX", "overflowY",
+  "width", "height", "minWidth", "maxWidth", "minHeight", "maxHeight", "aspectRatio",
+  // Flex
+  "flexDirection", "flexWrap", "flexGrow", "flexShrink", "flexBasis",
+  "alignItems", "alignSelf", "alignContent",
+  "justifyContent", "justifyItems", "justifySelf", "order",
+  // Grid
+  "gridTemplateColumns", "gridTemplateRows", "gridAutoColumns", "gridAutoRows", "gridAutoFlow",
+  // Spacing
+  "marginTop", "marginRight", "marginBottom", "marginLeft",
+  "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+  "gap", "columnGap", "rowGap",
+  // Borders
+  "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+  "borderTopStyle", "borderRightStyle", "borderBottomStyle", "borderLeftStyle",
+  "borderTopColor", "borderRightColor", "borderBottomColor", "borderLeftColor",
+  "borderTopLeftRadius", "borderTopRightRadius", "borderBottomRightRadius", "borderBottomLeftRadius",
+  // Typography
+  "fontFamily", "fontSize", "fontWeight", "fontStyle", "textTransform",
+  "textDecoration", "lineHeight", "letterSpacing", "textAlign", "color",
+  // Backgrounds
+  "backgroundColor", "backgroundImage", "backgroundSize", "backgroundPosition", "backgroundRepeat",
+  // Effects
+  "boxShadow", "textShadow", "opacity", "transform",
+  // Positioning
+  "top", "right", "bottom", "left",
+  // Object
+  "objectFit", "objectPosition",
+]);
+
+// ── CSS property helpers ────────────────────────────────────
+
+/** Convert kebab-case CSS property to camelCase. */
+function toCamelCase(prop: string): string {
+  return prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+/**
+ * Expand CSS shorthand property:value pairs into individual
+ * longhand entries. Returns an array of [camelCaseKey, value] tuples.
+ * Unrecognized shorthands are returned as-is (single entry).
+ */
+function expandShorthand(prop: string, value: string): Array<[string, string]> {
+  const parts = value.split(/\s+/);
+  const sides = ["Top", "Right", "Bottom", "Left"] as const;
+
+  switch (prop) {
+    case "padding":
+    case "margin": {
+      const prefix = prop; // "padding" or "margin"
+      if (parts.length === 1) {
+        return sides.map((s) => [`${prefix}${s}`, parts[0]] as [string, string]);
+      }
+      if (parts.length === 2) {
+        return [
+          [`${prefix}Top`, parts[0]],
+          [`${prefix}Bottom`, parts[0]],
+          [`${prefix}Right`, parts[1]],
+          [`${prefix}Left`, parts[1]],
+        ];
+      }
+      if (parts.length === 4) {
+        return sides.map((s, i) => [`${prefix}${s}`, parts[i]] as [string, string]);
+      }
+      // 3-value: top, right/left, bottom
+      return [
+        [`${prefix}Top`, parts[0]],
+        [`${prefix}Right`, parts[1]],
+        [`${prefix}Bottom`, parts[2]],
+        [`${prefix}Left`, parts[1]],
+      ];
+    }
+
+    case "border": {
+      // border: [width] [style] [color]
+      const widthParts = parts.filter((p) =>
+        /^\d/.test(p) || ["thin", "medium", "thick"].includes(p)
+      );
+      const styleParts = parts.filter((p) =>
+        ["none", "hidden", "dotted", "dashed", "solid", "double",
+         "groove", "ridge", "inset", "outset"].includes(p.toLowerCase())
+      );
+      const colorParts = parts.filter((p) =>
+        !widthParts.includes(p) && !styleParts.includes(p)
+      );
+
+      const result: Array<[string, string]> = [];
+      if (widthParts.length > 0) {
+        for (const s of sides) result.push([`border${s}Width`, widthParts[0]]);
+      }
+      if (styleParts.length > 0) {
+        for (const s of sides) result.push([`border${s}Style`, styleParts[0]]);
+      }
+      for (const c of colorParts) {
+        for (const s of sides) result.push([`border${s}Color`, c]);
+      }
+      return result;
+    }
+
+    case "border-width": {
+      if (parts.length === 1)
+        return sides.map((s) => [`border${s}Width`, parts[0]] as [string, string]);
+      if (parts.length === 2) return [
+        ["borderTopWidth", parts[0]], ["borderBottomWidth", parts[0]],
+        ["borderRightWidth", parts[1]], ["borderLeftWidth", parts[1]],
+      ];
+      return sides.map((s, i) =>
+        [`border${s}Width`, parts[i] ?? parts[0]] as [string, string]
+      );
+    }
+
+    case "border-style": {
+      return sides.map((s) => [`border${s}Style`, value] as [string, string]);
+    }
+
+    case "border-color": {
+      return sides.map((s) => [`border${s}Color`, value] as [string, string]);
+    }
+
+    case "border-radius": {
+      if (parts.length === 1) return [
+        ["borderTopLeftRadius", parts[0]], ["borderTopRightRadius", parts[0]],
+        ["borderBottomRightRadius", parts[0]], ["borderBottomLeftRadius", parts[0]],
+      ];
+      if (parts.length === 2) return [
+        ["borderTopLeftRadius", parts[0]], ["borderTopRightRadius", parts[1]],
+        ["borderBottomRightRadius", parts[0]], ["borderBottomLeftRadius", parts[1]],
+      ];
+      return [
+        ["borderTopLeftRadius", parts[0] ?? "0"],
+        ["borderTopRightRadius", parts[1] ?? "0"],
+        ["borderBottomRightRadius", parts[2] ?? "0"],
+        ["borderBottomLeftRadius", parts[3] ?? "0"],
+      ];
+    }
+
+    case "flex": {
+      const result: Array<[string, string]> = [];
+      if (parts.length >= 1) result.push(["flexGrow", parts[0]]);
+      if (parts.length >= 2) result.push(["flexShrink", parts[1]]);
+      if (parts.length >= 3) result.push(["flexBasis", parts[2]]);
+      return result;
+    }
+
+    case "gap": {
+      if (parts.length >= 2) return [["rowGap", parts[0]], ["columnGap", parts[1]]];
+      return [["rowGap", parts[0]], ["columnGap", parts[0]]];
+    }
+
+    case "inset": {
+      if (parts.length === 1)
+        return sides.map((s) => [s.toLowerCase(), parts[0]] as [string, string]);
+      if (parts.length === 2) return [
+        ["top", parts[0]], ["bottom", parts[0]],
+        ["right", parts[1]], ["left", parts[1]],
+      ];
+      return sides.map((s, i) =>
+        [s.toLowerCase(), parts[i] ?? parts[0]] as [string, string]
+      );
+    }
+
+    case "overflow": {
+      if (parts.length >= 2) return [["overflowX", parts[0]], ["overflowY", parts[1]]];
+      return [["overflowX", parts[0]], ["overflowY", parts[0]]];
+    }
+
+    default:
+      return [[toCamelCase(prop), value]];
+  }
 }
 
 // ── Selector helpers (unchanged from original) ──────────────
@@ -220,6 +402,43 @@ function classifyDeclarations(declarations: css.Declaration[]): "gs" | "uc" {
   return "gs";
 }
 
+// ── Style Data Generation (Gate Check) ──────────────────────
+
+/**
+ * Generate the `data` field for a GB Global Style entry from CSS
+ * declarations. Expands shorthands, converts to camelCase, and
+ * checks every property against GB_DATA_PROPERTIES.
+ *
+ * Returns the data object if ALL properties pass the gate.
+ * Returns null if ANY property fails (rule should be demoted
+ * to styles-unique.css).
+ */
+function generateStyleData(declarations: css.Declaration[]): Record<string, string> | null {
+  if (!declarations || declarations.length === 0) return null;
+
+  const data: Record<string, string> = {};
+
+  for (const decl of declarations) {
+    if (!decl.property || decl.value === undefined) continue;
+    const prop = decl.property.toLowerCase().trim();
+    const value = (decl.value || "").trim();
+    if (!prop || !value) continue;
+
+    // Expand shorthand → array of [camelCaseKey, value]
+    const expanded = expandShorthand(prop, value);
+
+    for (const [camelKey, val] of expanded) {
+      // Gate check: must be in GB's recognized property set
+      if (!GB_DATA_PROPERTIES.has(camelKey)) {
+        return null; // gate failed — demote entire rule
+      }
+      data[camelKey] = val;
+    }
+  }
+
+  return Object.keys(data).length > 0 ? data : null;
+}
+
 // ── Rule walking ────────────────────────────────────────────
 
 /**
@@ -264,7 +483,13 @@ function walkRule(
           isSingleClassSelector(r.selectors![0]) &&
           customClassNames.has(getClassName(r.selectors![0]))
         ) {
-          gsChildren.push(r);
+          // Custom class name — still gate-check before promoting
+          const data = generateStyleData((r.declarations || []) as css.Declaration[]);
+          if (data !== null) {
+            gsChildren.push(r);
+          } else {
+            ucChildren.push(r);
+          }
           continue;
         }
 
@@ -293,14 +518,22 @@ function walkRule(
     for (const child of gsChildren) {
       const selectors = child.selectors || [];
       if (selectors.length === 1 && isSingleClassSelector(selectors[0])) {
-        const wrappedMedia: css.Media = { ...media, rules: [child] };
-        const selector = selectors[0];
-        const baseSelector = extractBaseSelector(selector);
-        globalStyles.push({
-          name: classNameToName(baseSelector),
-          selector: sanitizeSelector(baseSelector),
-          css: serializeRule(wrappedMedia, true),
-        });
+        const data = generateStyleData((child.declarations || []) as css.Declaration[]);
+        if (data !== null) {
+          const wrappedMedia: css.Media = { ...media, rules: [child] };
+          const selector = selectors[0];
+          const baseSelector = extractBaseSelector(selector);
+          globalStyles.push({
+            name: classNameToName(baseSelector),
+            selector: sanitizeSelector(baseSelector),
+            css: serializeRule(wrappedMedia, true),
+            data,
+          });
+        } else {
+          // Gate failed → demote to UC
+          const wrappedMedia: css.Media = { ...media, rules: [child] };
+          uniqueCssParts.push(serializeRule(wrappedMedia));
+        }
       } else {
         // Multi-selector or non-class inside @media → UC
         const wrappedMedia: css.Media = { ...media, rules: [child] };
@@ -326,13 +559,19 @@ function walkRule(
       isSingleClassSelector(selectors[0]) &&
       customClassNames.has(getClassName(selectors[0]))
     ) {
-      const selector = selectors[0];
-      const baseSelector = extractBaseSelector(selector);
-      globalStyles.push({
-        name: classNameToName(baseSelector),
-        selector: sanitizeSelector(baseSelector),
-        css: serializeRule(r, true),
-      });
+      const data = generateStyleData((r.declarations || []) as css.Declaration[]);
+      if (data !== null) {
+        const selector = selectors[0];
+        const baseSelector = extractBaseSelector(selector);
+        globalStyles.push({
+          name: classNameToName(baseSelector),
+          selector: sanitizeSelector(baseSelector),
+          css: serializeRule(r, true),
+          data,
+        });
+      } else {
+        uniqueCssParts.push(serializeRule(r));
+      }
       return;
     }
 
@@ -346,13 +585,20 @@ function walkRule(
       selectors.length === 1 &&
       isSingleClassSelector(selectors[0])
     ) {
-      const selector = selectors[0];
-      const baseSelector = extractBaseSelector(selector);
-      globalStyles.push({
-        name: classNameToName(baseSelector),
-        selector: sanitizeSelector(baseSelector),
-        css: serializeRule(r, true),
-      });
+      const data = generateStyleData((r.declarations || []) as css.Declaration[]);
+      if (data !== null) {
+        const selector = selectors[0];
+        const baseSelector = extractBaseSelector(selector);
+        globalStyles.push({
+          name: classNameToName(baseSelector),
+          selector: sanitizeSelector(baseSelector),
+          css: serializeRule(r, true),
+          data,
+        });
+      } else {
+        // Gate failed → demote to UC
+        uniqueCssParts.push(serializeRule(r));
+      }
     } else {
       uniqueCssParts.push(serializeRule(r));
     }
@@ -410,6 +656,10 @@ export function splitCss(
     const existing = merged.get(entry.selector);
     if (existing) {
       existing.css += entry.css;
+      // Merge data: later entry wins on key conflicts
+      if (entry.data) {
+        existing.data = { ...existing.data, ...entry.data };
+      }
     } else {
       merged.set(entry.selector, { ...entry });
     }
