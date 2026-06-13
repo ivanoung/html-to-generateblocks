@@ -31,13 +31,11 @@ export function extractCustomClassNames(html: string): Set<string> {
 import * as cheerio from "cheerio";
 import type { BlockStyles } from "./types.js";
 import { parseStyleString } from "./style-parser.js";
-import { extractTailwindConfig } from "./tailwind-resolver.js";
 
 export interface PreprocessResult {
   html: string;
   classNameToProperties: Map<string, BlockStyles>;
   customCss: string;
-  tailwindConfig: string | null;
   warnings: string[];
   navHtml: string | null;
   footerHtml: string | null;
@@ -135,9 +133,6 @@ function isStandaloneIcon($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): boo
 export function preprocess(rawHtml: string, skipStripNavFooter?: boolean): PreprocessResult {
   const warnings: string[] = [];
 
-  // 0. Extract tailwind config BEFORE cheerio strips <script>
-  const tailwindConfig = extractTailwindConfig(rawHtml);
-
   const $ = cheerio.load(rawHtml);
 
   // 0.5. Capture nav and footer HTML before stripping
@@ -199,7 +194,6 @@ export function preprocess(rawHtml: string, skipStripNavFooter?: boolean): Prepr
     html,
     classNameToProperties,
     customCss,
-    tailwindConfig,
     warnings,
     navHtml,
     footerHtml,

@@ -11,14 +11,9 @@ import { GlobalStylesCollector } from "./global-styles-collector.js";
 import { serializeBlocks, countBlocks } from "./serializer.js";
 import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
-import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
-import { cleanTailwindSource } from "./tailwind-cleaner.js";
-import { classifyStyles } from "./style-classifier.js";
-import { extractTailwindConfig } from "./tailwind-resolver.js";
 import { resolveIconifyIcons } from "./iconify-resolver.js";
 import { generateCustomizerSettings } from "./customizer-generator.js";
 import { analyzeSource, generateManualStepsReport } from "./manual-steps.js";
-import type { InlinerResult } from "./tailwind-inliner.js";
 import { checkContentLoss } from "./content-verifier.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
@@ -27,9 +22,7 @@ export interface ConversionInput {
   rawHtml: string;
   pageName: string;
   projectDir?: string;
-  resolveCss?: boolean;
   skipShared?: boolean;  // skip styles.css, customizer, manual-steps
-  skipInliner?: boolean; // skip Tailwind inliner + iconify resolver (CSS already compiled)
   skipStripNavFooter?: boolean; // skip stripping nav/footer (for component conversion)
 }
 
@@ -39,7 +32,6 @@ export interface ConversionOutput {
   report: Record<string, unknown>;
   globalStyles: Record<string, unknown>;
   customCss: string;
-  tailwindCss: string;
 }
 
 export async function convert(
@@ -47,68 +39,14 @@ export async function convert(
 ): Promise<ConversionOutput> {
   resetIds();
 
-  // Stage 0: Compile Tailwind CSS (if present)
   let rawHtml = input.rawHtml;
-  const inlinerWarnings: { code: string; message: string }[] = [];
-  let compiledCss = "";
-  let outputCss = "";
-  let classifiedInlineStyles: Record<string, Record<string, string>> | undefined;
+  const warnings: { code: string; message: string }[] = [];
 
-  // Stage 0a: Clean Tailwind source (structural fixes + data-gb-path injection)
-  // Runs even when skipInliner is true — we still need computed styles
-  if (usesTailwind(input.rawHtml)) {
-    const cleanResult = cleanTailwindSource(rawHtml);
-    rawHtml = cleanResult.html;
-    if (cleanResult.warnings.length > 0) {
-      inlinerWarnings.push(
-        ...cleanResult.warnings.map((m) => ({ code: "CLEANER", message: m })),
-      );
-    }
-  }
-
-  // Stage 0b: Compile Tailwind CSS + capture computed styles
-  // Compilation respects skipInliner; computed styles ALWAYS captured for Tailwind pages
-  if (usesTailwind(rawHtml)) {
-    if (!input.skipInliner) {
-      const compiled = await inlineTailwindStyles(rawHtml);
-      if (compiled.warnings.length > 0) {
-        inlinerWarnings.push(
-          ...compiled.warnings.map((m) => ({ code: "INLINER", message: m })),
-        );
-      }
-      compiledCss = compiled.stylesCss;
-
-      if (Object.keys(compiled.computedStyles).length > 0) {
-        const configStr = extractTailwindConfig(input.rawHtml);
-        let config = null;
-        if (configStr) {
-          try { config = JSON.parse(configStr); } catch { /* JS-style config, not JSON */ }
-        }
-        const classified = classifyStyles(compiled.computedStyles, config);
-        classifiedInlineStyles = classified.inlineStyles;
-      }
-    } else {
-      // skipInliner: CSS already compiled, but we still need computed styles.
-      // Load page in Playwright (no Tailwind CDN needed, already in HTML as <style>)
-      const compiled = await inlineTailwindStyles(rawHtml);
-      compiledCss = compiled.stylesCss;
-      if (Object.keys(compiled.computedStyles).length > 0) {
-        const configStr = extractTailwindConfig(input.rawHtml);
-        let config = null;
-        if (configStr) {
-          try { config = JSON.parse(configStr); } catch { /* JS-style config, not JSON */ }
-        }
-        const classified = classifyStyles(compiled.computedStyles, config);
-        classifiedInlineStyles = classified.inlineStyles;
-      }
-    }
-  }
-
-  // Stage 0.5: Resolve <iconify-icon> to inline SVG (always run)
+  // Stage 0: Resolve <iconify-icon> to inline SVG (always run)
   const iconifyResult = await resolveIconifyIcons(rawHtml);
   rawHtml = iconifyResult.html;
   if (iconifyResult.failed.length > 0) {
-    inlinerWarnings.push({
+    warnings.push({
       code: "ICONIFY",
       message: `Could not resolve ${iconifyResult.failed.length} icon(s): ${iconifyResult.failed.join(", ")}`,
     });
@@ -123,26 +61,23 @@ export async function convert(
     collector.registerDefinition(className, styles);
   });
 
-  // Stage 3: DOM walk — computed styles passed directly (no HTML round-trip)
+  // Stage 3: DOM walk
   const walkResult = walkDom(
     prepResult.html,
     prepResult.classNameToProperties,
     collector,
     input.skipStripNavFooter,
-    classifiedInlineStyles,
   );
 
   // Collect all warnings
   const allWarnings = [
-    ...inlinerWarnings,
+    ...warnings,
     ...prepResult.warnings.map((w) => ({ code: "PREPROCESS", message: w })),
     ...walkResult.warnings.map((w) => ({ code: "WALK", message: w })),
   ];
 
   // Stage 4: Serialize
-  let html = serializeBlocks(walkResult.blocks);
-  // Strip data-gb-path attributes from the final HTML output (internal markers)
-  html = html.replace(/\s*data-gb-path="[^"]*"/g, "");
+  const html = serializeBlocks(walkResult.blocks);
   const blockCount = countBlocks(walkResult.blocks);
 
   // Stage 4.5: Content-loss check
@@ -206,13 +141,12 @@ export async function convert(
     "utf-8",
   );
 
-  // Single styles.css: compiled Tailwind CSS + custom CSS
-  const combinedCss = [compiledCss, prepResult.customCss]
-    .filter(Boolean).join("\n");
+  // Single styles.css: custom CSS from source <style> blocks
+  const combinedCss = prepResult.customCss || "";
   if (!input.skipShared) {
     if (combinedCss.trim()) {
       writeFileSync(
-        resolve(outDir, "styles.css"),
+        resolve(outDir, "pages", "styles.css"),
         combinedCss + "\n",
         "utf-8",
       );
@@ -241,6 +175,5 @@ export async function convert(
     report,
     globalStyles: {} as Record<string, unknown>,
     customCss: combinedCss,
-    tailwindCss: "",
   };
 }

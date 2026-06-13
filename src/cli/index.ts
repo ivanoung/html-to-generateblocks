@@ -18,10 +18,8 @@ import {
 } from "../runner/run-fixture.js";
 import type { Fixture, FixtureReport, ReportStatus } from "../core/types.js";
 import { convert } from "../core/orchestrator.js";
-import { inlineTailwindStyles, usesTailwind, inlineTailwindMultiPage } from "../core/tailwind-inliner.js";
 import { resolveIconifyIcons } from "../core/iconify-resolver.js";
 import { checkContentLoss } from "../core/content-verifier.js";
-import { compileTailwindOffline, extractTailwindConfig, validateTailwindConfig } from "../core/tailwind-resolver.js";
 import { splitCss } from "../core/css-splitter.js";
 import { extractScripts, deduplicateScripts, formatGlobalJs } from "../core/script-extractor.js";
 
@@ -383,68 +381,23 @@ async function main(): Promise<void> {
       }
       const uniqueScripts = deduplicateScripts(allScripts);
 
-      // Stage 2: Compile Tailwind CSS via CDN (Playwright, live DOM)
-      let inlinerCss = "";
-      const tailwindConfig = extractTailwindConfig(pageContents[0]?.html || "");
-
-      if (tailwindConfig) {
-        console.log(`  Compiling Tailwind CSS from ${files.length} page(s) via CDN...`);
-        const compiled = await inlineTailwindMultiPage(
-          pageContents.map((pc) => pc.html),
-          pageContents.map((pc) => pc.name),
-        );
-        if (compiled.warnings.length > 0) {
-          for (const w of compiled.warnings) console.log(`    [WARN] ${w}`);
-        }
-        inlinerCss = compiled.stylesCss;
-        console.log(`    ✓ Compiled (${(compiled.stylesCss.length / 1024).toFixed(1)} KB)`);
-
-        // Validate config for known patterns
-        const allPageClasses = new Set<string>();
-        for (const pc of pageContents) {
-          const classMatches = pc.html.match(/class="([^"]*)"/g) || [];
-          for (const m of classMatches) {
-            const cls = m.replace(/class="([^"]*)"/, "$1");
-            cls.split(/\s+/).forEach((c) => c && allPageClasses.add(c));
-          }
-        }
-        const configWarnings = validateTailwindConfig(tailwindConfig, [...allPageClasses]);
-        for (const w of configWarnings) {
-          if (w.type === "single_value_color") {
-            console.log(`    [WARN] Color "${w.color}" is a single hex value but ${w.missingClasses.length} shade variant classes are used`);
-            console.log(`           → Define "${w.color}" as an object with shades (50-950) instead of a single hex`);
-          }
-        }
-      } else {
-        console.log("  No tailwind.config found — skipping CSS compilation");
-      }
-
-      // Write shared styles.css (combined Tailwind + custom CSS from all pages)
-      // The first page's convert with skipInliner produces the custom CSS portion.
-      // We'll write the Tailwind CSS now and let the first page append custom CSS.
+      // Write shared global.js
       const outDir = resolve(process.cwd(), outputDir);
-      if (!existsSync(outDir)) {
-        const { mkdirSync } = await import("node:fs");
-        mkdirSync(outDir, { recursive: true });
+      const globalJs = formatGlobalJs(uniqueScripts);
+      if (globalJs.trim()) {
+        mkdirSync(resolve(outDir, "setup"), { recursive: true });
+        writeFileSync(resolve(outDir, "setup", "global.js"), globalJs, "utf-8");
       }
 
-      // Stage 4: Convert each page with skipInliner=true
+      // Convert each page
       let firstPage = true;
       for (const pc of pageContents) {
         const output = await convert({
           rawHtml: pc.html,
           pageName: pc.name,
           projectDir,
-          skipShared: !firstPage,  // shared files only from first page
-          skipInliner: true,       // CSS already compiled once for all pages
+          skipShared: !firstPage,
         });
-
-        // On first page: prepend Tailwind CSS to styles.css
-        if (firstPage && inlinerCss) {
-          const cssPath = resolve(outDir, "styles.css");
-          const existing = existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "";
-          writeFileSync(cssPath, inlinerCss + "\n" + existing, "utf-8");
-        }
 
         const lossCheck = checkContentLoss(pc.html, output.blockHtml);
         const lossFlag = lossCheck.warning ? ` ⚠ LOSS ${Math.round(lossCheck.lossPercent)}%` : "";
@@ -514,7 +467,6 @@ async function main(): Promise<void> {
           pageName: "nav",
           projectDir: projectDir ? `${projectDir}/components/nav` : undefined,
           skipShared: true,
-          skipInliner: true,
           skipStripNavFooter: true,
         });
         // Flatten: components/nav/pages/nav.html → components/nav/nav.html
@@ -539,7 +491,6 @@ async function main(): Promise<void> {
           pageName: "footer",
           projectDir: projectDir ? `${projectDir}/components/footer` : undefined,
           skipShared: true,
-          skipInliner: true,
           skipStripNavFooter: true,
         });
         const nestedPages = resolve(footerDir, "pages");
