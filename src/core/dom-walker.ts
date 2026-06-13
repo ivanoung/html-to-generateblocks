@@ -58,6 +58,7 @@ interface WalkerOptions {
   collector: GlobalStylesCollector;
   warnings: string[];
   hardFails: { code: string; message: string }[];
+  inlineStyles?: Record<string, Record<string, string>>;
 }
 
 // ── Core walker ────────────────────────────────────────────
@@ -234,6 +235,13 @@ function makeTextBlock(
   const { styles, css, warnings: styleWarnings } = parseStyleString(styleAttr);
   opts.warnings.push(...styleWarnings);
 
+  // Query computed styles from the classifier and remove path attr before extraction
+  const textPath = $el.attr("data-gb-path");
+  $el.removeAttr("data-gb-path");
+  if (textPath && opts.inlineStyles?.[textPath]) {
+    Object.assign(styles, opts.inlineStyles[textPath]);
+  }
+
   const htmlAttributes = extractHtmlAttributes($el);
   const globalClasses = extractGlobalClasses($el, opts);
 
@@ -264,8 +272,23 @@ function makeElementBlock(
   const { styles, css, warnings: styleWarnings } = parseStyleString(styleAttr);
   opts.warnings.push(...styleWarnings);
 
+  // Query computed styles from the classifier and remove path attr before extraction
+  const elemPath = $el.attr("data-gb-path");
+  $el.removeAttr("data-gb-path");
+  if (elemPath && opts.inlineStyles?.[elemPath]) {
+    Object.assign(styles, opts.inlineStyles[elemPath]);
+  }
+
   const htmlAttributes = extractHtmlAttributes($el);
   const globalClasses = extractGlobalClasses($el, opts);
+
+  // Query computed styles from the classifier (direct lookup, no HTML round-trip)
+  const path = $el.attr("data-gb-path");
+  if (path && opts.inlineStyles?.[path]) {
+    Object.assign(styles, opts.inlineStyles[path]);
+  }
+  // Remove data-gb-path (internal marker, don't leak into output)
+  $el.removeAttr("data-gb-path");
 
   return {
     blockName: "generateblocks/element",
@@ -299,6 +322,13 @@ function makeMediaBlock(
   if (height) htmlAttributes.height = height;
 
   const globalClasses = extractGlobalClasses($el, opts);
+
+  // Query computed styles from the classifier
+  const path = $el.attr("data-gb-path");
+  if (path && opts.inlineStyles?.[path]) {
+    Object.assign(styles, opts.inlineStyles[path]);
+  }
+  $el.removeAttr("data-gb-path");
 
   return {
     blockName: "generateblocks/media",
@@ -343,6 +373,13 @@ function makeShapeBlock(
   const styleAttr = $el.attr("style") || "";
   const { styles, css, warnings: styleWarnings } = parseStyleString(styleAttr);
   opts.warnings.push(...styleWarnings);
+
+  // Query computed styles from the classifier
+  const path = $el.attr("data-gb-path");
+  if (path && opts.inlineStyles?.[path]) {
+    Object.assign(styles, opts.inlineStyles[path]);
+  }
+  $el.removeAttr("data-gb-path");
 
   return {
     blockName: "generateblocks/shape",
@@ -486,7 +523,7 @@ export function walkDom(
   const hardFails: { code: string; message: string }[] = [];
   const $ = cheerio.load(`<div>${html}</div>`);
 
-  const opts: WalkerOptions = { classNameToProperties, collector, warnings, hardFails };
+  const opts: WalkerOptions = { classNameToProperties, collector, warnings, hardFails, inlineStyles };
   const blocks: Block[] = [];
 
   // Walk top-level children of the wrapper div only
