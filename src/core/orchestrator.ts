@@ -5,7 +5,6 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import * as cheerio from "cheerio";
 import { preprocess } from "./preprocessor.js";
 import { walkDom } from "./dom-walker.js";
 import { GlobalStylesCollector } from "./global-styles-collector.js";
@@ -118,42 +117,19 @@ export async function convert(
   // Stage 1: Preprocess
   const prepResult = preprocess(rawHtml, input.skipStripNavFooter);
 
-  // Apply classified inline styles as style="..." attributes before DOM walk
-  let processedHtml = prepResult.html;
-  if (classifiedInlineStyles && Object.keys(classifiedInlineStyles).length > 0) {
-    const $ = cheerio.load(processedHtml, { decodeEntities: false, xmlMode: false });
-    $("[data-gb-path]").each((_, el) => {
-      const path = $(el).attr("data-gb-path");
-      if (!path || !classifiedInlineStyles[path]) return;
-      const props = classifiedInlineStyles[path];
-      const styleEntries: string[] = [];
-      for (const [k, v] of Object.entries(props)) {
-        const cssProp = k.replace(/[A-Z]/g, (m: string) => "-" + m.toLowerCase());
-        styleEntries.push(`${cssProp}:${v}`);
-      }
-      const existingStyle = $(el).attr("style") || "";
-      $(el).attr("style", existingStyle ? `${existingStyle};${styleEntries.join(";")}` : styleEntries.join(";"));
-      // Remove data-gb-path (internal marker, not needed past this point)
-      $(el).removeAttr("data-gb-path");
-    });
-    processedHtml = $.html();
-    // Extract body content (cheerio wraps in <html><head></head><body>...)
-    const bodyMatch = processedHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-    if (bodyMatch) processedHtml = bodyMatch[1];
-  }
-
   // Stage 2: Register class definitions in collector
   const collector = new GlobalStylesCollector(input.pageName);
   prepResult.classNameToProperties.forEach((styles, className) => {
     collector.registerDefinition(className, styles);
   });
 
-  // Stage 3: DOM walk
+  // Stage 3: DOM walk — computed styles passed directly (no HTML round-trip)
   const walkResult = walkDom(
-    processedHtml,
+    prepResult.html,
     prepResult.classNameToProperties,
     collector,
     input.skipStripNavFooter,
+    classifiedInlineStyles,
   );
 
   // Collect all warnings
@@ -164,7 +140,9 @@ export async function convert(
   ];
 
   // Stage 4: Serialize
-  const html = serializeBlocks(walkResult.blocks);
+  let html = serializeBlocks(walkResult.blocks);
+  // Strip data-gb-path attributes from the final HTML output (internal markers)
+  html = html.replace(/\s*data-gb-path="[^"]*"/g, "");
   const blockCount = countBlocks(walkResult.blocks);
 
   // Stage 4.5: Content-loss check
