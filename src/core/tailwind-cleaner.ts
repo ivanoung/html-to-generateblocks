@@ -12,8 +12,9 @@ export function cleanTailwindSource(rawHtml: string): CleanResult {
   const warnings: string[] = [];
   const $ = cheerio.load(rawHtml, { decodeEntities: false, xmlMode: false });
 
-  // Step 1: Inject data-gb-path on walker-processed elements FIRST
-  // (so wrapper spans created later don't get paths)
+  // Inject data-gb-path on walker-processed elements.
+  // These paths are used by: (a) the inliner to capture computed styles,
+  // (b) the DOM walker to match elements against classified computed styles.
   const pathCounters: Record<string, number> = {};
   WALKER_TAGS.forEach(tag => {
     $(tag).each((_, el) => {
@@ -36,7 +37,7 @@ export function cleanTailwindSource(rawHtml: string): CleanResult {
     });
   });
 
-  // Step 2: Detect bare text nodes (WARNING only, no transformation)
+  // Detect bare text nodes (WARNING only, no transformation)
   $("*").each((_, el) => {
     const tag = (el as any).tagName?.toLowerCase();
     if (!tag || !BLOCK_TAGS.has(tag)) return;
@@ -47,15 +48,6 @@ export function cleanTailwindSource(rawHtml: string): CleanResult {
         if (text.length === 0) continue;
         warnings.push(`Bare text in <${tag}>: "${text.slice(0, 40)}${text.length > 40 ? "..." : ""}" — consider wrapping in <p> or <span>`);
       }
-    }
-  });
-
-  // Step 3: Detect empty divs (WARNING only, no removal)
-  $("div").each((_, el) => {
-    const $el = $(el);
-    const html = $el.html();
-    if (!html || html.trim().length === 0) {
-      warnings.push(`Empty <div> detected — consider removing from source`);
     }
   });
 
