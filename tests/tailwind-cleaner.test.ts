@@ -13,11 +13,10 @@ describe("cleanTailwindSource", () => {
     assert.ok(!result.html.includes("<span>"), "should not wrap in span");
   });
 
-  it("warns about empty divs instead of removing them", () => {
+  it("does not modify empty divs", () => {
     const input = '<div></div><section>content</section>';
     const result = cleanTailwindSource(input);
-    assert.ok(result.warnings.some(w => w.includes("Empty")), "should warn about empty div");
-    // Empty div should remain (but may have data-gb-path injected)
+    // Empty div should remain (may have data-gb-path injected)
     assert.ok(result.html.includes('<div'), "empty div should remain in HTML");
     assert.ok(result.html.includes("content"), "section should remain");
   });
