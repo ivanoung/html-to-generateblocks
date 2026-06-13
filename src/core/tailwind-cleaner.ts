@@ -12,9 +12,8 @@ export function cleanTailwindSource(rawHtml: string): CleanResult {
   const warnings: string[] = [];
   const $ = cheerio.load(rawHtml, { decodeEntities: false, xmlMode: false });
 
-  // Inject data-gb-path on walker-processed elements.
-  // These paths are used by: (a) the inliner to capture computed styles,
-  // (b) the DOM walker to match elements against classified computed styles.
+  // Inject data-gb-path using same algorithm as tailwind-inliner's page.evaluate().
+  // These paths are read by the DOM walker to look up computed styles.
   const pathCounters: Record<string, number> = {};
   WALKER_TAGS.forEach(tag => {
     $(tag).each((_, el) => {
