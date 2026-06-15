@@ -46,6 +46,10 @@ Regex pattern to locate the config:
 /tailwind\.config\s*=\s*(\{[\s\S]*?\n\})/
 ```
 
+**Fallback path:** The regex approach handles most CDN-sourced configs (single-line JS objects). If real-world configs prove too complex (nested objects, comments, template literals), the implementation plan includes a documented contingency to replace extraction with a lightweight JS parser (acorn + estree walk). Fuzz tests must exercise nested objects, trailing commas, and minified formats before considering regex sufficient.
+
+**Manifest generation robustness:** The class-extraction regex scanning `tailwind.css` is sufficient for initial implementation. During integration testing, validate the manifest against a known test fixture to detect false positives/negatives. If issues emerge with complex selectors or escaped variants, the implementation plan notes PostCSS + Tailwind's internal class list as a future upgrade path.
+
 If no config is found → silent skip. Converter produces valid output without Tailwind.
 
 ### 1.2 JS → v4 @theme Translation
@@ -64,15 +68,22 @@ Tailwind v4 CLI uses CSS-based configuration with `@theme` blocks. The source HT
 - `theme.extend.colors.*` → `--color-*`
 - `theme.extend.fontFamily.*` → `--font-*`
 - `theme.extend.fontSize.*` → `--font-size-*`
+- `theme.extend.fontWeight.*` → `--font-weight-*`
+- `theme.extend.lineHeight.*` → `--line-height-*`
+- `theme.extend.letterSpacing.*` → `--letter-spacing-*`
 - `theme.extend.spacing.*` → `--spacing-*`
 - `theme.extend.maxWidth.*` → `--max-width-*`
 - `theme.extend.borderRadius.*` → `--radius-*`
+- `theme.extend.boxShadow.*` → `--shadow-*`
+- `theme.extend.zIndex.*` → `--z-index-*`
+- `theme.extend.opacity.*` → `--opacity-*`
 - `theme.extend.screens.*` → `--breakpoint-*`
 
 **Unsupported patterns (warn and skip):**
 - Dynamic `theme()` calls (e.g., `theme('colors.red.500')`)
 - Nested theme overrides beyond `theme.extend`
 - Plugin references
+- Array-based values with complex object entries (e.g., `fontSize: { sm: ['0.875rem', { lineHeight: '1.25rem' }] }`) — warn, skip the nested object, use the first array value only
 
 ### 1.3 Compilation
 
@@ -291,7 +302,29 @@ From multi-model review of each design section:
 - Cache-busting via `filemtime()` on enqueued CSS
 - `allowedBlockClasses` safelist to prevent Gutenberg from stripping Tailwind classes
 
-## Section 8 — Risks and Mitigations
+## Section 8 — Deployment Workflow
+
+After running `convert`, the user deploys to WordPress:
+
+1. **Copy the project output folder** (`output/<project>/`) into `wp-content/plugins/gb-tailwind-<project>/`
+2. **Activate the plugin** from WordPress Admin → Plugins (look for "GB Tailwind Styles")
+3. **Paste block markup** from `pages/*.html` into the WordPress block editor
+4. **Verify:** Tailwind-styled blocks should render correctly in both the editor preview and the published frontend
+5. **Re-run `convert`** whenever the source HTML changes — copy the new output folder over the old one; `filemtime()` cache-busting ensures browsers pick up the new CSS
+
+The plugin is project-specific. Multiple projects each get their own companion plugin with a unique handle prefix (`gb-tailwind-<project>`) to avoid conflicts.
+
+## Section 9 — Requirements
+
+| Requirement | Minimum | Notes |
+|---|---|---|
+| Tailwind CLI | v4.3.0+ | Required for `@theme` block compilation |
+| WordPress | 5.8+ | Required for `block_editor_settings_all` filter |
+| Node.js | Same as project minimum (v22+) | Already a devDependency |
+
+During `convert`, check that `npx @tailwindcss/cli --help` succeeds before attempting compilation. Warn and skip if unavailable.
+
+## Section 10 — Risks and Mitigations
 
 | Risk | Mitigation |
 |---|---|
