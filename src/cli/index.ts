@@ -10,7 +10,7 @@
 //   regression                 Check M1 fixtures against snapshots
 
 import { resolve, basename, extname } from "node:path";
-import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, rmdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, copyFileSync } from "node:fs";
 import {
   runFixture, loadFixture, writeOutput,
   runFidelityFixture, isFidelityFixture,
@@ -21,9 +21,12 @@ import { convert } from "../core/orchestrator.js";
 import { inlineTailwindStyles, usesTailwind, inlineTailwindMultiPage } from "../core/tailwind-inliner.js";
 import { resolveIconifyIcons } from "../core/iconify-resolver.js";
 import { checkContentLoss } from "../core/content-verifier.js";
-import { compileTailwindOffline, extractTailwindConfig, validateTailwindConfig } from "../core/tailwind-resolver.js";
+import { compileTailwindOffline, extractTailwindConfig, validateTailwindConfig, expandColorPalettes } from "../core/tailwind-resolver.js";
 import { splitCss } from "../core/css-splitter.js";
+import { generateGlobalStylesData, buildGlobalStylesManifest } from "../core/global-styles-data.js";
 import { extractScripts, deduplicateScripts, formatGlobalJs } from "../core/script-extractor.js";
+import { createSession, readSession, updateSession, deleteSession, hasActiveSession, validateEnv, checkStagingUrl } from "../core/verify-session.js";
+import { prepareVerification } from "../core/verify-prepare.js";
 
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
 const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
@@ -322,10 +325,13 @@ async function main(): Promise<void> {
     const firstHtml = pageContents[0].html;
     const tailwindConfig = extractTailwindConfig(firstHtml);
     if (tailwindConfig) {
+      const expandedConfig = expandColorPalettes(tailwindConfig);
       console.log(`  Compiling Tailwind CSS from ${pageContents.length} page(s) via CDN...`);
       const compiled = await inlineTailwindMultiPage(
         pageContents.map((pc) => pc.html),
         pageContents.map((pc) => pc.name),
+        fullDir,
+        expandedConfig,
       );
       tailwindCss = compiled.stylesCss;
       console.log(`    ✓ Compiled (${(compiled.stylesCss.length / 1024).toFixed(1)} KB)`);
@@ -420,10 +426,13 @@ async function main(): Promise<void> {
       const tailwindConfig = extractTailwindConfig(pageContents[0]?.html || "");
 
       if (tailwindConfig) {
+        const expandedConfig = expandColorPalettes(tailwindConfig);
         console.log(`  Compiling Tailwind CSS from ${files.length} page(s) via CDN...`);
         const compiled = await inlineTailwindMultiPage(
           pageContents.map((pc) => pc.html),
           pageContents.map((pc) => pc.name),
+          fullPath,
+          expandedConfig,
         );
         if (compiled.warnings.length > 0) {
           for (const w of compiled.warnings) console.log(`    [WARN] ${w}`);
@@ -440,7 +449,7 @@ async function main(): Promise<void> {
             cls.split(/\s+/).forEach((c) => c && allPageClasses.add(c));
           }
         }
-        const configWarnings = validateTailwindConfig(tailwindConfig, [...allPageClasses]);
+        const configWarnings = validateTailwindConfig(expandedConfig, [...allPageClasses]);
         for (const w of configWarnings) {
           if (w.type === "single_value_color") {
             console.log(`    [WARN] Color "${w.color}" is a single hex value but ${w.missingClasses.length} shade variant classes are used`);
@@ -488,7 +497,8 @@ async function main(): Promise<void> {
         firstPage = false;
       }
 
-      // After all pages: split styles.css into setup/ folder
+      // Phase 2: Split styles.css into global-styles.json + styles-unique.css
+      // styles.css at project root stays untouched (master fallback)
       const cssPath = resolve(outDir, "styles.css");
       const setupDir = resolve(outDir, "setup");
       const pagesDir = resolve(outDir, "pages");
@@ -496,77 +506,40 @@ async function main(): Promise<void> {
         mkdirSync(setupDir, { recursive: true });
 
         const fullCss = readFileSync(cssPath, "utf-8");
+        
+        // Generate structured gb_style_data for global-styles.json
+        const { editable, raw } = generateGlobalStylesData(fullCss);
+        console.log(`  Global Styles: ${editable.length} structured (editable), ${raw.length} raw (CSS-only)`);
+        
+        // Build manifest with both structured + raw entries
+        const manifest = buildGlobalStylesManifest(editable, raw, []);
+        writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+        
+        // styles-unique.css: non-class CSS (keyframes, preflight, element selectors, vendor prefixes)
         const split = splitCss(fullCss);
-        writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(split.globalStyles, null, 2) + "\n", "utf-8");
         writeFileSync(resolve(setupDir, "styles-unique.css"), split.uniqueCss + "\n", "utf-8");
-
-        // Move manual-steps.txt into setup/
-        const srcManual = resolve(outDir, "manual-steps.txt");
-        if (existsSync(srcManual)) {
-          writeFileSync(resolve(setupDir, "manual-steps.txt"), readFileSync(srcManual, "utf-8"));
-          unlinkSync(srcManual);
-        }
-
-        // styles.css stays at project root (shared across all pages)
+        
+        // styles.css at project root stays as master fallback (never deleted)
       }
 
-      // Write global.js with all scripts
+      // Write app.js at project root with all scripts
       if (uniqueScripts.length > 0) {
-        writeFileSync(resolve(setupDir, "global.js"), formatGlobalJs(uniqueScripts), "utf-8");
+        writeFileSync(resolve(outDir, "app.js"), formatGlobalJs(uniqueScripts), "utf-8");
       }
 
-      // Convert nav and footer components from the index page
-      const firstPageHtml = pageContents[0]?.html || "";
-      const { preprocess } = await import("../core/preprocessor.js");
-      const prepResult = preprocess(firstPageHtml, true);
-
-      if (prepResult.navHtml) {
-        console.log(`  Converting nav component...`);
-        const navDir = resolve(outDir, "components", "nav");
-        mkdirSync(navDir, { recursive: true });
-        const navDoc = `<!DOCTYPE html><html><head></head><body>${prepResult.navHtml}</body></html>`;
-        await convert({
-          rawHtml: navDoc,
-          pageName: "nav",
-          projectDir: projectDir ? `${projectDir}/components/nav` : undefined,
-          skipShared: true,
-          skipInliner: true,
-          skipStripNavFooter: true,
-        });
-        // Flatten: components/nav/pages/nav.html → components/nav/nav.html
-        const nestedPages = resolve(navDir, "pages");
-        if (existsSync(nestedPages)) {
-          for (const f of readdirSync(nestedPages)) {
-            writeFileSync(resolve(navDir, f), readFileSync(resolve(nestedPages, f)));
-            unlinkSync(resolve(nestedPages, f));
-          }
-          rmdirSync(nestedPages);
+      // Copy non-HTML assets (images, favicons, fonts) verbatim into mirrored output
+      const assetFiles = readdirSync(fullPath).filter((f) => {
+        const ext = f.split(".").pop()?.toLowerCase() || "";
+        return !f.endsWith(".html") && !f.endsWith(".css") && !f.endsWith(".js")
+          && !f.startsWith(".");
+      });
+      for (const asset of assetFiles) {
+        const srcAsset = resolve(fullPath, asset);
+        const destAsset = resolve(outDir, asset);
+        if (statSync(srcAsset).isFile()) {
+          copyFileSync(srcAsset, destAsset);
+          console.log(`  Asset copied: ${asset}`);
         }
-        console.log(`    ✓ nav converted`);
-      }
-
-      if (prepResult.footerHtml) {
-        console.log(`  Converting footer component...`);
-        const footerDir = resolve(outDir, "components", "footer");
-        mkdirSync(footerDir, { recursive: true });
-        const footerDoc = `<!DOCTYPE html><html><head></head><body>${prepResult.footerHtml}</body></html>`;
-        await convert({
-          rawHtml: footerDoc,
-          pageName: "footer",
-          projectDir: projectDir ? `${projectDir}/components/footer` : undefined,
-          skipShared: true,
-          skipInliner: true,
-          skipStripNavFooter: true,
-        });
-        const nestedPages = resolve(footerDir, "pages");
-        if (existsSync(nestedPages)) {
-          for (const f of readdirSync(nestedPages)) {
-            writeFileSync(resolve(footerDir, f), readFileSync(resolve(nestedPages, f)));
-            unlinkSync(resolve(nestedPages, f));
-          }
-          rmdirSync(nestedPages);
-        }
-        console.log(`    ✓ footer converted`);
       }
 
       console.log(`\n  Done. ${pageContents.length} page(s) converted.`);
@@ -624,6 +597,134 @@ async function main(): Promise<void> {
       console.log(`  Styles CSS: ${outputPrefix}styles.css (${lines} rules)`);
     }
     console.log("");
+    return;
+  }
+
+  // ── verify:prepare ──────────────────────────────────────
+  if (cmd === "verify:prepare") {
+    const inputPath = args[1];
+    if (!inputPath) {
+      console.error("Usage: verify:prepare <inputs/project/> [--pass 2]");
+      process.exit(1);
+    }
+
+    const envError = validateEnv();
+    if (envError) {
+      console.error(`ERROR: ${envError}`);
+      process.exit(1);
+    }
+
+    const stagingWarning = checkStagingUrl();
+    if (stagingWarning) console.log(stagingWarning);
+
+    if (hasActiveSession()) {
+      console.log("An active verification session exists. Run 'verify:cleanup' first or 'verify:status' to inspect.");
+      process.exit(1);
+    }
+
+    const passNum = args.includes("--pass") && args[args.indexOf("--pass") + 1] === "2" ? 2 : 1;
+    const wpUrl = process.env.GB_WP_URL!;
+    const projectDir = inputPath.replace(/^inputs\//, "").replace(/\/$/, "");
+    const session = createSession(wpUrl, passNum as 1 | 2, projectDir);
+
+    const outDir = `output/${projectDir}`;
+    if (!existsSync(resolve(process.cwd(), outDir, "pages"))) {
+      console.log(`No output found for ${projectDir}. Run conversion first.`);
+      deleteSession();
+      process.exit(1);
+    }
+
+    console.log(`Preparing Pass ${passNum} verification for ${projectDir}...`);
+
+    let prepResult;
+    try {
+      prepResult = prepareVerification(session);
+    } catch (err: any) {
+      console.error(`ERROR: ${err.message}`);
+      deleteSession();
+      process.exit(1);
+    }
+
+    if (prepResult.warnings.length > 0) {
+      console.log("\nWarnings:");
+      for (const w of prepResult.warnings) console.log(`  ⚠ ${w}`);
+    }
+
+    const sessionPosts = prepResult.pages.map((p) => ({
+      slug: p.slug,
+      status: "pending" as const,
+    }));
+    updateSession({ createdPosts: sessionPosts, status: "awaiting_review" });
+
+    const output = {
+      session_file: "output/.verify-session.json",
+      run_id: session.runId,
+      wp_url: wpUrl,
+      pass: passNum,
+      css_source: prepResult.cssSource,
+      css_size: prepResult.cssPayload.length,
+      pages: prepResult.pages.map((p) => ({
+        slug: p.slug,
+        title: p.postTitle,
+        block_size: p.blockMarkup.length,
+        hard_fails: ((p.report.hardFails as unknown[]) || []).length,
+      })),
+      instructions: [
+        "1. Read output/.verify-session.json for run_id",
+        "2. Upload sandbox loader: write-file to novamira-sandbox/gb-verify-{run_id}.php",
+        "3. Enable sandbox loader: enable-file",
+        "4. For each page: execute-php wp_insert_post() with block markup",
+        "5. Update session file with post IDs",
+        "6. Set CSS transient: execute-php set_transient()",
+        "7. Generate nonce: execute-php wp_create_nonce()",
+        "8. Report URLs to user with ?gb_verify={run_id}&_nonce={nonce}",
+      ],
+    };
+
+    console.log(JSON.stringify(output, null, 2));
+    return;
+  }
+
+  // ── verify:status ─────────────────────────────────────
+  if (cmd === "verify:status") {
+    const session = readSession();
+    if (!session) {
+      console.log("No active verification session.");
+      process.exit(0);
+    }
+    console.log(`Session: ${session.runId}`);
+    console.log(`Status:  ${session.status}`);
+    console.log(`Pass:    ${session.pass}`);
+    console.log(`Project: ${session.projectDir}`);
+    console.log(`Started: ${session.startedAt}`);
+    console.log(`\nPages (${session.createdPosts.length}):`);
+    for (const p of session.createdPosts) {
+      const icon = p.status === "created" ? "✓" : p.status === "failed" ? "✗" : "◌";
+      console.log(`  ${icon} ${p.slug}${p.url ? ` → ${p.url}` : ""}${p.error ? ` (${p.error})` : ""}`);
+    }
+    return;
+  }
+
+  // ── verify:cleanup ────────────────────────────────────
+  if (cmd === "verify:cleanup") {
+    const session = readSession();
+    if (!session) {
+      console.log("No session to clean up.");
+      process.exit(0);
+    }
+    console.log(`Cleaning up session ${session.runId}...`);
+    console.log(`  ${session.createdPosts.length} post(s) to delete`);
+    console.log(`  Sandbox file: ${session.sandboxFile}`);
+    console.log(`  Transient: gb_verify_css_${session.runId}`);
+    console.log(JSON.stringify({
+      cleanup_steps: [
+        { step: "delete_posts", postIds: session.createdPosts.filter(p => p.postId).map(p => p.postId) },
+        { step: "delete_transient", key: `gb_verify_css_${session.runId}` },
+        { step: "disable_file", path: session.sandboxFile },
+        { step: "delete_file", path: session.sandboxFile },
+        { step: "delete_session", file: "output/.verify-session.json" },
+      ],
+    }, null, 2));
     return;
   }
 
