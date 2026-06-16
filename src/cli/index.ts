@@ -307,17 +307,52 @@ async function main(): Promise<void> {
 
     console.log(`\nSetting up project from ${htmlFiles.length} page(s)...\n`);
 
-    // Use the first HTML file to generate shared files
-    const firstFile = htmlFiles[0];
-    const rawHtml = readFileSync(resolve(fullDir, firstFile), "utf-8");
+    // Collect all pages and compile Tailwind from all of them
     const projectDir = projectPath.replace(/^inputs\//, "").replace(/\/$/, "");
+    const pageContents: { name: string; html: string }[] = [];
+    for (const f of htmlFiles) {
+      pageContents.push({
+        name: f.replace(".html", ""),
+        html: readFileSync(resolve(fullDir, f), "utf-8"),
+      });
+    }
 
-    await convert({ rawHtml, pageName: "_setup", projectDir, skipShared: false });
+    // Compile Tailwind CSS from ALL pages via CDN (Playwright)
+    let tailwindCss = "";
+    const firstHtml = pageContents[0].html;
+    const tailwindConfig = extractTailwindConfig(firstHtml);
+    if (tailwindConfig) {
+      console.log(`  Compiling Tailwind CSS from ${pageContents.length} page(s) via CDN...`);
+      const compiled = await inlineTailwindMultiPage(
+        pageContents.map((pc) => pc.html),
+        pageContents.map((pc) => pc.name),
+      );
+      tailwindCss = compiled.stylesCss;
+      console.log(`    ✓ Compiled (${(compiled.stylesCss.length / 1024).toFixed(1)} KB)`);
+    }
+
+    // Convert first page to generate shared files (skip inliner — already compiled)
+    await convert({
+      rawHtml: firstHtml,
+      pageName: "_setup",
+      projectDir,
+      skipShared: false,
+      skipInliner: true,
+    });
+
+    // Prepend compiled Tailwind CSS to styles.css
+
+    const outDir = projectDir ? `output/${projectDir}/` : "output/";
+    const absOutDir = resolve(process.cwd(), outDir);
+    if (tailwindCss) {
+      const cssPath = resolve(absOutDir, "styles.css");
+      const existing = existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "";
+      writeFileSync(cssPath, tailwindCss + "\n" + existing, "utf-8");
+    }
 
     // Clean up throwaway setup blocks
-    const outDir = projectDir ? `output/${projectDir}/` : "output/";
-    try { unlinkSync(resolve(process.cwd(), outDir, "pages", "_setup.html")); } catch {}
-    try { unlinkSync(resolve(process.cwd(), outDir, "pages", "_setup.report.json")); } catch {}
+    try { unlinkSync(resolve(absOutDir, "pages", "_setup.html")); } catch {}
+    try { unlinkSync(resolve(absOutDir, "pages", "_setup.report.json")); } catch {}
     console.log(`  styles.css:         ${outDir}styles.css`);
     console.log(`  manual-steps:       ${outDir}manual-steps.txt`);
     console.log("");
