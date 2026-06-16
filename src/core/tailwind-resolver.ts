@@ -193,6 +193,9 @@ export function expandColorPalettes(configJson: string): string {
       const shadeHex = hslToHex(hsl.h, hsl.s, adjustedL);
       shades.push(`${shade}: "${shadeHex}"`);
     }
+    // Add DEFAULT key so bare class names (e.g. text-orange) still resolve
+    // after single-hex expansion to a shade palette
+    shades.push(`DEFAULT: "${hexColor}"`);
     
     const expandedColor = `${colorName}: { ${shades.join(", ")} }`;
     
