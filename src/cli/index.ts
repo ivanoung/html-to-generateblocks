@@ -22,8 +22,8 @@ import { inlineTailwindStyles, usesTailwind, inlineTailwindMultiPage } from "../
 import { resolveIconifyIcons } from "../core/iconify-resolver.js";
 import { checkContentLoss } from "../core/content-verifier.js";
 import { compileTailwindOffline, extractTailwindConfig, validateTailwindConfig, expandColorPalettes } from "../core/tailwind-resolver.js";
-import { splitCss } from "../core/css-splitter.js";
-import { generateGlobalStylesData, buildGlobalStylesManifest } from "../core/global-styles-data.js";
+import { buildGlobalStylesManifest } from "../core/global-styles-data.js";
+import { CssClassifier } from "../core/css-classifier.js";
 import { extractScripts, deduplicateScripts, formatGlobalJs } from "../core/script-extractor.js";
 import { createSession, readSession, updateSession, deleteSession, hasActiveSession, validateEnv, checkStagingUrl } from "../core/verify-session.js";
 import { prepareVerification } from "../core/verify-prepare.js";
@@ -147,7 +147,7 @@ async function main(): Promise<void> {
     console.log("  fixtures:run-all           Run all fixtures");
     console.log("  convert <input.html|dir/>  Convert HTML page(s) to GB blocks");
     console.log("    --skip-shared            Skip shared files (styles.css, manual-steps)");
-    console.log("    --split                  Also generate setup/ (global-styles.json + styles-unique.css)");
+    console.log("    --split                  Also generate setup/ (global-styles.json + styles-unique.css + rejected.json)");
     console.log("  regression                 Check M1 vs snapshots");
     process.exit(0);
   }
@@ -524,34 +524,30 @@ async function main(): Promise<void> {
 
         const fullCss = readFileSync(cssPath, "utf-8");
 
-        const useCanonical = args.includes("--canonicalize");
+        const result = CssClassifier.classify(fullCss);
+        const structuredStyles = result.structuredStyles.map((s) => ({
+          selector: s.selector,
+          name: s.name,
+          styles: s.styles,
+        }));
+        const rawSelectors = [...new Set(
+          [...result.rawCss.matchAll(/^([.#][^\s{]+)\s*\{/gm)].map((m) => m[1])
+        )];
+        const rawEntries = rawSelectors.map((sel) => ({
+          selector: sel,
+          name: sel.replace(/^\./, ""),
+          styles: {} as Record<string, unknown>,
+          raw: true,
+        }));
+        const manifest = buildGlobalStylesManifest(structuredStyles, rawEntries, []);
+        writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+        writeFileSync(resolve(setupDir, "styles-unique.css"), result.rawCss, "utf-8");
+        writeFileSync(resolve(setupDir, "rejected.json"), result.rejectionLog.toJSON(
+          structuredStyles.length + rawEntries.length,
+        ), "utf-8");
 
-        if (useCanonical) {
-          // Canonicalized path: PostCSS AST pipeline with --tw-*-opacity resolution
-          const { generateGlobalStylesDataCanonicalized } = await import("../core/global-styles-data.js");
-          const { splitCssCanonicalized } = await import("../core/css-splitter.js");
-
-          const { editable, raw, rejectionJson } = generateGlobalStylesDataCanonicalized(fullCss);
-          const manifest = buildGlobalStylesManifest(editable, raw, []);
-          writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(manifest, null, 2) + "\n", "utf-8");
-
-          const { uniqueCss } = splitCssCanonicalized(fullCss);
-          writeFileSync(resolve(setupDir, "styles-unique.css"), uniqueCss + "\n", "utf-8");
-          writeFileSync(resolve(setupDir, "rejected.json"), rejectionJson, "utf-8");
-
-          console.log(`  Global Styles: ${editable.length} structured (editable), ${raw.length} raw (CSS-only)`);
-          console.log(`  Rejections:    setup/rejected.json`);
-        } else {
-          // Legacy path: regex-based
-          const { editable, raw } = generateGlobalStylesData(fullCss);
-          const manifest = buildGlobalStylesManifest(editable, raw, []);
-          writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(manifest, null, 2) + "\n", "utf-8");
-
-          const split = splitCss(fullCss);
-          writeFileSync(resolve(setupDir, "styles-unique.css"), split.uniqueCss + "\n", "utf-8");
-
-          console.log(`  Global Styles: ${editable.length} structured (editable), ${raw.length} raw (CSS-only)`);
-        }
+        console.log(`  Global Styles: ${structuredStyles.length} structured (editable), ${rawEntries.length} raw (CSS-only)`);
+        console.log(`  Rejections:    setup/rejected.json`);
       }
 
       // Write app.js at project root with all scripts

@@ -1,210 +1,24 @@
 // ── CSS Splitter ───────────────────────────────────────────
 //
-// Parses compiled CSS and splits into:
-// - globalStyles: single-class rules suitable for GB Global Styles import
-// - uniqueCss: everything else (preflight, element selectors, keyframes, etc.)
+// Splits compiled CSS into unique CSS (non-class rules: preflight,
+// element selectors, @keyframes, @media, pseudo-elements, transforms,
+// filters) and the structured counterpart via global-styles-data.
+//
+// All classification is delegated to CssClassifier. This module is
+// a thin adapter for the styles-unique.css output file.
 
-import css from "css";
-
-export interface GlobalStyleEntry {
-  name: string;
-  selector: string;
-  css: string;
-}
+import { CssClassifier } from "./css-classifier.js";
 
 export interface CssSplitResult {
-  globalStyles: GlobalStyleEntry[];
+  globalStyles: Array<{ selector: string; name: string; css: string }>;
   uniqueCss: string;
 }
 
 /**
- * Check if a selector is an element/universal selector (preflight reset).
- * These must load before utility classes and should not go into unique CSS.
- * Matches: *, body, h1, h1,h2,h3, :host, ::backdrop, [type=search], etc.
- * Does NOT match: .class, .class:pseudo, #id, [attr] on its own context
+ * Split compiled CSS using the canonicalized PostCSS classifier.
+ * Returns styles-unique.css content and a rejection log string.
  */
-function isElementOrUniversalSelector(selector: string): boolean {
-  const trimmed = selector.trim();
-  // Universal selector or pseudo-element on universal
-  if (/^\*|^::backdrop|^:host/.test(trimmed)) return true;
-  // Element selectors (start with a letter)
-  if (/^[a-zA-Z]/.test(trimmed)) return true;
-  // Attribute-only selectors on elements: [type=search], [type=button], etc.
-  if (/^\[.*\]$/.test(trimmed)) return true;
-  // Vendor-prefixed pseudo-elements: ::-webkit-*, ::-moz-*
-  if (/^::?-webkit-|^::?-moz-|^::?-ms-/.test(trimmed)) return true;
-  // Multi-selector: if there are commas, check each part
-  if (trimmed.includes(",")) {
-    return trimmed.split(",").some((p) => isElementOrUniversalSelector(p));
-  }
-  return false;
-}
-
-/**
- * Check if a CSS selector is a single class selector.
- * Matches: .foo, .foo\:bar, .foo\:bar:hover
- * Does NOT match: tag selectors, pseudo-elements (::), multi-selectors (a,b),
- *   combinators (a b, a>b, a+b, a~b)
- */
-function isSingleClassSelector(selector: string): boolean {
-  // Check for pseudo-elements (::before, ::after, ::-webkit-*, etc.)
-  if (/::/.test(selector)) return false;
-
-  // Strip trailing pseudo-classes (:hover, :focus, :active, :first-child, etc.)
-  // but only if the colon is NOT CSS-escaped (not preceded by backslash)
-  const withoutPseudo = selector.replace(/([^\\]|^)(:[a-zA-Z-]+)+$/, "$1");
-
-  // Remove CSS escaping for combinator detection — replace escapes with
-  // the actual characters they represent (e.g., \: → :, \/ → /)
-  const unescaped = withoutPseudo
-    .replace(/\\:/g, ":")
-    .replace(/\\\//g, "/")
-    .replace(/\\\[/g, "[")
-    .replace(/\\\]/g, "]")
-    .replace(/\\#/g, "#")
-    .replace(/\\\./g, ".");
-
-  // Check for combinators or multiple selectors (commas, spaces, >, +, ~)
-  if (/[,\s>+~]/.test(unescaped)) return false;
-
-  // Must be a class selector: starts with ., no combinators, no pseudo-elements
-  return /^\.[^,\s>+~]+$/.test(withoutPseudo) && !withoutPseudo.includes("::");
-}
-
-/**
- * Extract the base class name (without pseudo-classes) for the selector field.
- * .hover\:bg-seafoam:hover → .hover\:bg-seafoam
- */
-function extractBaseSelector(selector: string): string {
-  // Only strip pseudo-classes NOT CSS-escaped
-  return selector.replace(/([^\\]|^)(:[a-zA-Z-]+)+$/, "$1");
-}
-
-/**
- * Convert a kebab-case class name to Title Case for human-readable name.
- * pt-32 → Pt 32, bg-primary → Bg Primary
- */
-function classNameToName(className: string): string {
-  const clean = className.replace(/^\./, "").replace(/(:[a-zA-Z-]+)+$/, "");
-  return clean
-    .split("-")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
-/**
- * Serialize a CSS rule AST node back to a CSS string.
- */
-function serializeRule(rule: css.Rule | css.Media): string {
-  if (rule.type === "media") {
-    const media = rule as css.Media;
-    const innerCss = (media.rules || [])
-      .map((r) => serializeRule(r as css.Rule))
-      .join("");
-    return `@media ${media.media}{${innerCss}}`;
-  }
-
-  if (rule.type === "rule") {
-    const r = rule as css.Rule;
-    const selector = (r.selectors || []).join(",");
-    const declarations = (r.declarations || [])
-      .map((d) => `${d.property}:${d.value}`)
-      .join(";");
-    return `${selector}{${declarations}${declarations ? ";" : ""}}`;
-  }
-
-  // keyframes, font-face, etc.
-  if (rule.type === "keyframes") {
-    const kf = rule as css.KeyFrames;
-    const keyframesCss = (kf.keyframes || [])
-      .map((k) => {
-        const decs = (k.declarations || [])
-          .map((d) => `${d.property}:${d.value}`)
-          .join(";");
-        return `${k.values.join(",")}{${decs}${decs ? ";" : ""}}`;
-      })
-      .join("");
-    return `@keyframes ${kf.name}{${keyframesCss}}`;
-  }
-
-  return "";
-}
-
-/**
- * Walk a CSS rule and classify it.
- */
-function walkRule(
-  rule: css.Rule | css.Media,
-  parentMediaQuery: string | null,
-  globalStyles: GlobalStyleEntry[],
-  uniqueCssParts: string[],
-): void {
-  if (rule.type === "media") {
-    const media = rule as css.Media;
-    const mediaQuery = `@media ${media.media}`;
-
-    const innerRules = (media.rules || []) as css.Rule[];
-    const allSingleClass = innerRules.every(
-      (r) =>
-        r.type === "rule" &&
-        (r.selectors || []).length === 1 &&
-        isSingleClassSelector(r.selectors![0]),
-    );
-
-    // Media blocks stay intact in unique CSS (responsive variants
-    // need their @media wrapper and shouldn't be split into global styles)
-    if (!allSelectorsAreElements(innerRules)) {
-      uniqueCssParts.push(serializeRule(rule));
-    }
-    return;
-  }
-
-  if (rule.type === "rule") {
-    const r = rule as css.Rule;
-    const selectors = r.selectors || [];
-
-    if (selectors.length === 1 && isSingleClassSelector(selectors[0])) {
-      const selector = selectors[0];
-      const baseSelector = extractBaseSelector(selector);
-      const ruleCss = serializeRule(r);
-      globalStyles.push({
-        name: classNameToName(baseSelector),
-        selector: baseSelector,
-        css: parentMediaQuery
-          ? `${parentMediaQuery}{${ruleCss}}`
-          : ruleCss,
-      });
-    } else if (!selectors.every((s) => isElementOrUniversalSelector(s))) {
-      // Only add to unique CSS if not all selectors are element/universal
-      // (preflight resets stay in master only, not in styles-unique.css)
-      const serialized = parentMediaQuery
-        ? `${parentMediaQuery}{${serializeRule(r)}}`
-        : serializeRule(r);
-      uniqueCssParts.push(serialized);
-    }
-    return;
-  }
-
-  // Other types: keyframes, font-face, charset, etc. — always unique
-  uniqueCssParts.push(serializeRule(rule));
-}
-
-/** Check if all rules in an array have only element/universal selectors */
-function allSelectorsAreElements(rules: css.Rule[]): boolean {
-  if (rules.length === 0) return true;
-  return rules.every((r) => {
-    if (r.type !== "rule") return false;
-    const sels = r.selectors || [];
-    return sels.length > 0 && sels.every((s) => isElementOrUniversalSelector(s));
-  });
-}
-
-// ── Canonicalized Path (PostCSS AST) ──────────────────
-
-import { CssClassifier } from "./css-classifier.js";
-
-/** Split CSS using the canonicalized PostCSS classifier. */
-export function splitCssCanonicalized(compiledCss: string): {
+export function splitCss(compiledCss: string): {
   uniqueCss: string;
   rejectionJson: string;
 } {
@@ -214,45 +28,5 @@ export function splitCssCanonicalized(compiledCss: string): {
   return {
     uniqueCss: result.rawCss,
     rejectionJson: result.rejectionLog.toJSON(totalRules),
-  };
-}
-
-/**
- * Split compiled CSS into globalStyles (single-class rules) and uniqueCss (everything else).
- */
-export function splitCss(compiledCss: string): CssSplitResult {
-  const globalStyles: GlobalStyleEntry[] = [];
-  const uniqueCssParts: string[] = [];
-
-  if (!compiledCss.trim()) {
-    return { globalStyles: [], uniqueCss: "" };
-  }
-
-  try {
-    const ast = css.parse(compiledCss, { silent: true });
-    const rules = ast.stylesheet?.rules || [];
-
-    for (const rule of rules) {
-      walkRule(rule as css.Rule | css.Media, null, globalStyles, uniqueCssParts);
-    }
-  } catch {
-    return { globalStyles: [], uniqueCss: compiledCss };
-  }
-
-  // Deduplicate: merge entries with the same selector (e.g., .container
-  // appears at top-level and inside multiple @media breakpoints)
-  const merged = new Map<string, GlobalStyleEntry>();
-  for (const entry of globalStyles) {
-    const existing = merged.get(entry.selector);
-    if (existing) {
-      existing.css += entry.css;
-    } else {
-      merged.set(entry.selector, { ...entry });
-    }
-  }
-
-  return {
-    globalStyles: [...merged.values()],
-    uniqueCss: uniqueCssParts.join(""),
   };
 }
