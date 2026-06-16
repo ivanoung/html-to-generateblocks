@@ -56,98 +56,163 @@ export function analyzeSource(html: string): ManualSteps {
 }
 
 export function generateManualStepsReport(steps: ManualSteps): string {
-  const lines: string[] = [
+  const autoFixable: string[] = [];
+  const judgment: string[] = [];
+  const pureManual: string[] = [];
+
+  const header = [
     "============================================",
     "  MANUAL STEPS — Post-Conversion Checklist",
     "============================================",
     "",
+    "Categories:",
+    "  [AUTO]     — Can be automated in future updates",
+    "  [JUDGMENT] — Requires human decision",
+    "  [MANUAL]   — Must be done by hand",
+    "",
   ];
+
+  // ── AUTO-FIXABLE ────────────────────────────────────
+
+  // 1. JavaScript
+  autoFixable.push(
+    "1. ADD JAVASCRIPT",
+    "   Add setup/global.js to your site via WPCode plugin",
+    "   or enqueue in functions.php. This preserves all",
+    "   interactions, animations, and scripts.",
+    "",
+  );
+
+  // 2. Global Styles
+  autoFixable.push(
+    "2. IMPORT GLOBAL STYLES",
+    "   Import setup/global-styles.json into GenerateBlocks →",
+    "   Global Styles. Structured entries (non-raw) are",
+    "   fully editable through the GB Styles UI.",
+    "",
+  );
+
+  // 3. CSS
+  autoFixable.push(
+    "3. ADD REMAINING CSS",
+    "   Paste setup/styles-unique.css into Appearance →",
+    "   Customize → Additional CSS for non-class styles",
+    "   (keyframes, media queries, pseudo-elements).",
+    "   Tip: styles.css at project root is the complete",
+    "   master fallback if global-styles isn't enough.",
+    "",
+  );
+
+  // 4. Customizer
+  autoFixable.push(
+    "4. IMPORT CUSTOMIZER SETTINGS",
+    "   Import setup/customizer-import.json via Appearance →",
+    "   Customize → Import/Export (or a plugin like",
+    "   \"Customizer Export/Import\").",
+    "",
+  );
+
+  // ── JUDGMENT-REQUIRED ────────────────────────────────
 
   // Fonts
   if (steps.fonts.length > 0) {
-    lines.push("1. ENQUEUE GOOGLE FONTS");
+    judgment.push(
+      "5. ENQUEUE GOOGLE FONTS",
+      "   The following fonts were detected. Choose a method:",
+    );
     for (const f of steps.fonts) {
-      lines.push(`   - ${f}`);
+      judgment.push(`     - ${f}`);
     }
-    lines.push("   Use a fonts plugin or add to functions.php.");
-    lines.push("");
+    judgment.push(
+      "   Option A: Use a fonts plugin (e.g., Fonts Plugin |",
+      "             Google Fonts Typography).",
+      "   Option B: Add to functions.php with wp_enqueue_style.",
+      "   Option C: Use GeneratePress Typography module.",
+      "",
+    );
   }
 
-  // Navigation & Footer
+  // Navigation
   if (steps.hasNav) {
-    lines.push("2. IMPORT NAVIGATION");
-    lines.push("   Open components/nav/nav.html in the WordPress Code");
-    lines.push("   Editor and paste into your navigation block area.");
-    lines.push("");
+    judgment.push(
+      `${steps.fonts.length > 0 ? 6 : 5}. NAVIGATION PRESENT`,
+      "   The source has a <nav> element. It's been converted",
+      "   as part of each page. If you want reusable navigation:",
+      "   Option A: Keep as-is (each page has its own nav).",
+      "   Option B: Create a reusable block from one page's nav",
+      "             and replace nav in other pages.",
+      "",
+    );
   }
-  if (steps.hasFooter) {
-    lines.push("3. IMPORT FOOTER");
-    lines.push("   Open components/footer/footer.html in the WordPress Code");
-    lines.push("   Editor and paste into your footer block area.");
-    lines.push("");
-  }
 
-  // Blocks
-  const next = steps.hasNav ? (steps.hasFooter ? 4 : 3) : (steps.hasFooter ? 3 : 2);
-  lines.push(`${next}. PASTE BLOCKS`);
-  lines.push("   Open the WordPress Code Editor (Ctrl+Shift+Alt+M).");
-  lines.push("   Copy the ENTIRE contents of pages/index.html and paste.");
-  lines.push("   Save the post, reload the editor, confirm no");
-  lines.push("   \"Attempt Recovery\" prompt.");
-  lines.push("");
+  // ── PURE MANUAL ───────────────────────────────────────
 
-  // JavaScript
-  lines.push(`${next + 1}. ADD JAVASCRIPT`);
-  lines.push("   Add setup/global.js to your site via WPCode plugin");
-  lines.push("   or enqueue in functions.php. This preserves all");
-  lines.push("   interactions, animations, and scripts.");
-  lines.push("");
+  const manualBase = steps.fonts.length > 0
+    ? (steps.hasNav ? 7 : 6)
+    : (steps.hasNav ? 6 : 5);
 
-  // Global Styles
-  lines.push(`${next + 2}. IMPORT GLOBAL STYLES`);
-  lines.push("   Import setup/global-styles.json into GenerateBlocks →");
-  lines.push("   Global Styles. This covers most utility classes.");
-  lines.push("");
-
-  // CSS
-  lines.push(`${next + 3}. ADD REMAINING CSS`);
-  lines.push("   Paste setup/styles-unique.css into Appearance →");
-  lines.push("   Customize → Additional CSS for non-class styles");
-  lines.push("   (keyframes, media queries, pseudo-elements).");
-  lines.push("   Tip: pages/styles.css is the complete master fallback.");
-  lines.push("");
-
-  // Customizer
-  lines.push(`${next + 4}. IMPORT CUSTOMIZER SETTINGS`);
-  lines.push("   Import setup/customizer-import.json via Appearance →");
-  lines.push("   Customize → Import/Export (or a plugin like");
-  lines.push("   \"Customizer Export/Import\").");
-  lines.push("");
+  // Paste blocks
+  pureManual.push(
+    `${manualBase}. PASTE BLOCKS PER PAGE`,
+    "   Open the WordPress Code Editor (Ctrl+Shift+Alt+M).",
+    "   For each page in setup/pages/, copy the entire",
+    "   contents and paste into the corresponding WP page.",
+    "   Save, reload, confirm no \"Attempt Recovery\" prompt.",
+    "",
+  );
 
   // Iconify
   if (steps.hasIconify) {
-    lines.push(`${next + 5}. ICONIFY ICONS`);
-    lines.push("   The original uses <iconify-icon> web components.");
-    lines.push("   Option A: Enqueue the Iconify script:");
-    steps.externalScripts.filter((s) => s.includes("iconify")).forEach((s) => {
-      lines.push(`     ${s}`);
-    });
-    lines.push("   Option B: Replace icons with GenerateBlocks");
-    lines.push("   Shape blocks + SVGs manually.");
-    lines.push("");
+    pureManual.push(
+      `${manualBase + 1}. ICONIFY ICONS`,
+      "   The original uses <iconify-icon> web components.",
+      "   They've been auto-resolved to inline SVGs where",
+      "   possible. Any unresolved icons need manual handling:",
+    );
+    const iconifyScripts = steps.externalScripts.filter((s) => s.includes("iconify"));
+    if (iconifyScripts.length > 0) {
+      pureManual.push("   Option A: Enqueue the Iconify script:");
+      iconifyScripts.forEach((s) => pureManual.push(`     ${s}`));
+    }
+    pureManual.push(
+      "   Option B: Replace icons with GenerateBlocks",
+      "             Shape blocks + SVGs manually.",
+      "",
+    );
   }
 
   // Images
   if (steps.externalImages.length > 0) {
-    const stepNum = steps.hasIconify ? next + 6 : next + 5;
-    lines.push(`${stepNum}. REPLACE EXTERNAL IMAGES (${steps.externalImages.length} total)`);
+    const imgNum = steps.hasIconify ? manualBase + 2 : manualBase + 1;
+    pureManual.push(
+      `${imgNum}. REPLACE EXTERNAL IMAGES (${steps.externalImages.length} total)`,
+    );
     steps.externalImages.slice(0, 5).forEach((url) => {
-      lines.push(`   - ${url.substring(0, 70)}${url.length > 70 ? "..." : ""}`);
+      pureManual.push(`   - ${url.substring(0, 70)}${url.length > 70 ? "..." : ""}`);
     });
     if (steps.externalImages.length > 5) {
-      lines.push(`   ... and ${steps.externalImages.length - 5} more`);
+      pureManual.push(`   ... and ${steps.externalImages.length - 5} more`);
     }
-    lines.push("");
+    pureManual.push("");
+  }
+
+  // ── Assemble report ───────────────────────────────────
+
+  const lines: string[] = [...header];
+
+  if (autoFixable.length > 0) {
+    lines.push("─── AUTO-FIXABLE ───", "");
+    lines.push(...autoFixable);
+  }
+
+  if (judgment.length > 0) {
+    lines.push("─── JUDGMENT REQUIRED ───", "");
+    lines.push(...judgment);
+  }
+
+  if (pureManual.length > 0) {
+    lines.push("─── PURE MANUAL ───", "");
+    lines.push(...pureManual);
   }
 
   return lines.join("\n");

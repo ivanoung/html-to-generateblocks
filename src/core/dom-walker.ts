@@ -479,7 +479,7 @@ export function walkDom(
   html: string,
   classNameToProperties: Map<string, BlockStyles>,
   collector: GlobalStylesCollector,
-  allowNavFooter?: boolean,
+  _allowNavFooter?: boolean,
 ): WalkResult {
   const warnings: string[] = [];
   const hardFails: { code: string; message: string }[] = [];
@@ -493,7 +493,7 @@ export function walkDom(
   if ($wrapper.length > 0) {
     $wrapper.children().each((_, el) => {
       const tag = (el as any).name?.toLowerCase() || "";
-      if (!allowNavFooter && (tag === "nav" || tag === "footer")) return;
+      // nav and footer are no longer stripped — pages stay whole
       if (tag === "script" || tag === "style") return;
 
       const $el = $(el);

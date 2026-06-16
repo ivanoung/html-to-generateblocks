@@ -138,7 +138,7 @@ export function prepareVerification(
  * Convert a gb_style_data styles object to a CSS declarations string.
  * Handles nested @media and :pseudo rules.
  */
-function stylesToCss(
+export function stylesToCss(
   styles: Record<string, unknown>,
 ): string {
   const declarations: string[] = [];

@@ -14,6 +14,7 @@ import { resetIds } from "./id-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
 import { resolveIconifyIcons } from "./iconify-resolver.js";
 import { analyzeSource, generateManualStepsReport } from "./manual-steps.js";
+import { generateCustomizerSettings } from "./customizer-generator.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
 import { checkContentLoss } from "./content-verifier.js";
 
@@ -26,7 +27,6 @@ export interface ConversionInput {
   resolveCss?: boolean;
   skipShared?: boolean;  // skip styles.css, customizer, manual-steps
   skipInliner?: boolean; // skip Tailwind inliner + iconify resolver (CSS already compiled)
-  skipStripNavFooter?: boolean; // skip stripping nav/footer (for component conversion)
 }
 
 export interface ConversionOutput {
@@ -70,7 +70,7 @@ export async function convert(
   }
 
   // Stage 1: Preprocess
-  const prepResult = preprocess(rawHtml, input.skipStripNavFooter);
+  const prepResult = preprocess(rawHtml);
 
   // Stage 2: Register class definitions in collector
   const collector = new GlobalStylesCollector(input.pageName);
@@ -83,7 +83,6 @@ export async function convert(
     prepResult.html,
     prepResult.classNameToProperties,
     collector,
-    input.skipStripNavFooter,
   );
 
   // Collect all warnings
@@ -170,12 +169,20 @@ export async function convert(
       );
     }
 
-    // styles.css stays at project root (shared across all pages)
-    // (customizer-import.json generation removed — styles.css is the single source of truth)
+    // customizer-import.json — GeneratePress Customizer settings
+    const customizer = generateCustomizerSettings(input.rawHtml);
+    if (customizer) {
+      writeFileSync(
+        resolve(outDir, "customizer-import.json"),
+        JSON.stringify(customizer, null, 2) + "\n",
+        "utf-8",
+      );
+    }
 
+    // manual-steps.md — categorized setup instructions
     const manualSteps = analyzeSource(input.rawHtml);
     writeFileSync(
-      resolve(outDir, "manual-steps.txt"),
+      resolve(outDir, "manual-steps.md"),
       generateManualStepsReport(manualSteps) + "\n",
       "utf-8",
     );

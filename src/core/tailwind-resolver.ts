@@ -92,6 +92,123 @@ export function extractTailwindConfig(rawHtml: string): string | null {
 }
 
 /**
+ * Convert a hex color to HSL components.
+ * Returns { h, s, l } where h is 0-360, s/l are 0-100.
+ */
+function hexToHsl(hex: string): { h: number; s: number; l: number } {
+  // Remove hash
+  let h = hex.replace(/^#/, "");
+  // Expand shorthand: #abc → #aabbcc
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  
+  const r = parseInt(h.substring(0, 2), 16) / 255;
+  const g = parseInt(h.substring(2, 4), 16) / 255;
+  const b = parseInt(h.substring(4, 6), 16) / 255;
+  
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  
+  let hue = 0;
+  let s = 0;
+  
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: hue = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: hue = ((b - r) / d + 2) / 6; break;
+      case b: hue = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  
+  return {
+    h: Math.round(hue * 360),
+    s: Math.round(s * 100),
+    l: Math.round(l * 100),
+  };
+}
+
+/**
+ * Convert HSL back to hex.
+ */
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100;
+  l /= 100;
+  
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, "0");
+  };
+  
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+/**
+ * Tailwind shade lightness values (approximate, matches Tailwind v3 defaults).
+ * Shade 50 is lightest, 950 is darkest.
+ */
+const SHADE_LIGHTNESS: Record<number, number> = {
+  50: 97, 100: 94, 200: 86, 300: 76, 400: 62,
+  500: 50, 600: 40, 700: 30, 800: 22, 900: 14, 950: 8,
+};
+
+/**
+ * Auto-expand single-value Tailwind colors into full shade palettes (50-950).
+ * Uses the original value as shade 500 and generates lighter/darker variants
+ * using HSL lightness steps while preserving the hue and saturation.
+ *
+ * Only expands user-defined colors that appear as single hex values in the
+ * theme.extend.colors block. Built-in Tailwind colors are left untouched.
+ */
+export function expandColorPalettes(configJson: string): string {
+  // Find all single-value hex colors anywhere in the config.
+  // Pattern: colorName: "#hex" or colorName: '#hex' 
+  // But NOT: colorName: { ... } (already an object with shades)
+  // We detect single values by checking that the value is a quoted hex
+  // NOT followed by an opening brace (which means it's already expanded).
+  
+  // Match: word: "#hex" or word: '#hex' — not followed by { or another word:
+  const singleHexRegex = /(\w+)\s*:\s*["'](#[a-fA-F0-9]{3,8})["']\s*(?=[,}\n])/g;
+  
+  let result = configJson;
+  let match;
+  const expanded = new Set<string>();
+  
+  while ((match = singleHexRegex.exec(configJson)) !== null) {
+    const colorName = match[1];
+    const hexColor = match[2];
+    
+    // Skip if already processed (regex can match overlapping entries)
+    if (expanded.has(colorName)) continue;
+    expanded.add(colorName);
+    
+    const hsl = hexToHsl(hexColor);
+    const shades: string[] = [];
+    
+    for (const [shade, targetL] of Object.entries(SHADE_LIGHTNESS)) {
+      const adjustedL = Math.max(0, Math.min(100, Math.round(targetL)));
+      const shadeHex = hslToHex(hsl.h, hsl.s, adjustedL);
+      shades.push(`${shade}: "${shadeHex}"`);
+    }
+    
+    const expandedColor = `${colorName}: { ${shades.join(", ")} }`;
+    
+    // Replace ONLY the single hex value for this color (not entries inside objects)
+    // Match: colorName: "#hex" or colorName: '#hex' followed by comma, }, or newline
+    const singlePattern = new RegExp(
+      colorName + "\\s*:\\s*[\"']" + hexColor + "[\"']\\s*(?=[,}\\n])",
+      "g",
+    );
+    result = result.replace(singlePattern, expandedColor);
+  }
+  
+  return result;
+}
+
+/**
  * Validate a tailwind config for patterns known to cause missing CSS.
  * Returns warnings for colors defined as single values where the HTML
  * uses shade variants (e.g., slate: "#334155" but HTML has bg-slate-100).

@@ -23,7 +23,8 @@ export interface PreprocessResult {
 }
 
 // Tags to strip entirely
-const STRIP_TAGS = new Set(["nav", "footer", "script", "link"]);
+// NOTE: nav and footer are no longer stripped — pages stay whole.
+const STRIP_TAGS = new Set(["script", "link"]);
 
 // Elements to wrap in core-html markers
 const WRAP_TAGS = new Set(["form"]);
@@ -111,7 +112,7 @@ function isStandaloneIcon($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): boo
   return !INLINE_TAGS.has(parentTag) && parentTag !== "";
 }
 
-export function preprocess(rawHtml: string, skipStripNavFooter?: boolean): PreprocessResult {
+export function preprocess(rawHtml: string, _skipStripNavFooter?: boolean): PreprocessResult {
   const warnings: string[] = [];
 
   // 0. Extract tailwind config BEFORE cheerio strips <script>
@@ -119,16 +120,8 @@ export function preprocess(rawHtml: string, skipStripNavFooter?: boolean): Prepr
 
   const $ = cheerio.load(rawHtml);
 
-  // 0.5. Capture nav and footer HTML before stripping
-  const navEl = $("nav").first();
-  const navHtml = navEl.length > 0 ? $.html(navEl) : null;
-  const footerEl = $("footer").first();
-  const footerHtml = footerEl.length > 0 ? $.html(footerEl) : null;
-
-  // 1. Strip nav, footer, script, link
-  const tagsToStrip = skipStripNavFooter
-    ? new Set(["script", "link"])
-    : STRIP_TAGS;
+  // 1. Strip script, link (nav/footer no longer stripped)
+  const tagsToStrip = STRIP_TAGS;
   tagsToStrip.forEach((tag) => {
     const count = $(tag).length;
     if (count > 0) {
@@ -180,7 +173,7 @@ export function preprocess(rawHtml: string, skipStripNavFooter?: boolean): Prepr
     customCss,
     tailwindConfig,
     warnings,
-    navHtml,
-    footerHtml,
+    navHtml: null,
+    footerHtml: null,
   };
 }
