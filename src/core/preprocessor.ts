@@ -158,13 +158,18 @@ export function preprocess(rawHtml: string, _skipStripNavFooter?: boolean): Prep
     }
   });
 
-  // 5. Extract cleaned HTML with body classes preserved
+  // 5. Extract cleaned HTML with body classes and styles preserved
   const bodyClasses = $("body").attr("class") || "";
+  const bodyStyle = $("body").attr("style") || "";
   const bodyHtml = $("body").html() || "";
-  // Wrap body content in a div that carries the body's classes
-  // so the DOM walker preserves blueprint-bg, font-sans, etc.
-  const html = bodyClasses
-    ? `<div class="${bodyClasses}">${bodyHtml}</div>`
+  // Wrap body content in a div that carries the body's classes AND inline styles
+  // so the DOM walker preserves blueprint-bg, font-sans, etc. and any body-level
+  // inline styles like overflow-x: hidden.
+  const wrapperAttrs: string[] = [];
+  if (bodyClasses) wrapperAttrs.push(`class="${bodyClasses}"`);
+  if (bodyStyle) wrapperAttrs.push(`style="${bodyStyle}"`);
+  const html = wrapperAttrs.length > 0
+    ? `<div ${wrapperAttrs.join(" ")}>${bodyHtml}</div>`
     : bodyHtml;
 
   return {
