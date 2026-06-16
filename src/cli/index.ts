@@ -146,6 +146,8 @@ async function main(): Promise<void> {
     console.log("  fixtures:run <name>        Run single fixture");
     console.log("  fixtures:run-all           Run all fixtures");
     console.log("  convert <input.html|dir/>  Convert HTML page(s) to GB blocks");
+    console.log("    --skip-shared            Skip shared files (styles.css, manual-steps)");
+    console.log("    --split                  Also generate setup/ (global-styles.json + styles-unique.css)");
     console.log("  regression                 Check M1 vs snapshots");
     process.exit(0);
   }
@@ -498,28 +500,25 @@ async function main(): Promise<void> {
       }
 
       // Phase 2: Split styles.css into global-styles.json + styles-unique.css
-      // styles.css at project root stays untouched (master fallback)
+      // Only runs when --split flag is passed. Monolithic styles.css at
+      // project root is always the canonical pixel-perfect fallback.
+      const doSplit = args.includes("--split");
       const cssPath = resolve(outDir, "styles.css");
       const setupDir = resolve(outDir, "setup");
-      const pagesDir = resolve(outDir, "pages");
-      if (existsSync(cssPath)) {
+
+      if (existsSync(cssPath) && doSplit) {
         mkdirSync(setupDir, { recursive: true });
 
         const fullCss = readFileSync(cssPath, "utf-8");
-        
-        // Generate structured gb_style_data for global-styles.json
+
         const { editable, raw } = generateGlobalStylesData(fullCss);
-        console.log(`  Global Styles: ${editable.length} structured (editable), ${raw.length} raw (CSS-only)`);
-        
-        // Build manifest with both structured + raw entries
         const manifest = buildGlobalStylesManifest(editable, raw, []);
         writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(manifest, null, 2) + "\n", "utf-8");
-        
-        // styles-unique.css: non-class CSS (keyframes, preflight, element selectors, vendor prefixes)
+
         const split = splitCss(fullCss);
         writeFileSync(resolve(setupDir, "styles-unique.css"), split.uniqueCss + "\n", "utf-8");
-        
-        // styles.css at project root stays as master fallback (never deleted)
+
+        console.log(`  Global Styles: ${editable.length} structured (editable), ${raw.length} raw (CSS-only)`);
       }
 
       // Write app.js at project root with all scripts
@@ -544,7 +543,9 @@ async function main(): Promise<void> {
 
       console.log(`\n  Done. ${pageContents.length} page(s) converted.`);
       console.log(`  Pages:       ${outputDir}pages/`);
-      console.log(`  Setup:       ${outputDir}setup/`);
+      if (doSplit) {
+        console.log(`  Setup:       ${outputDir}setup/`);
+      }
       console.log("");
       return;
     }
