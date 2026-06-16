@@ -364,6 +364,45 @@ function classNameToName(className: string): string {
  * Serialize the full global-styles.json manifest including
  * structured gb_style_data entries and raw CSS class entries.
  */
+// ── Canonicalized Path (PostCSS AST) ──────────────────
+
+import { CssClassifier, type StructuredStyle } from "./css-classifier.js";
+
+/**
+ * Generate structured gb_style_data using the canonicalized PostCSS pipeline.
+ * Replaces regex-based extractClassRules with AST-driven classification.
+ */
+export function generateGlobalStylesDataCanonicalized(compiledCss: string): {
+  editable: GbStyleDataEntry[];
+  raw: GbStyleDataEntry[];
+  rejectionJson: string;
+} {
+  const result = CssClassifier.classify(compiledCss);
+
+  const editable: GbStyleDataEntry[] = result.structuredStyles.map((s: StructuredStyle) => ({
+    selector: s.selector,
+    name: s.name,
+    styles: s.styles,
+  }));
+
+  const raw: GbStyleDataEntry[] = [];
+  const rawSelectors = new Set<string>();
+  const selectorMatches = result.rawCss.matchAll(/^([.#][^\s{]+)\s*\{/gm);
+  for (const m of selectorMatches) {
+    rawSelectors.add(m[1]);
+  }
+  for (const sel of rawSelectors) {
+    raw.push({ selector: sel, name: sel.replace(/^\./, ""), styles: {}, raw: true });
+  }
+
+  const totalRules = result.structuredStyles.length + raw.length;
+  return {
+    editable,
+    raw,
+    rejectionJson: result.rejectionLog.toJSON(totalRules),
+  };
+}
+
 export function buildGlobalStylesManifest(
   editable: GbStyleDataEntry[],
   raw: GbStyleDataEntry[],

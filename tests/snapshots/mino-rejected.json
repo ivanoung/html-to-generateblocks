@@ -1,0 +1,2656 @@
+{
+  "version": "1.0",
+  "totalRules": 906,
+  "rejectedRules": 399,
+  "rejectionRate": "44.0%",
+  "rejections": [
+    {
+      "selector": "body",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".clip-hex",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "clipPath",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".no-scrollbar",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "MsOverflowStyle",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".no-scrollbar",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "scrollbarWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "*, ::before, ::after",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "::backdrop",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "*,::after,::before",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "::after,::before",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ":host,html",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "body",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "hr",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "abbr:where([title])",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "h1,h2,h3,h4,h5,h6",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "a",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "b,strong",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "code,kbd,pre,samp",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "small",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "sub,sup",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "sub",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "sup",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "table",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "button,input,optgroup,select,textarea",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "button,select",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "button,input:where([type=button]),input:where([type=reset]),input:where([type=submit])",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ":-moz-focusring",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ":-moz-ui-invalid",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "progress",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "::-webkit-inner-spin-button,::-webkit-outer-spin-button",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "[type=search]",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "::-webkit-search-decoration",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "::-webkit-file-upload-button",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "summary",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "fieldset",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "legend",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "menu,ol,ul",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "dialog",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "textarea",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "input::placeholder,textarea::placeholder",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "[role=button],button",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ":disabled",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "audio,canvas,embed,iframe,img,object,svg,video",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "img,video",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "[hidden]:where(:not([hidden=until-found]))",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".sr-only",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".sr-only",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "margin",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".sr-only",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "overflow",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".sr-only",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "clip",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".sr-only",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "whiteSpace",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".pointer-events-none",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "pointerEvents",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".invisible",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "visibility",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".inset-0",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "inset",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".inset-10",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "inset",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".inset-5",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "inset",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".inset-y-0",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".inset-y-0",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "bottom",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".bottom-0",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "bottom",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-0",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".right-0",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-0",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-full",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-top-1\\.5",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-top-\\[16px\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".bottom-20",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "bottom",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-1\\/2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-4",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-\\[10\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-\\[56\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".right-4",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".right-\\[15\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-1\\/2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-20",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".bottom-6",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "bottom",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-6",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-\\[50\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".right-6",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".right-8",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-8",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-bottom-\\[6px\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "bottom",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-left-\\[5px\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-right-\\[5px\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-top-\\[6px\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-8",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-24",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-\\[15\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".right-\\[10\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-left-6",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-right-1\\.5",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-right-10",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-right-3",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-top-3",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-top-8",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".bottom-4",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "bottom",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".bottom-\\[30\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "bottom",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".bottom-\\[40\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "bottom",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-1",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-\\[20\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-\\[25\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".left-\\[30\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "left",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".right-1",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".right-\\[20\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".right-\\[25\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".right-\\[35\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "right",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-1",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[15\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[20\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[25\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[30\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[35\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[40\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[50\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[60\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[65\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[70\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[80\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-\\[85\\%\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".bottom-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "bottom",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".top-6",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".col-span-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".col-span-1",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".aspect-\\[4\\/3\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "aspectRatio",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".aspect-\\[5\\/2\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "aspectRatio",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".aspect-square",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "aspectRatio",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".aspect-\\[16\\/10\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "aspectRatio",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".aspect-\\[16\\/9\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "aspectRatio",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".w-fit",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "width",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".flex-1",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "flex",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-translate-y-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-translate-x-1\\/2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-translate-y-1\\/2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".translate-x-1\\/4",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".translate-y-1\\/4",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-rotate-3",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".rotate-3",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".rotate-12",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".rotate-45",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".rotate-90",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-rotate-6",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".rotate-6",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".scale-110",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transform",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "to",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-\\[spin_40s_linear_infinite\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "75%, 100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-ping",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "50%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-pulse",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".select-none",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "WebkitUserSelect",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".select-none",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "userSelect",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".resize-none",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "resize",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".scroll-mt-32",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "scrollMarginTop",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".auto-rows-\\[minmax\\(300px\\2c _auto\\)\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".grid-cols-1",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".grid-cols-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".grid-cols-3",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".grid-cols-\\[24px_1fr\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".-space-x-3 > :not([hidden]) ~ :not([hidden])",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".space-y-1 > :not([hidden]) ~ :not([hidden])",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".space-y-4 > :not([hidden]) ~ :not([hidden])",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".space-y-5 > :not([hidden]) ~ :not([hidden])",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".space-y-6 > :not([hidden]) ~ :not([hidden])",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".space-y-8 > :not([hidden]) ~ :not([hidden])",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".space-y-3 > :not([hidden]) ~ :not([hidden])",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".self-start",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "alignSelf",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".overflow-hidden",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "overflow",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".whitespace-nowrap",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "whiteSpace",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-x",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderLeftWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-x",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderRightWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-y",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderTopWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-y",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderBottomWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-b",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderBottomWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-l",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderLeftWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-r",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderRightWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-t",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderTopWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-b-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderBottomWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-r-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderRightWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-t-8",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderTopWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".border-l-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderLeftWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".bg-\\[radial-gradient\\(circle_at_center\\2c _\\#4F75FF_0\\%\\2c _transparent_70\\%\\)\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".bg-gradient-to-r",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "backgroundImage",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".fill-current",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "fill",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".stroke-current",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "stroke",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".stroke-\\[1\\.5\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "strokeWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".stroke-\\[2\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "strokeWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".object-contain",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "objectFit",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".object-cover",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "objectFit",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".p-6",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".p-3",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".p-4",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".p-5",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".p-8",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".p-10",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".p-12",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".p-1",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".p-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".italic",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "fontStyle",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".underline",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "WebkitTextDecorationLine",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".underline",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "textDecorationLine",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".decoration-\\[\\#202633\\]\\/50",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "WebkitTextDecorationColor",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".decoration-\\[\\#202633\\]\\/50",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "textDecorationColor",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".underline-offset-4",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "textUnderlineOffset",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".antialiased",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "WebkitFontSmoothing",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".antialiased",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "MozOsxFontSmoothing",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".mix-blend-multiply",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "mixBlendMode",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_0_3px_\\#1E293B\\]",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_30px_rgba\\(197\\2c 255\\2c 214\\2c 0\\.1\\)\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_8px_\\#C5FFD6\\]",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-sm",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_30px_rgba\\(255\\2c 207\\2c 254\\2c 0\\.1\\)\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_8px_\\#FFCFFE\\]",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_30px_rgba\\(147\\2c 255\\2c 216\\2c 0\\.1\\)\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_8px_\\#93FFD8\\]",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-2xl",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_0_3px_\\#4C4656\\]",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_12px_rgba\\(212\\2c 255\\2c 89\\2c 0\\.5\\)\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_25px_rgba\\(212\\2c 255\\2c 89\\2c 0\\.15\\)\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_8px_\\#D9F99D\\]",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-\\[0_0_8px_rgba\\(212\\2c 255\\2c 89\\2c 0\\.8\\)\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-inner",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-lg",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-md",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".shadow-black\\/10",
+      "reason": "CANONICALIZE_SKIPPED",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".ring-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "boxShadow",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".blur-\\[100px\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "filter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".blur-\\[120px\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "filter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".blur-\\[2px\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "filter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".grayscale",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "filter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".backdrop-blur-md",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "WebkitBackdropFilter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".backdrop-blur-md",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "backdropFilter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".backdrop-blur-xl",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "WebkitBackdropFilter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".backdrop-blur-xl",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "backdropFilter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".backdrop-blur-sm",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "WebkitBackdropFilter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".backdrop-blur-sm",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "backdropFilter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-all",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionProperty",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-all",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionTimingFunction",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-all",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionDuration",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-colors",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionProperty",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-colors",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionProperty",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-colors",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionProperty",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-colors",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionTimingFunction",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-colors",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionDuration",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-opacity",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionProperty",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-opacity",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionTimingFunction",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-opacity",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionDuration",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-transform",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionProperty",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-transform",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionTimingFunction",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-transform",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionDuration",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionProperty",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionProperty",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionProperty",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionTimingFunction",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionDuration",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-shadow",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionProperty",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-shadow",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionTimingFunction",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".transition-shadow",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionDuration",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".duration-200",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionDuration",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".duration-300",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionDuration",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".duration-500",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionDuration",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".duration-700",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transitionDuration",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".selection\\:bg-primary *::selection",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".selection\\:text-surface *::selection",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".hover\\:decoration-\\[\\#10b981\\]:hover",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "WebkitTextDecorationColor",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".hover\\:decoration-\\[\\#10b981\\]:hover",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "textDecorationColor",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".hover\\:grayscale-0:hover",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "filter",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".focus\\:outline-none:focus",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "outline",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".focus\\:outline-none:focus",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "outlineOffset",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".focus-visible\\:outline-none:focus-visible",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "outline",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".focus-visible\\:outline-none:focus-visible",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "outlineOffset",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".active\\:translate-y-1:active",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "transform",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group[open] .group-open\\:rotate-180",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group\\/dropdown:hover .group-hover\\/dropdown\\:visible",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group\\/dropdown:hover .group-hover\\/dropdown\\:translate-y-0",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:translate-x-1",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group\\/dropdown:hover .group-hover\\/dropdown\\:-rotate-180",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:scale-110",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:border-seafoam\\/50",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:bg-\\[\\#D4FF59\\]\\/10",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:bg-magenta\\/10",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:bg-orange\\/10",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:bg-primary\\/10",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:bg-seafoam\\/10",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-\\[\\#10b981\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-black",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-blue-600",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-green-600",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-orange-500",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-primary",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-red-600",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-blue-500",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-indigo-600",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-purple-600",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-slate-600",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-gray-900",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-orange-400",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-teal-600",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-seafoam",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-\\[\\#047857\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-\\[\\#0F766E\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-\\[\\#A21CAF\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-\\[\\#C2410C\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-\\[\\#93FFD8\\]",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-magenta\\/80",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-seafoam\\/80",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group\\/dropdown:hover .group-hover\\/dropdown\\:opacity-100",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:opacity-100",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group:hover .group-hover\\:grayscale-0",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".peer:checked ~ .peer-checked\\:border-seafoam",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".peer:checked ~ .peer-checked\\:text-teal-300",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".peer:checked ~ .peer-checked\\:text-seafoam",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".sm\\:aspect-\\[21\\/9\\]",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "aspectRatio",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".sm\\:grid-cols-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".sm\\:p-8",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".md\\:col-span-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".md\\:grid-cols-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".md\\:grid-cols-3",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".md\\:grid-cols-4",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".md\\:border-b-0",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderBottomWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".md\\:border-r",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderRightWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".md\\:p-8",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".md\\:p-12",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".md\\:p-14",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".md\\:p-10",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:top-32",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "top",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:col-span-5",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:col-span-7",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:col-span-3",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:col-span-9",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:col-span-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:col-span-4",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:col-span-8",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:grid-cols-4",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:grid-cols-12",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:grid-cols-3",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:grid-cols-6",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:grid-cols-2",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:border-b-0",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderBottomWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:border-r",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderRightWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:border-l",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderLeftWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:border-t-0",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderTopWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".lg\\:p-8",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "padding",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".xl\\:col-span-1",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridColumn",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".xl\\:grid-cols-3",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "gridTemplateColumns",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".xl\\:border-r",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "borderRightWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".cal-embed",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "border",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".cal-embed",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "margin",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".cal-embed",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "colorScheme",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "0%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "0%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-marquee-left",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-marquee-right",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group-hover\\/section .animate-marquee-left,\n          .group-hover\\/section .animate-marquee-right",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "0%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "0%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-marquee-left",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-marquee-right",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group-hover\\/section .animate-marquee-left,\n          .group-hover\\/section .animate-marquee-right",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "0%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "0%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-marquee-left",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-marquee-right",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group-hover\\/section .animate-marquee-left,\n          .group-hover\\/section .animate-marquee-right",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "0%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "0%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-marquee-left",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-marquee-right",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group-hover\\/section .animate-marquee-left,\n          .group-hover\\/section .animate-marquee-right",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "0%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "0%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "100%",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-marquee-left",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".animate-marquee-right",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "animation",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".group-hover\\/section .animate-marquee-left,\n          .group-hover\\/section .animate-marquee-right",
+      "reason": "COMPOUND_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "body",
+      "reason": "NON_CLASS_SELECTOR",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".clip-hex",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "clipPath",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".no-scrollbar",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "MsOverflowStyle",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": ".no-scrollbar",
+      "reason": "UNSUPPORTED_PROPERTY",
+      "property": "scrollbarWidth",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes spin",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes ping",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes pulse",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes marquee-left",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes marquee-right",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes marquee-left",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes marquee-right",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes marquee-left",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes marquee-right",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes marquee-left",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes marquee-right",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes marquee-left",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    },
+    {
+      "selector": "@keyframes marquee-right",
+      "reason": "ATRULE_KEYFRAMES",
+      "severity": "expected",
+      "destination": "styles-unique.css"
+    }
+  ],
+  "summaryByReason": {
+    "NON_CLASS_SELECTOR": 65,
+    "UNSUPPORTED_PROPERTY": 247,
+    "COMPOUND_SELECTOR": 62,
+    "CANONICALIZE_SKIPPED": 12,
+    "ATRULE_KEYFRAMES": 13
+  }
+}

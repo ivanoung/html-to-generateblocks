@@ -199,6 +199,24 @@ function allSelectorsAreElements(rules: css.Rule[]): boolean {
   });
 }
 
+// ── Canonicalized Path (PostCSS AST) ──────────────────
+
+import { CssClassifier } from "./css-classifier.js";
+
+/** Split CSS using the canonicalized PostCSS classifier. */
+export function splitCssCanonicalized(compiledCss: string): {
+  uniqueCss: string;
+  rejectionJson: string;
+} {
+  const result = CssClassifier.classify(compiledCss);
+  const totalRules = result.structuredStyles.length +
+    (result.rawCss.match(/\{/g) || []).length;
+  return {
+    uniqueCss: result.rawCss,
+    rejectionJson: result.rejectionLog.toJSON(totalRules),
+  };
+}
+
 /**
  * Split compiled CSS into globalStyles (single-class rules) and uniqueCss (everything else).
  */
