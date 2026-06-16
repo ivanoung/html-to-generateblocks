@@ -499,11 +499,24 @@ async function main(): Promise<void> {
         firstPage = false;
       }
 
+      // Generate manual-steps.md with global selector inventory
+      const cssPath = resolve(outDir, "styles.css");
+      const { analyzeSource, generateManualStepsReport } = await import("../core/manual-steps.js");
+      const { inventoryGlobalSelectors } = await import("../core/global-selector-inventory.js");
+      const manualSteps = analyzeSource(pageContents[0].html);
+      const inventory = inventoryGlobalSelectors(
+        existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "",
+      );
+      writeFileSync(
+        resolve(outDir, "manual-steps.md"),
+        generateManualStepsReport(manualSteps, inventory) + "\n",
+        "utf-8",
+      );
+
       // Phase 2: Split styles.css into global-styles.json + styles-unique.css
       // Only runs when --split flag is passed. Monolithic styles.css at
       // project root is always the canonical pixel-perfect fallback.
       const doSplit = args.includes("--split");
-      const cssPath = resolve(outDir, "styles.css");
       const setupDir = resolve(outDir, "setup");
 
       if (existsSync(cssPath) && doSplit) {

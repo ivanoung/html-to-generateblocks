@@ -4,6 +4,8 @@
 // manual steps needed after conversion. Written as a
 // human-readable report alongside other output files.
 
+import type { GlobalSelectorInventory } from "./global-selector-inventory.js";
+
 export interface ManualSteps {
   fonts: string[];
   externalScripts: string[];
@@ -55,7 +57,7 @@ export function analyzeSource(html: string): ManualSteps {
   };
 }
 
-export function generateManualStepsReport(steps: ManualSteps): string {
+export function generateManualStepsReport(steps: ManualSteps, inventory?: GlobalSelectorInventory): string {
   const autoFixable: string[] = [];
   const judgment: string[] = [];
   const pureManual: string[] = [];
@@ -143,6 +145,29 @@ export function generateManualStepsReport(steps: ManualSteps): string {
       "             and replace nav in other pages.",
       "",
     );
+  }
+
+  // ── Global Selector Rules Inventory ──────────────────
+  if (inventory && inventory.rules.length > 0) {
+    let inventoryNum = 5;
+    if (steps.fonts.length > 0) inventoryNum = 6;
+    autoFixable.push(
+      `${inventoryNum}. GLOBAL DOCUMENT STYLES`,
+      "   The following CSS rules target <html>, <body>, :root,",
+      "   or pseudo-elements like ::selection. These are preserved",
+      "   in styles.css but only apply when enqueued globally.",
+    );
+    for (const rule of inventory.rules) {
+      autoFixable.push(`   - ${rule.selector}`);
+    }
+    if (inventory.hasBackgroundColor) {
+      autoFixable.push(
+        "   ⚠ The source body has a background-color. If your theme",
+        '     overrides body styles, add class="bg-background" to',
+        "     the outermost GB container block.",
+      );
+    }
+    autoFixable.push("");
   }
 
   // ── PURE MANUAL ───────────────────────────────────────

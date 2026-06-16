@@ -13,7 +13,6 @@ import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
 import { resolveIconifyIcons } from "./iconify-resolver.js";
-import { analyzeSource, generateManualStepsReport } from "./manual-steps.js";
 import { generateCustomizerSettings } from "./customizer-generator.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
 import { checkContentLoss } from "./content-verifier.js";
@@ -179,13 +178,8 @@ export async function convert(
       );
     }
 
-    // manual-steps.md — categorized setup instructions
-    const manualSteps = analyzeSource(input.rawHtml);
-    writeFileSync(
-      resolve(outDir, "manual-steps.md"),
-      generateManualStepsReport(manualSteps) + "\n",
-      "utf-8",
-    );
+    // manual-steps.md moved to CLI level (needs compiled CSS for global selector inventory)
+
   }
 
   return {
