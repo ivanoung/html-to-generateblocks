@@ -307,19 +307,53 @@ async function main(): Promise<void> {
 
     console.log(`\nSetting up project from ${htmlFiles.length} page(s)...\n`);
 
-    // Use the first HTML file to generate shared files
-    const firstFile = htmlFiles[0];
-    const rawHtml = readFileSync(resolve(fullDir, firstFile), "utf-8");
+    // Collect all pages and compile Tailwind from all of them
     const projectDir = projectPath.replace(/^inputs\//, "").replace(/\/$/, "");
+    const pageContents: { name: string; html: string }[] = [];
+    for (const f of htmlFiles) {
+      pageContents.push({
+        name: f.replace(".html", ""),
+        html: readFileSync(resolve(fullDir, f), "utf-8"),
+      });
+    }
 
-    await convert({ rawHtml, pageName: "_setup", projectDir, skipShared: false });
+    // Compile Tailwind CSS from ALL pages via CDN (Playwright)
+    let tailwindCss = "";
+    const firstHtml = pageContents[0].html;
+    const tailwindConfig = extractTailwindConfig(firstHtml);
+    if (tailwindConfig) {
+      console.log(`  Compiling Tailwind CSS from ${pageContents.length} page(s) via CDN...`);
+      const compiled = await inlineTailwindMultiPage(
+        pageContents.map((pc) => pc.html),
+        pageContents.map((pc) => pc.name),
+      );
+      tailwindCss = compiled.stylesCss;
+      console.log(`    ✓ Compiled (${(compiled.stylesCss.length / 1024).toFixed(1)} KB)`);
+    }
+
+    // Convert first page to generate shared files (skip inliner — already compiled)
+    await convert({
+      rawHtml: firstHtml,
+      pageName: "_setup",
+      projectDir,
+      skipShared: false,
+      skipInliner: true,
+    });
+
+    // Prepend compiled Tailwind CSS to styles.css
+
+    const outDir = projectDir ? `output/${projectDir}/` : "output/";
+    const absOutDir = resolve(process.cwd(), outDir);
+    if (tailwindCss) {
+      const cssPath = resolve(absOutDir, "styles.css");
+      const existing = existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "";
+      writeFileSync(cssPath, tailwindCss + "\n" + existing, "utf-8");
+    }
 
     // Clean up throwaway setup blocks
-    const outDir = projectDir ? `output/${projectDir}/` : "output/";
-    try { unlinkSync(resolve(process.cwd(), outDir, "_setup.html")); } catch {}
-    try { unlinkSync(resolve(process.cwd(), outDir, "_setup.report.json")); } catch {}
+    try { unlinkSync(resolve(absOutDir, "pages", "_setup.html")); } catch {}
+    try { unlinkSync(resolve(absOutDir, "pages", "_setup.report.json")); } catch {}
     console.log(`  styles.css:         ${outDir}styles.css`);
-    console.log(`  customizer-import:  ${outDir}customizer-import.json`);
     console.log(`  manual-steps:       ${outDir}manual-steps.txt`);
     console.log("");
     console.log("Now run individual pages:");
@@ -430,21 +464,14 @@ async function main(): Promise<void> {
         writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(split.globalStyles, null, 2) + "\n", "utf-8");
         writeFileSync(resolve(setupDir, "styles-unique.css"), split.uniqueCss + "\n", "utf-8");
 
-        // Move customizer-import.json and manual-steps.txt into setup/
-        const srcCustomizer = resolve(outDir, "customizer-import.json");
+        // Move manual-steps.txt into setup/
         const srcManual = resolve(outDir, "manual-steps.txt");
-        if (existsSync(srcCustomizer)) {
-          writeFileSync(resolve(setupDir, "customizer-import.json"), readFileSync(srcCustomizer, "utf-8"));
-          unlinkSync(srcCustomizer);
-        }
         if (existsSync(srcManual)) {
           writeFileSync(resolve(setupDir, "manual-steps.txt"), readFileSync(srcManual, "utf-8"));
           unlinkSync(srcManual);
         }
 
-        // Copy styles.css to pages/ for easy access
-        writeFileSync(resolve(pagesDir, "styles.css"), fullCss);
-        unlinkSync(cssPath);
+        // styles.css stays at project root (shared across all pages)
       }
 
       // Write global.js with all scripts

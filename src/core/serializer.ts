@@ -5,7 +5,6 @@
 // rendered HTML with correct class patterns.
 
 import type { Block } from "./types.js";
-import { mapStylesToGbAttributes } from "./gb-attribute-mapper.js";
 
 // ── CSS formatting ────────────────────────────────────────────
 
@@ -59,12 +58,8 @@ function buildElementAttrs(block: Block): Record<string, unknown> {
   attrs.uniqueId = block.uniqueId;
   attrs.tagName = block.tagName ?? "div";
 
-  // Promote inline styles to GB top-level attributes (backgrounds, colors, gradients)
-  const { gbAttrs, remainingStyles } = mapStylesToGbAttributes(block.styles || {});
-  Object.assign(attrs, gbAttrs);
-
-  const stylesEmpty = !remainingStyles || Object.keys(remainingStyles).length === 0;
-  attrs.styles = stylesEmpty ? {} : remainingStyles;
+  const stylesEmpty = !block.styles || Object.keys(block.styles).length === 0;
+  attrs.styles = stylesEmpty ? {} : block.styles;
   attrs.css = formatCss(block, block.css || "");
 
   if (block.globalClasses && block.globalClasses.length > 0) {
@@ -226,7 +221,8 @@ function renderElementHtml(block: Block): string {
 
 function renderTextHtml(block: Block): string {
   const tag = block.tagName ?? "p";
-  // Text uses base-first pattern: gb-text gb-text-{id}
+  const hasStyles = block.styles && Object.keys(block.styles).length > 0;
+  // Text uses base-first pattern: gb-text gb-text-{id} (always emitted)
   const gbClasses = `gb-text gb-text-${block.uniqueId}`;
   const globalClasses = (block.globalClasses || []).join(" ");
   const classes = globalClasses
