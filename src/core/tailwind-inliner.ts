@@ -43,6 +43,24 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 
 /**
+ * Extract all unique class names from <body> tags across pages.
+ * These classes would otherwise be invisible to the Tailwind CDN
+ * since only body CONTENT (not the body tag itself) is compiled.
+ */
+export function extractBodyClasses(pageHtmls: string[]): string[] {
+  const classSet = new Set<string>();
+  for (const html of pageHtmls) {
+    // Use word boundary + non-greedy match to ensure \sclass= is the real class attribute,
+    // not a preceding attribute that happens to end in "class" (e.g. data-class="y")
+    const bodyMatch = html.match(/<body\b(?:\s[^>]*?)?\sclass\s*=\s*"([^"]*)"[^>]*>/i);
+    if (bodyMatch) {
+      bodyMatch[1].split(/\s+/).filter(c => c.length > 0).forEach(c => classSet.add(c));
+    }
+  }
+  return [...classSet];
+}
+
+/**
  * Extract all <link rel="stylesheet"> and <style> tags from the <head>
  * of an HTML document for inclusion in the CDN document.
  * If baseDir is provided, relative stylesheet hrefs are resolved and inlined.
@@ -120,6 +138,13 @@ export async function inlineTailwindMultiPage(
   // Use pre-expanded config if provided, otherwise extract from first page
   const configJson = preExpandedConfig || extractTailwindConfig(pageHtmls[0]) || "{}";
 
+  // Inject hidden proxy div with all body classes so Tailwind CDN
+  // compiles utilities like selection:bg-primary that only appear on <body>
+  const bodyClasses = extractBodyClasses(pageHtmls);
+  const proxyDiv = bodyClasses.length > 0
+    ? `\n<div class="${bodyClasses.join(" ")}" style="display:none" data-gb-proxy></div>`
+    : "";
+
   // Build CDN document with original head resources included
   const cdnDoc = `<!DOCTYPE html>
 <html><head>
@@ -130,6 +155,7 @@ export async function inlineTailwindMultiPage(
 ${combinedHead}
 </head><body>
 ${combinedBody}
+${proxyDiv}
 </body></html>`;
 
   return compileWithPlaywright(cdnDoc);
