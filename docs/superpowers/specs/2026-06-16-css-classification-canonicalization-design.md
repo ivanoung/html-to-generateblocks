@@ -266,7 +266,20 @@ Detection:
 
 Each `--tw-<name>-opacity` is name-pair matched independently. No global substitution. Iterate per variable.
 
-### 5.6 Box-Shadow
+### 5.6 Declaration Order Preservation
+
+CSS is cascade-order-dependent. When two declarations set the same property on the same selector, the last one wins. This order MUST be preserved through ALL canonicalization, splitting, and unwrapping stages.
+
+**Guarantees:**
+
+1. **Within a rule:** declaration order is never reordered. Canonicalization removes `--tw-*-opacity` declarations but never rearranges remaining declarations.
+2. **Property-level splitting:** when a rule's declarations are split between global-styles.json and styles-unique.css, the relative order of declarations within each output matches their order in the source rule.
+3. **@media unwrapping:** declarations extracted from @media blocks retain source order within the unwrapped rule.
+4. **Across files:** the cascade order across output files is documented (see §8) — `styles-unique.css` follows `global-styles.json` in the load order, meaning raw CSS declarations have final say when the same property is set in both.
+
+**Testing:** golden snapshot tests assert that for every rule, the declaration array in the output matches the source order (minus stripped declarations).
+
+### 5.7 Box-Shadow
 
 ```css
 /* Safe: no shadow-colored */
@@ -395,7 +408,20 @@ Shorthand properties (`margin`, `padding`, `border`, `background`, `flex`, `over
 
 Example: `margin: 1rem 2rem` → `marginTop: 1rem`, `marginRight: 2rem`, `marginBottom: 1rem`, `marginLeft: 2rem`.
 
-### 6.5 Property-Value Validation
+### 6.5 Vendor Prefix Policy
+
+GenerateBlocks operates in WordPress, where vendor prefixes have specific semantics. Policy per prefix type:
+
+| Prefix | Policy | Rationale |
+|---|---|---|
+| `-webkit-` properties (e.g., `-webkit-backdrop-filter`) | Strip prefix, keep standard property if GB-supported. If no standard equivalent exists, reject with code=VENDOR_PREFIX. | Modern WordPress and all supported browsers ship unprefixed versions. |
+| `-webkit-` pseudo-elements (`::-webkit-scrollbar`, `::-webkit-details-marker`) | Always route to `styles-unique.css`. Never attempt canonicalization. | Non-standard, no unprefixed equivalent. |
+| `-moz-`, `-ms-`, `-o-` prefixes | Reject with code=VENDOR_PREFIX. | These browsers are not supported by WordPress or GB. |
+| `-webkit-` values (e.g., `display: -webkit-box`) | Reject with code=VENDOR_PREFIXED_VALUE. | GB uses standard `display` values. |
+
+**Stripping `-webkit-` properties:** when a rule has both `-webkit-backdrop-filter: blur(12px)` AND `backdrop-filter: blur(12px)`, strip the `-webkit-` variant and keep only the standard property. When ONLY the `-webkit-` variant exists (no standard counterpart), check if the standard property is GB-supported. If yes, rename the property to the standard form. If the standard property is NOT GB-supported (e.g., `backdrop-filter` is unsupported), route to raw CSS.
+
+### 6.6 Property-Value Validation
 
 Beyond property-name matching:
 
@@ -625,7 +651,48 @@ Assert: pipeline never crashes, never produces invalid JSON, never emits unescap
 
 ---
 
-## 11. Phased Implementation Roadmap
+## 11. Migration & Backward Compatibility
+
+### 11.1 Schema Versioning
+
+All output files carry a `schemaVersion` field. The current baseline (pre-canonicalizer, regex-based classifier, rule-level splitting) is `schemaVersion: "0.1.0"`. The new canonicalized, property-level split, AST-based output is `schemaVersion: "1.0.0"`.
+
+Consumers (WPCodeBox import, manual paste workflow, CI validation) can gate on `schemaVersion` to detect format changes.
+
+### 11.2 Dual-Mode Rollout
+
+During P1 development, the converter runs in **dual-output mode**:
+
+1. **Legacy path** (existing): produces `output/mino/styles.css` and old-format split files if `--split` is passed. Unchanged.
+2. **New path** (canonicalized): produces `output/mino/setup/global-styles.json` and `output/mino/setup/styles-unique.css` with `schemaVersion: "1.0.0"`.
+
+Both paths run from the same input. The legacy path is the default. The new path is enabled via `--canonicalize` flag during P1. In P2, the new path becomes the default and `--legacy` preserves the old path. In P3, the legacy path is removed.
+
+### 11.3 Backward Compatibility for Existing Output
+
+Existing output files (pre-P1) have no `schemaVersion` field. The converter treats missing `schemaVersion` as `"0.1.0"`. When a consumer detects `schemaVersion: "0.1.0"`:
+
+- **styles.css:** unchanged — this file format is identical across all schema versions (always raw monolithic CSS).
+- **global-styles.json:** pre-P1 output may contain rules with unresolved `--tw-*` variables. Consumers should warn the user to re-run the converter.
+- **styles-unique.css:** format unchanged.
+
+### 11.4 Rollback Path
+
+If canonicalized output causes rendering regressions:
+
+1. Set converter to legacy mode: `npx tsx src/cli/index.ts convert inputs/mino/ --legacy`
+2. Replace `output/mino/setup/` with legacy output
+3. The monolithic `styles.css` at project root is NEVER affected by the canonicalizer — it is always raw CDN output. This is the ultimate fallback.
+
+### 11.5 Database Migration (WordPress)
+
+When blocks are already pasted into WordPress posts:
+
+- **No automatic migration needed.** The canonicalizer changes CSS values (strips `--tw-*` variables) but does NOT change class names or selectors. Existing blocks reference the same class names — only the CSS definitions change.
+- **Re-import flow:** the user re-imports `global-styles.json` into GB Global Styles. Since selectors are unchanged, existing blocks pick up the new canonicalized styles automatically.
+- **Safety:** if canonicalization produces wrong values, the user re-imports the monolithic `styles.css` (always available) and reverts.
+
+## 12. Phased Implementation Roadmap
 
 | Phase | Scope | Why phased |
 |---|---|---|
