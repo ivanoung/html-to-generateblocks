@@ -39,34 +39,95 @@ export async function inlineTailwindStyles(rawHtml: string): Promise<InlinerResu
   return compileWithPlaywright(rawHtml);
 }
 
+import { readFileSync, existsSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+
+/**
+ * Extract all <link rel="stylesheet"> and <style> tags from the <head>
+ * of an HTML document for inclusion in the CDN document.
+ * If baseDir is provided, relative stylesheet hrefs are resolved and inlined.
+ */
+function extractHeadResources(html: string, baseDir?: string): string {
+  const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+  if (!headMatch) return "";
+
+  const headContent = headMatch[1];
+  const parts: string[] = [];
+
+  // Extract <link rel="stylesheet"> tags and resolve relative paths
+  const linkRegex = /<link\b[^>]*rel\s*=\s*["']stylesheet["'][^>]*\/?>/gi;
+  let match;
+  while ((match = linkRegex.exec(headContent)) !== null) {
+    const linkTag = match[0];
+    const hrefMatch = linkTag.match(/href\s*=\s*["']([^"']+)["']/);
+    if (hrefMatch && baseDir) {
+      const href = hrefMatch[1];
+      // Only resolve relative paths (not http://, https://, //)
+      if (!/^(https?:\/\/|\/\/)/.test(href)) {
+        const resolved = resolve(baseDir, href);
+        if (existsSync(resolved)) {
+          const css = readFileSync(resolved, "utf-8");
+          parts.push(`<style>/* ${href} */\n${css}\n</style>`);
+          continue;
+        }
+      }
+    }
+    // Fall back to including the link tag as-is (for absolute URLs)
+    parts.push(linkTag);
+  }
+
+  // Extract <style> tags
+  const styleRegex = /<style\b[^>]*>[\s\S]*?<\/style>/gi;
+  while ((match = styleRegex.exec(headContent)) !== null) {
+    parts.push(match[0]);
+  }
+
+  return parts.join("\n");
+}
+
 /**
  * Compile Tailwind CSS from multiple pages by concatenating body content
  * and loading in a headless browser with Tailwind CDN.
+ * Includes original <link> stylesheets and <style> blocks from source heads
+ * so Pattern 2 projects (external stylesheets) are fully captured.
  */
 export async function inlineTailwindMultiPage(
   pageHtmls: string[],
   pageNames: string[],
+  baseDir?: string,
+  preExpandedConfig?: string,
 ): Promise<InlinerResult> {
   const warnings: string[] = [];
 
-  // Extract body content from each page
-  const bodyParts = pageHtmls.map((html, i) => {
+  // Extract body content and head resources from each page
+  const bodyParts: string[] = [];
+  const headResources: string[] = [];
+
+  for (let i = 0; i < pageHtmls.length; i++) {
+    const html = pageHtmls[i];
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
     const body = bodyMatch ? bodyMatch[1] : html;
-    return `<!-- page:${pageNames[i]} -->\n${body}`;
-  });
+    bodyParts.push(`<!-- page:${pageNames[i]} -->\n${body}`);
+    headResources.push(extractHeadResources(html, baseDir));
+  }
+
   const combinedBody = bodyParts.join("\n");
 
-  // Extract tailwind config from first page
-  const configJson = extractTailwindConfig(pageHtmls[0]) || "{}";
+  // Deduplicate head resources across pages
+  const uniqueHeadResources = [...new Set(headResources.filter(r => r))];
+  const combinedHead = uniqueHeadResources.join("\n");
 
-  // Build CDN document
+  // Use pre-expanded config if provided, otherwise extract from first page
+  const configJson = preExpandedConfig || extractTailwindConfig(pageHtmls[0]) || "{}";
+
+  // Build CDN document with original head resources included
   const cdnDoc = `<!DOCTYPE html>
 <html><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config = ${configJson}</script>
+${combinedHead}
 </head><body>
 ${combinedBody}
 </body></html>`;
@@ -85,28 +146,174 @@ async function compileWithPlaywright(html: string): Promise<InlinerResult> {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
 
+    // ── Layer 1: Capture baseline inline <style> content BEFORE CDN loads ──
+    await page.addInitScript(() => {
+      (window as any).__gb_baselineCssLength = 0;
+      const observer = new MutationObserver(() => {
+        let total = 0;
+        document.querySelectorAll("style").forEach((s) => {
+          total += (s.textContent || "").length;
+        });
+        (window as any).__gb_baselineCssLength = total;
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      // Capture initial state immediately
+      let total = 0;
+      document.querySelectorAll("style").forEach((s) => {
+        total += (s.textContent || "").length;
+      });
+      (window as any).__gb_baselineCssLength = total;
+    });
+
+    // ── Layer 4: Inject hidden test element for orthogonal verification ──
+    // Appended after CDN loads to prove it actually compiled AND applied rules
+
     await page.setContent(html, { waitUntil: "networkidle" });
 
-    try {
-      await page.waitForFunction(
-        () => {
-          const el = document.querySelector(".pt-32, [class*='pt-32']");
-          if (!el || !(el instanceof HTMLElement)) return false;
-          return window.getComputedStyle(el).paddingTop !== "0px";
-        },
-        { timeout: 15000 },
-      );
-    } catch {
-      warnings.push("Tailwind CDN did not compile within timeout");
+    // Inject test element AFTER page load (so CDN sees it and compiles for it)
+    await page.evaluate(() => {
+      const testEl = document.createElement("div");
+      testEl.id = "__gb_tailwind_test";
+      testEl.className = "bg-red-500";
+      testEl.style.cssText = "position:absolute;visibility:hidden;width:1px;height:1px;";
+      document.body.appendChild(testEl);
+    });
+
+    // ── Layer 2: Poll until CSS stabilizes ──
+    const POLL_INTERVAL_MS = 500;
+    const STABILITY_WINDOW_MS = 500;
+    const HARD_TIMEOUT_MS = 30000;
+
+    let lastCssLength = 0;
+    let stableSince = 0;
+    const startTime = Date.now();
+    let timedOut = false;
+
+    while (true) {
+      const currentLength = await page.evaluate(() => {
+        let total = 0;
+        document.querySelectorAll("style").forEach((s) => {
+          total += (s.textContent || "").length;
+        });
+        return total;
+      });
+
+      if (currentLength !== lastCssLength) {
+        stableSince = Date.now();
+        lastCssLength = currentLength;
+      }
+
+      // Stable: no change for STABILITY_WINDOW_MS
+      if (Date.now() - stableSince >= STABILITY_WINDOW_MS) {
+        break;
+      }
+
+      // Hard timeout
+      if (Date.now() - startTime >= HARD_TIMEOUT_MS) {
+        timedOut = true;
+        break;
+      }
+
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
 
-    // Extract all <style> block contents (compiled Tailwind + custom CSS)
+    // ── Layer 3: Two-signal verification ──
+    const verification = await page.evaluate(() => {
+      // Get baseline captured before CDN loaded
+      const baseline = (window as any).__gb_baselineCssLength || 0;
+
+      // Get current total inline <style> content
+      let total = 0;
+      let hasTailwindMarkers = false;
+      document.querySelectorAll("style").forEach((s) => {
+        const text = s.textContent || "";
+        total += text.length;
+        if (/\-\-tw-|@layer|\/\*!\s*tailwindcss/.test(text)) {
+          hasTailwindMarkers = true;
+        }
+      });
+
+      const growth = total - baseline;
+      const growthPercent = baseline > 0 ? (growth / baseline) * 100 : (growth > 0 ? 100 : 0);
+
+      // Check orthogonal signal: did bg-red-500 actually apply?
+      const testEl = document.getElementById("__gb_tailwind_test");
+      let testBgApplied = false;
+      if (testEl) {
+        const bg = window.getComputedStyle(testEl).backgroundColor;
+        // Default transparent is "rgba(0, 0, 0, 0)" — anything else means CDN worked
+        testBgApplied = bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent";
+      }
+
+      return {
+        baseline,
+        total,
+        growth,
+        growthPercent: Math.round(growthPercent),
+        hasTailwindMarkers,
+        testBgApplied,
+        passed: growth >= 200 && growthPercent >= 20 && hasTailwindMarkers && testBgApplied,
+      };
+    });
+
+    if (timedOut || !verification.passed) {
+      const reason = timedOut
+        ? `CSS did not stabilize within ${HARD_TIMEOUT_MS / 1000}s`
+        : [
+            verification.growth < 200 ? `insufficient growth (${verification.growth} bytes, need ≥200)` : "",
+            verification.growthPercent < 20 ? `insufficient growth % (${verification.growthPercent}%, need ≥20%)` : "",
+            !verification.hasTailwindMarkers ? "no Tailwind markers (--tw-, @layer) found" : "",
+            !verification.testBgApplied ? "bg-red-500 test element not styled by CDN" : "",
+          ]
+            .filter(Boolean)
+            .join("; ");
+
+      throw new Error(
+        `Tailwind CDN compilation failed: ${reason}. ` +
+        `Baseline CSS: ${verification.baseline}B, total: ${verification.total}B, growth: ${verification.growth}B (${verification.growthPercent}%). ` +
+        `Check that the page has valid Tailwind classes and the CDN URL is reachable.`,
+      );
+    }
+
+    if (verification.growth < 1000) {
+      warnings.push(
+        `Tailwind CDN compiled minimal CSS (${verification.growth}B growth). ` +
+        `If the page uses few Tailwind classes this may be expected.`,
+      );
+    }
+
+    // Extract all stylesheets: <style> blocks AND external <link> stylesheets
     const payload = await page.evaluate(() => {
       const cssParts: string[] = [];
+
+      // 1. Capture <style> block contents (inline + CDN-compiled Tailwind)
       document.querySelectorAll("style").forEach((el) => {
         const text = el.textContent || "";
         if (text.trim()) cssParts.push(text);
       });
+
+      // 2. Capture external stylesheet contents (Pattern 2: <link rel="stylesheet">)
+      // document.styleSheets includes both <style> and <link> sheets
+      for (let i = 0; i < document.styleSheets.length; i++) {
+        try {
+          const sheet = document.styleSheets[i];
+          // Only capture <link> sheets (not <style> blocks, already captured above)
+          if (sheet.ownerNode && (sheet.ownerNode as Element).tagName === "LINK") {
+            const rules = sheet.cssRules || sheet.rules;
+            if (rules) {
+              const sheetCss: string[] = [];
+              for (let j = 0; j < rules.length; j++) {
+                sheetCss.push(rules[j].cssText);
+              }
+              if (sheetCss.length > 0) {
+                cssParts.push(`/* external:${(sheet.href || "inline")} */\n` + sheetCss.join("\n"));
+              }
+            }
+          }
+        } catch {
+          // Cross-origin stylesheets throw on cssRules access — skip silently
+        }
+      }
 
       // Collect all class names used on elements
       const classNames = new Set<string>();
