@@ -13,7 +13,6 @@ import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
 import { resolveIconifyIcons } from "./iconify-resolver.js";
-import { generateCustomizerSettings } from "./customizer-generator.js";
 import { analyzeSource, generateManualStepsReport } from "./manual-steps.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
 import { checkContentLoss } from "./content-verifier.js";
@@ -171,14 +170,8 @@ export async function convert(
       );
     }
 
-    const customizer = generateCustomizerSettings(input.rawHtml);
-    if (customizer) {
-      writeFileSync(
-        resolve(outDir, "customizer-import.json"),
-        JSON.stringify(customizer, null, 2) + "\n",
-        "utf-8",
-      );
-    }
+    // styles.css stays at project root (shared across all pages)
+    // (customizer-import.json generation removed — styles.css is the single source of truth)
 
     const manualSteps = analyzeSource(input.rawHtml);
     writeFileSync(
