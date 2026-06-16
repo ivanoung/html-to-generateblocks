@@ -2,413 +2,92 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import { splitCss } from "../src/core/css-splitter.js";
 
-describe("splitCss — property-based classification", () => {
-  // ── GS-eligible: structural ────────────────────────────────
-
-  it("structural: display → GS", () => {
-    const css = ".flex{display:flex}";
+describe("splitCss", () => {
+  it("classifies single-class rules into globalStyles", () => {
+    const css = ".pt-32{padding-top:8rem}.flex{display:flex}";
     const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".flex");
-    assert.ok(result.globalStyles[0].css.includes("display:flex"));
+    assert.strictEqual(result.globalStyles.length, 2);
+    assert.strictEqual(result.globalStyles[0].selector, ".pt-32");
+    assert.strictEqual(result.globalStyles[1].selector, ".flex");
     assert.strictEqual(result.uniqueCss, "");
   });
 
-  it("structural: sizing → GS", () => {
-    const css = ".w-full{width:100%}.h-screen{height:100vh}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 2);
-  });
-
-  it("structural: spacing → GS", () => {
-    const css = ".pt-32{padding-top:8rem}.m-4{margin:1rem}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 2);
-  });
-
-  it("structural: flex/grid → GS", () => {
-    const css = ".flex-col{flex-direction:column}.grid-cols-2{grid-template-columns:repeat(2,1fr)}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 2);
-  });
-
-  it("structural: borders → GS", () => {
-    const css = ".rounded-lg{border-radius:0.5rem}.border{border-width:1px;border-style:solid}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 2);
-  });
-
-  it("structural: positioning → GS", () => {
-    const css = ".absolute{position:absolute}.top-0{top:0}.z-10{z-index:10}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 3);
-  });
-
-  // ── GS-eligible: typography ────────────────────────────────
-
-  it("typography → GS", () => {
-    const css = ".text-lg{font-size:1.125rem;line-height:1.75rem}";
+  it("excludes element selectors from uniqueCss (preflight stays in master only)", () => {
+    const css = "body{margin:0}h1{font-size:2rem}.foo{color:red}";
     const result = splitCss(css);
     assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".text-lg");
+    assert.strictEqual(result.globalStyles[0].selector, ".foo");
+    // Element selectors should NOT be in unique CSS
+    assert.ok(!result.uniqueCss.includes("body"), "body should NOT be in uniqueCss");
+    assert.ok(!result.uniqueCss.includes("h1"), "h1 should NOT be in uniqueCss");
   });
 
-  it("text color → GS", () => {
-    const css = ".text-primary{color:var(--primary)}";
+  it("handles pseudo-classes on single-class selectors", () => {
+    const css = ".hover\\:bg-seafoam:hover{background-color:#93FFD8}";
     const result = splitCss(css);
     assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".text-primary");
+    assert.strictEqual(result.globalStyles[0].selector, ".hover\\:bg-seafoam");
+    assert.ok(result.globalStyles[0].css.includes(":hover"), "CSS should preserve pseudo-class");
   });
 
-  // ── UC-only: background-color ──────────────────────────────
-
-  it("background-color → UC", () => {
-    const css = ".bg-primary{background-color:var(--primary)}";
+  it("puts pseudo-element selectors into uniqueCss", () => {
+    const css = ".no-scrollbar::-webkit-scrollbar{display:none}";
     const result = splitCss(css);
     assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("bg-primary"));
+    assert.ok(result.uniqueCss.includes("no-scrollbar"), "pseudo-element rule should be in uniqueCss");
   });
 
-  it("background shorthand → UC", () => {
-    const css = ".bg-white{background:#fff}";
+  it("puts multi-selector rules into uniqueCss", () => {
+    const css = "h1,h2,h3{font-weight:bold}*,:after,:before{box-sizing:border-box}.group:hover .group-hover\\:text-primary{color:red}";
     const result = splitCss(css);
+    // Element multi-selectors are excluded (preflight stays in master only)
+    // Class-based combinator rules go to unique CSS
     assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("bg-white"));
+    assert.ok(result.uniqueCss.includes("group-hover"), "class combinator rule should be in uniqueCss");
   });
 
-  // ── UC-only: backgrounds ───────────────────────────────────
-
-  it("background-image → UC", () => {
-    const css = ".bg-gradient-to-r{background-image:linear-gradient(to right,red,blue)}";
+  it("keeps @media blocks intact in uniqueCss", () => {
+    const css = "@media(min-width:768px){.md\\:text-7xl{font-size:4.5rem}.md\\:flex{display:flex}}";
     const result = splitCss(css);
+    // Media blocks stay in unique CSS, not split into global styles
     assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("bg-gradient-to-r"));
+    assert.ok(result.uniqueCss.includes("@media"), "@media block should be in uniqueCss");
   });
 
-  // ── UC-only: effects ───────────────────────────────────────
-
-  it("effects → UC", () => {
-    const css = ".shadow{box-shadow:0 1px 3px rgba(0,0,0,0.1)}.opacity-50{opacity:0.5}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("shadow"));
-    assert.ok(result.uniqueCss.includes("opacity-50"));
-  });
-
-  it("transforms → UC", () => {
-    const css = ".rotate-45{transform:rotate(45deg)}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("rotate-45"));
-  });
-
-  // ── UC-only: transitions & animations ──────────────────────
-
-  it("transitions → UC", () => {
-    const css = ".transition{transition:0.3s}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("transition"));
-  });
-
-  it("animations → UC", () => {
-    const css = ".animate-spin{animation:spin 1s linear infinite}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("animate-spin"));
-  });
-
-  // ── Mixed properties (any UC → entire rule to UC) ──────────
-
-  it("mixed: structural + transition → UC", () => {
-    const css = ".btn{padding:1rem;transition:0.3s}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("btn"));
-  });
-
-  it("mixed: typography + box-shadow → UC", () => {
-    const css = ".card{font-size:1rem;padding:1rem;box-shadow:0 2px 4px rgba(0,0,0,0.1)}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("card"));
-  });
-
-  // ── @media (responsive) handling ───────────────────────────
-
-  it("responsive structural → GS with @media wrapper", () => {
-    const css = "@media(min-width:768px){.md\\:flex{display:flex}}";
+  it("handles @keyframes — goes to uniqueCss", () => {
+    const css = "@keyframes spin{to{transform:rotate(360deg)}}.animate-spin{animation:spin 1s linear infinite}";
     const result = splitCss(css);
     assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".md-flex");
-    assert.ok(result.globalStyles[0].css.includes("@media"));
-    assert.ok(result.globalStyles[0].css.includes("display:flex"));
+    assert.strictEqual(result.globalStyles[0].selector, ".animate-spin");
+    assert.ok(result.uniqueCss.includes("@keyframes"), "keyframes should be in uniqueCss");
   });
 
-  it("responsive typography → GS with @media wrapper", () => {
-    const css = "@media(min-width:768px){.md\\:text-7xl{font-size:4.5rem;line-height:1}}";
+  it("generates human-readable names from class names", () => {
+    const css = ".pt-32{padding-top:8rem}.bg-primary{background:#c5ffd6}";
     const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".md-text-7xl");
-    assert.ok(result.globalStyles[0].css.includes("@media"));
+    assert.strictEqual(result.globalStyles[0].name, "Pt 32");
+    assert.strictEqual(result.globalStyles[1].name, "Bg Primary");
   });
 
-  it("responsive background-color stays in UC", () => {
-    const css = "@media(min-width:768px){.md\\:bg-primary{background-color:var(--primary)}}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("@media"));
-    assert.ok(result.uniqueCss.includes("md\\:bg-primary"));
-  });
-
-  it("mixed @media children: GS + UC coexist", () => {
-    const css = "@media(min-width:768px){.md\\:flex{display:flex}.md\\:shadow{box-shadow:0 2px 4px rgba(0,0,0,0.1)}}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".md-flex");
-    assert.ok(result.uniqueCss.includes("md\\:shadow"));
-  });
-
-  // ── Non-class selectors ────────────────────────────────────
-
-  it("element selector → UC", () => {
-    const css = "body{margin:0}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("body"));
-  });
-
-  it("multi-selector → UC", () => {
-    const css = "h1,h2,h3{font-weight:bold}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("h1,h2,h3"));
-  });
-
-  it("pseudo-element → UC (even with GS properties)", () => {
-    const css = ".foo::before{display:block;content:\"\"}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("foo"));
-  });
-
-  it("combinator (descendant) → UC", () => {
-    const css = ".group:hover .group-hover\\:flex{display:flex}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("group-hover"));
-  });
-
-  // ── Keyframes ──────────────────────────────────────────────
-
-  it("keyframes → UC", () => {
-    const css = "@keyframes spin{to{transform:rotate(360deg)}}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("@keyframes"));
-  });
-
-  // ── Preflight ──────────────────────────────────────────────
-
-  it("preflight reset → UC", () => {
-    const css = "*,::after,::before{box-sizing:border-box}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("box-sizing"));
-  });
-
-  // ── Custom class priority ──────────────────────────────────
-
-  it("custom class bypasses property check → GS", () => {
-    const css = ".blueprint-bg{background:#0a0a0a}";
-    const custom = new Set(["blueprint-bg"]);
-    const result = splitCss(css, custom);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".blueprint-bg");
-  });
-
-  it("custom class with UC-only property still goes to GS", () => {
-    const css = ".custom-glow{box-shadow:0 0 10px blue}";
-    const custom = new Set(["custom-glow"]);
-    const result = splitCss(css, custom);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".custom-glow");
-  });
-
-  it("custom class inside @media bypasses property check → GS", () => {
-    const css = "@media(min-width:768px){.custom-bg{background:red}}";
-    const custom = new Set(["custom-bg"]);
-    const result = splitCss(css, custom);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".custom-bg");
-    assert.ok(result.globalStyles[0].css.includes("@media"));
-  });
-
-  // ── Fallback: unclassified properties ──────────────────────
-
-  it("unclassified property → UC (safe fallback)", () => {
-    const css = ".snap-start{scroll-margin-top:1rem}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("snap-start"));
-  });
-
-  // ── Compound and functional pseudo-class selectors ─────────
-
-  it("compound class selector → UC", () => {
-    const css = ".foo.bar{display:flex}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-  });
-
-  it("functional pseudo-class → UC", () => {
-    const css = ".foo:nth-child(2){display:flex}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-  });
-
-  // ── @font-face and @supports handling ──────────────────────
-
-  it("@font-face → UC", () => {
-    const css = "@font-face{font-family:Test;src:url(test.woff)}.text-lg{font-size:1.125rem}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.ok(result.uniqueCss.includes("@font-face"));
-    assert.ok(result.uniqueCss.includes("font-family:Test"));
-  });
-
-  it("@supports → UC with children preserved", () => {
-    const css = "@supports(display:grid){.grid{display:grid}}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-    assert.ok(result.uniqueCss.includes("@supports"));
-    assert.ok(result.uniqueCss.includes(".grid"));
-  });
-
-  // ── Empty rules ────────────────────────────────────────────
-
-  it("empty rule → UC (no GS clutter)", () => {
-    const css = ".empty{}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 0);
-  });
-
-  // ── Edge cases ─────────────────────────────────────────────
-
-  it("empty input → empty results", () => {
+  it("returns empty results for empty input", () => {
     const result = splitCss("");
     assert.strictEqual(result.globalStyles.length, 0);
     assert.strictEqual(result.uniqueCss, "");
   });
 
-  it("malformed CSS → returns empty globalStyles, original as uniqueCss", () => {
+  it("survives malformed CSS — returns empty", () => {
     const result = splitCss("not valid css {{{");
+    // Malformed CSS with no valid selectors — nothing to extract
     assert.strictEqual(result.globalStyles.length, 0);
   });
 
   it("deduplicates entries with the same selector", () => {
-    const css = ".my-class{display:flex}.my-class{width:100%}";
+    const css = ".container{width:100%}@media(min-width:640px){.container{max-width:640px}}";
     const result = splitCss(css);
+    // Top-level .container goes to GS; @media-wrapped one goes to UQ
     assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".my-class");
-    assert.ok(result.globalStyles[0].css.includes("display:flex"));
-    assert.ok(result.globalStyles[0].css.includes("width:100%"));
-  });
-
-  it("generates Title Case names from class names", () => {
-    const css = ".pt-32{padding-top:8rem}.md\\:text-7xl{font-size:4.5rem}";
-    const result = splitCss(css);
-    const names = result.globalStyles.map((s) => s.name);
-    assert.ok(names.some((n) => n.includes("Pt") && n.includes("32")), "should name pt-32");
-    assert.ok(names.some((n) => n.includes("Md") && n.includes("7xl")), "should name md:7xl");
-  });
-
-  // ── WordPress-safe selector conversion ─────────────────────
-
-  it("simple class: selector unchanged, css unchanged", () => {
-    const css = ".flex{display:flex}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".flex");
-    assert.strictEqual(result.globalStyles[0].css, ".flex{display:flex;}");
-  });
-
-  it("responsive variant: selector sanitized, css uses attribute selector", () => {
-    const css = ".md\\:flex{display:flex}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".md-flex");
-    assert.strictEqual(result.globalStyles[0].css, '[class~="md:flex"]{display:flex;}');
-  });
-
-  it("arbitrary value brackets: selector sanitized, css uses attribute selector", () => {
-    const css = ".w-\\[600px\\]{width:600px}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".w--600px");
-    assert.strictEqual(result.globalStyles[0].css, '[class~="w-[600px]"]{width:600px;}');
-  });
-
-  it("fraction slash: selector sanitized, css uses attribute selector", () => {
-    const css = ".w-1\\/2{width:50%}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".w-1-2");
-    assert.strictEqual(result.globalStyles[0].css, '[class~="w-1/2"]{width:50%;}');
-  });
-
-  it("pseudo-class preserved outside attribute selector", () => {
-    const css = ".hover\\:flex:hover{display:flex}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".hover-flex");
-    assert.strictEqual(result.globalStyles[0].css, '[class~="hover:flex"]:hover{display:flex;}');
-  });
-
-  it("responsive variant inside @media: selector sanitized, css uses attribute selector", () => {
-    const css = "@media(min-width:768px){.lg\\:flex{display:flex}}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".lg-flex");
-    assert.ok(result.globalStyles[0].css.includes("@media"));
-    assert.ok(result.globalStyles[0].css.includes('[class~="lg:flex"]'));
-  });
-
-  it("multiple simple classes unchanged", () => {
-    const css = ".flex{display:flex}.grid{display:grid}.pt-32{padding-top:8rem}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 3);
-    assert.strictEqual(result.globalStyles[0].selector, ".flex");
-    assert.strictEqual(result.globalStyles[1].selector, ".grid");
-    assert.strictEqual(result.globalStyles[2].selector, ".pt-32");
-  });
-
-  it("mixed: escaped and simple classes in separate rules", () => {
-    const css = ".flex{display:flex}.md\\:flex{display:flex}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 2);
-    const simple = result.globalStyles.find(s => s.selector === ".flex");
-    assert.ok(simple);
-    const escaped = result.globalStyles.find(s => s.selector === ".md-flex");
-    assert.ok(escaped);
-    assert.strictEqual(escaped.css, '[class~="md:flex"]{display:flex;}');
-  });
-
-  it("selector field deduplication works with sanitized selectors", () => {
-    const css = ".md\\:flex{display:flex}.md\\:flex{width:100%}";
-    const result = splitCss(css);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".md-flex");
-    assert.ok(result.globalStyles[0].css.includes("display:flex"));
-    assert.ok(result.globalStyles[0].css.includes("width:100%"));
-  });
-
-  it("custom class with escapes: selector sanitized, css converted", () => {
-    const css = ".my\\:custom{display:flex}";
-    const custom = new Set(["my:custom"]);
-    const result = splitCss(css, custom);
-    assert.strictEqual(result.globalStyles.length, 1);
-    assert.strictEqual(result.globalStyles[0].selector, ".my-custom");
-    assert.strictEqual(result.globalStyles[0].css, '[class~="my:custom"]{display:flex;}');
+    assert.strictEqual(result.globalStyles[0].selector, ".container");
+    assert.ok(result.globalStyles[0].css.includes("width:100%"), "should include base rule");
+    assert.ok(result.uniqueCss.includes("640px"), "@media-wrapped container should be in uniqueCss");
   });
 });

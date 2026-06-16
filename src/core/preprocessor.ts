@@ -3,27 +3,6 @@
 // Prepares raw HTML for the DOM walker:
 //   1. Strip <nav>, <footer>, <script>, <link>
 //   2. Wrap <form>, body <style>, standalone <iconify-icon> in
-
-import * as cheerio from "cheerio";
-
-/**
- * Extract custom class names from <style> blocks in HTML.
- * Returns unescaped class names (no dot prefix).
- */
-export function extractCustomClassNames(html: string): Set<string> {
-  const classNames = new Set<string>();
-  const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-  let styleMatch;
-  while ((styleMatch = styleRegex.exec(html)) !== null) {
-    const css = styleMatch[1];
-    const classRegex = /^\.([a-zA-Z_-][\w-]*)\s*\{/gm;
-    let classMatch;
-    while ((classMatch = classRegex.exec(css)) !== null) {
-      classNames.add(classMatch[1]);
-    }
-  }
-  return classNames;
-}
 //      <div data-gb-wrap="core-html"> markers
 //   3. Scan <head> <style> blocks → classNameToProperties map
 //      + customCss string (pseudo-classes, keyframes, vendor prefixes)
@@ -31,11 +10,13 @@ export function extractCustomClassNames(html: string): Set<string> {
 import * as cheerio from "cheerio";
 import type { BlockStyles } from "./types.js";
 import { parseStyleString } from "./style-parser.js";
+import { extractTailwindConfig } from "./tailwind-resolver.js";
 
 export interface PreprocessResult {
   html: string;
   classNameToProperties: Map<string, BlockStyles>;
   customCss: string;
+  tailwindConfig: string | null;
   warnings: string[];
   navHtml: string | null;
   footerHtml: string | null;
@@ -77,7 +58,7 @@ function isCssCompatible(ruleSelector: string, ruleProperties: string): boolean 
  * - classNameToProperties: simple class definitions suitable for GB globalClasses
  * - customCss: everything else
  */
-export function scanHeadStyles($: cheerio.CheerioAPI): {
+function scanHeadStyles($: cheerio.CheerioAPI): {
   classNameToProperties: Map<string, BlockStyles>;
   customCss: string;
 } {
@@ -132,6 +113,9 @@ function isStandaloneIcon($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): boo
 
 export function preprocess(rawHtml: string, skipStripNavFooter?: boolean): PreprocessResult {
   const warnings: string[] = [];
+
+  // 0. Extract tailwind config BEFORE cheerio strips <script>
+  const tailwindConfig = extractTailwindConfig(rawHtml);
 
   const $ = cheerio.load(rawHtml);
 
@@ -194,6 +178,7 @@ export function preprocess(rawHtml: string, skipStripNavFooter?: boolean): Prepr
     html,
     classNameToProperties,
     customCss,
+    tailwindConfig,
     warnings,
     navHtml,
     footerHtml,

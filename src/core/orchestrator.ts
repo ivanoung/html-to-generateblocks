@@ -11,8 +11,10 @@ import { GlobalStylesCollector } from "./global-styles-collector.js";
 import { serializeBlocks, countBlocks } from "./serializer.js";
 import { validateBlocks } from "./validator.js";
 import { resetIds } from "./id-generator.js";
+import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
 import { resolveIconifyIcons } from "./iconify-resolver.js";
 import { analyzeSource, generateManualStepsReport } from "./manual-steps.js";
+import type { InlinerResult } from "./tailwind-inliner.js";
 import { checkContentLoss } from "./content-verifier.js";
 
 const OUTPUT_DIR = resolve(process.cwd(), "output");
@@ -21,7 +23,9 @@ export interface ConversionInput {
   rawHtml: string;
   pageName: string;
   projectDir?: string;
+  resolveCss?: boolean;
   skipShared?: boolean;  // skip styles.css, customizer, manual-steps
+  skipInliner?: boolean; // skip Tailwind inliner + iconify resolver (CSS already compiled)
   skipStripNavFooter?: boolean; // skip stripping nav/footer (for component conversion)
 }
 
@@ -31,6 +35,7 @@ export interface ConversionOutput {
   report: Record<string, unknown>;
   globalStyles: Record<string, unknown>;
   customCss: string;
+  tailwindCss: string;
 }
 
 export async function convert(
@@ -38,14 +43,27 @@ export async function convert(
 ): Promise<ConversionOutput> {
   resetIds();
 
+  // Stage 0: Compile Tailwind CSS (if present)
   let rawHtml = input.rawHtml;
-  const warnings: { code: string; message: string }[] = [];
+  const inlinerWarnings: { code: string; message: string }[] = [];
+  let compiledCss = "";
+  let outputCss = "";
 
-  // Stage 0: Resolve <iconify-icon> to inline SVG (always run)
+  if (!input.skipInliner && usesTailwind(rawHtml)) {
+    const compiled = await inlineTailwindStyles(rawHtml);
+    if (compiled.warnings.length > 0) {
+      inlinerWarnings.push(
+        ...compiled.warnings.map((m) => ({ code: "INLINER", message: m })),
+      );
+    }
+    compiledCss = compiled.stylesCss;
+  }
+
+  // Stage 0.5: Resolve <iconify-icon> to inline SVG (always run)
   const iconifyResult = await resolveIconifyIcons(rawHtml);
   rawHtml = iconifyResult.html;
   if (iconifyResult.failed.length > 0) {
-    warnings.push({
+    inlinerWarnings.push({
       code: "ICONIFY",
       message: `Could not resolve ${iconifyResult.failed.length} icon(s): ${iconifyResult.failed.join(", ")}`,
     });
@@ -70,7 +88,7 @@ export async function convert(
 
   // Collect all warnings
   const allWarnings = [
-    ...warnings,
+    ...inlinerWarnings,
     ...prepResult.warnings.map((w) => ({ code: "PREPROCESS", message: w })),
     ...walkResult.warnings.map((w) => ({ code: "WALK", message: w })),
   ];
@@ -140,12 +158,13 @@ export async function convert(
     "utf-8",
   );
 
-  // Single styles.css: custom CSS from source <style> blocks
-  const combinedCss = prepResult.customCss || "";
+  // Single styles.css: compiled Tailwind CSS + custom CSS
+  const combinedCss = [compiledCss, prepResult.customCss]
+    .filter(Boolean).join("\n");
   if (!input.skipShared) {
     if (combinedCss.trim()) {
       writeFileSync(
-        resolve(outDir, "pages", "styles.css"),
+        resolve(outDir, "styles.css"),
         combinedCss + "\n",
         "utf-8",
       );
@@ -168,5 +187,6 @@ export async function convert(
     report,
     globalStyles: {} as Record<string, unknown>,
     customCss: combinedCss,
+    tailwindCss: "",
   };
 }

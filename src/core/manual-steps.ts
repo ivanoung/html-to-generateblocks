@@ -150,42 +150,5 @@ export function generateManualStepsReport(steps: ManualSteps): string {
     lines.push("");
   }
 
-  // CSS Load Order (WPCodeBox guidance)
-  lines.push("============================================");
-  lines.push("  CSS LOAD ORDER — WPCodeBox Configuration");
-  lines.push("============================================");
-  lines.push("");
-  lines.push("For correct frontend specificity, load CSS in this order:");
-  lines.push("");
-  lines.push("STEP 1 — styles-unique.css (WPCodeBox)");
-  lines.push("  1. Go to WPCodeBox → Add New Snippet");
-  lines.push("  2. Name: \"GB Converter — Unique CSS\"");
-  lines.push("  3. Paste the ENTIRE contents of setup/styles-unique.css");
-  lines.push("  4. Type: CSS");
-  lines.push("  5. Loading: Frontend Header (wp_head)");
-  lines.push("  6. Priority: 10");
-  lines.push("  7. Save & Activate");
-  lines.push("  Contains: preflight resets, backgrounds, effects, colors, keyframes");
-  lines.push("");
-  lines.push("STEP 2 — global-styles.json (GB Pro)");
-  lines.push("  1. Go to GenerateBlocks → Global Styles");
-  lines.push("  2. Click Import");
-  lines.push("  3. Paste the ENTIRE contents of setup/global-styles.json");
-  lines.push("  4. Click Import (replaces all existing styles)");
-  lines.push("  WordPress loads these at priority 20 automatically.");
-  lines.push("  Contains: structural layout, sizing, spacing, borders, typography");
-  lines.push("");
-  lines.push("STEP 3 — styles.css (Optional fallback)");
-  lines.push("  1. Go to Appearance → Customize → Additional CSS");
-  lines.push("  2. Paste the contents of pages/styles.css");
-  lines.push("  3. This is the complete master CSS — only needed if");
-  lines.push("     styles-unique.css + global-styles.json don't cover everything.");
-  lines.push("");
-  lines.push("Load order of CSS on the frontend:");
-  lines.push("  Priority 10: styles-unique.css (preflight, backgrounds, effects)");
-  lines.push("  Priority 20: global-styles.json (structural + typography)");
-  lines.push("  Priority 25: GB block-specific CSS (per-block dynamic styles)");
-  lines.push("");
-
   return lines.join("\n");
 }

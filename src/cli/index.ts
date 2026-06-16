@@ -9,7 +9,7 @@
 //   report:update <name>       Update manual verification in report
 //   regression                 Check M1 fixtures against snapshots
 
-import { resolve, basename, extname, dirname } from "node:path";
+import { resolve, basename, extname } from "node:path";
 import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, rmdirSync } from "node:fs";
 import {
   runFixture, loadFixture, writeOutput,
@@ -18,8 +18,10 @@ import {
 } from "../runner/run-fixture.js";
 import type { Fixture, FixtureReport, ReportStatus } from "../core/types.js";
 import { convert } from "../core/orchestrator.js";
+import { inlineTailwindStyles, usesTailwind, inlineTailwindMultiPage } from "../core/tailwind-inliner.js";
 import { resolveIconifyIcons } from "../core/iconify-resolver.js";
 import { checkContentLoss } from "../core/content-verifier.js";
+import { compileTailwindOffline, extractTailwindConfig, validateTailwindConfig } from "../core/tailwind-resolver.js";
 import { splitCss } from "../core/css-splitter.js";
 import { extractScripts, deduplicateScripts, formatGlobalJs } from "../core/script-extractor.js";
 
@@ -141,8 +143,6 @@ async function main(): Promise<void> {
     console.log("  fixtures:run <name>        Run single fixture");
     console.log("  fixtures:run-all           Run all fixtures");
     console.log("  convert <input.html|dir/>  Convert HTML page(s) to GB blocks");
-    console.log("  render <output-dir|file>   Render GB output as standalone HTML");
-    console.log("  compare <src> <out-dir>    Screenshot diff source vs rendered");
     console.log("  regression                 Check M1 vs snapshots");
     process.exit(0);
   }
@@ -415,23 +415,68 @@ async function main(): Promise<void> {
       }
       const uniqueScripts = deduplicateScripts(allScripts);
 
-      // Write shared global.js
-      const outDir = resolve(process.cwd(), outputDir);
-      const globalJs = formatGlobalJs(uniqueScripts);
-      if (globalJs.trim()) {
-        mkdirSync(resolve(outDir, "setup"), { recursive: true });
-        writeFileSync(resolve(outDir, "setup", "global.js"), globalJs, "utf-8");
+      // Stage 2: Compile Tailwind CSS via CDN (Playwright, live DOM)
+      let inlinerCss = "";
+      const tailwindConfig = extractTailwindConfig(pageContents[0]?.html || "");
+
+      if (tailwindConfig) {
+        console.log(`  Compiling Tailwind CSS from ${files.length} page(s) via CDN...`);
+        const compiled = await inlineTailwindMultiPage(
+          pageContents.map((pc) => pc.html),
+          pageContents.map((pc) => pc.name),
+        );
+        if (compiled.warnings.length > 0) {
+          for (const w of compiled.warnings) console.log(`    [WARN] ${w}`);
+        }
+        inlinerCss = compiled.stylesCss;
+        console.log(`    ✓ Compiled (${(compiled.stylesCss.length / 1024).toFixed(1)} KB)`);
+
+        // Validate config for known patterns
+        const allPageClasses = new Set<string>();
+        for (const pc of pageContents) {
+          const classMatches = pc.html.match(/class="([^"]*)"/g) || [];
+          for (const m of classMatches) {
+            const cls = m.replace(/class="([^"]*)"/, "$1");
+            cls.split(/\s+/).forEach((c) => c && allPageClasses.add(c));
+          }
+        }
+        const configWarnings = validateTailwindConfig(tailwindConfig, [...allPageClasses]);
+        for (const w of configWarnings) {
+          if (w.type === "single_value_color") {
+            console.log(`    [WARN] Color "${w.color}" is a single hex value but ${w.missingClasses.length} shade variant classes are used`);
+            console.log(`           → Define "${w.color}" as an object with shades (50-950) instead of a single hex`);
+          }
+        }
+      } else {
+        console.log("  No tailwind.config found — skipping CSS compilation");
       }
 
-      // Convert each page
+      // Write shared styles.css (combined Tailwind + custom CSS from all pages)
+      // The first page's convert with skipInliner produces the custom CSS portion.
+      // We'll write the Tailwind CSS now and let the first page append custom CSS.
+      const outDir = resolve(process.cwd(), outputDir);
+      if (!existsSync(outDir)) {
+        const { mkdirSync } = await import("node:fs");
+        mkdirSync(outDir, { recursive: true });
+      }
+
+      // Stage 4: Convert each page with skipInliner=true
       let firstPage = true;
       for (const pc of pageContents) {
         const output = await convert({
           rawHtml: pc.html,
           pageName: pc.name,
           projectDir,
-          skipShared: !firstPage,
+          skipShared: !firstPage,  // shared files only from first page
+          skipInliner: true,       // CSS already compiled once for all pages
         });
+
+        // On first page: prepend Tailwind CSS to styles.css
+        if (firstPage && inlinerCss) {
+          const cssPath = resolve(outDir, "styles.css");
+          const existing = existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "";
+          writeFileSync(cssPath, inlinerCss + "\n" + existing, "utf-8");
+        }
 
         const lossCheck = checkContentLoss(pc.html, output.blockHtml);
         const lossFlag = lossCheck.warning ? ` ⚠ LOSS ${Math.round(lossCheck.lossPercent)}%` : "";
@@ -451,16 +496,7 @@ async function main(): Promise<void> {
         mkdirSync(setupDir, { recursive: true });
 
         const fullCss = readFileSync(cssPath, "utf-8");
-
-        // Collect custom class names from the source <style> blocks
-        const { extractCustomClassNames } = await import("../core/preprocessor.js");
-        const customClassNames = extractCustomClassNames(pageContents[0].html);
-        for (let i = 1; i < pageContents.length; i++) {
-          const names = extractCustomClassNames(pageContents[i].html);
-          names.forEach((n) => customClassNames.add(n));
-        }
-
-        const split = splitCss(fullCss, customClassNames);
+        const split = splitCss(fullCss);
         writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(split.globalStyles, null, 2) + "\n", "utf-8");
         writeFileSync(resolve(setupDir, "styles-unique.css"), split.uniqueCss + "\n", "utf-8");
 
@@ -494,6 +530,7 @@ async function main(): Promise<void> {
           pageName: "nav",
           projectDir: projectDir ? `${projectDir}/components/nav` : undefined,
           skipShared: true,
+          skipInliner: true,
           skipStripNavFooter: true,
         });
         // Flatten: components/nav/pages/nav.html → components/nav/nav.html
@@ -518,6 +555,7 @@ async function main(): Promise<void> {
           pageName: "footer",
           projectDir: projectDir ? `${projectDir}/components/footer` : undefined,
           skipShared: true,
+          skipInliner: true,
           skipStripNavFooter: true,
         });
         const nestedPages = resolve(footerDir, "pages");
@@ -586,75 +624,6 @@ async function main(): Promise<void> {
       console.log(`  Styles CSS: ${outputPrefix}styles.css (${lines} rules)`);
     }
     console.log("");
-    return;
-  }
-
-  // ── render ─────────────────────────────────────────────
-  if (cmd === "render") {
-    const { renderStandalone } = await import("../core/renderer.js");
-    const targetPath = resolve(process.cwd(), args[1] || "output/");
-    const sourceIdx = args.indexOf("--source");
-    const sourcePath = sourceIdx >= 0 && args[sourceIdx + 1]
-      ? resolve(process.cwd(), args[sourceIdx + 1]) : undefined;
-    const noJs = args.includes("--no-js");
-    const sourceHtml = sourcePath && existsSync(sourcePath) ? readFileSync(sourcePath, "utf-8") : undefined;
-
-    if (existsSync(targetPath) && statSync(targetPath).isFile() && targetPath.endsWith(".html")) {
-      // Single page render
-      const pageName = basename(targetPath, ".html");
-      const projectDir = resolve(dirname(targetPath), "..");
-      const html = renderStandalone(projectDir, pageName, sourceHtml, !noJs);
-      const outPath = resolve(dirname(targetPath), `${pageName}.rendered.html`);
-      writeFileSync(outPath, html, "utf-8");
-      console.log(`Rendered: ${outPath}`);
-    } else if (existsSync(targetPath) && statSync(targetPath).isDirectory()) {
-      // Directory: render all pages
-      const pagesDir = resolve(targetPath, "pages");
-      if (!existsSync(pagesDir)) {
-        console.error(`No pages/ directory found in ${targetPath}`);
-        process.exit(1);
-      }
-      const pageFiles = readdirSync(pagesDir).filter(f =>
-        f.endsWith(".html") && !f.endsWith(".rendered.html")
-      );
-      for (const file of pageFiles) {
-        const pageName = basename(file, ".html");
-        const html = renderStandalone(targetPath, pageName, sourceHtml, !noJs);
-        const outPath = resolve(pagesDir, `${pageName}.rendered.html`);
-        writeFileSync(outPath, html, "utf-8");
-        console.log(`Rendered: ${outPath}`);
-      }
-    } else {
-      console.error(`Target not found: ${targetPath}`);
-      process.exit(1);
-    }
-    return;
-  }
-
-  // ── compare ─────────────────────────────────────────────
-  if (cmd === "compare") {
-    const { runCompare } = await import("./compare.js");
-    const sourcePath = resolve(process.cwd(), args[1] || "");
-    const outputDir = resolve(process.cwd(), args[2] || "");
-    const viewportArg = args.includes("--viewport") ? args[args.indexOf("--viewport") + 1] : "1440x900";
-    const waitArg = args.includes("--wait") ? parseInt(args[args.indexOf("--wait") + 1]) : undefined;
-    const thresholdArg = args.includes("--threshold") ? parseFloat(args[args.indexOf("--threshold") + 1]) : undefined;
-    const golden = args.includes("--golden");
-    const viewportParts = viewportArg.split("x");
-
-    if (!sourcePath || !outputDir) {
-      console.error("Usage: compare <source.html> <output-dir> [--viewport WxH] [--wait N] [--threshold N] [--golden]");
-      process.exit(1);
-    }
-
-    await runCompare({
-      sourcePath,
-      outputDir,
-      viewport: { width: parseInt(viewportParts[0]), height: parseInt(viewportParts[1]) },
-      waitMs: waitArg,
-      threshold: thresholdArg,
-      golden,
-    });
     return;
   }
 
