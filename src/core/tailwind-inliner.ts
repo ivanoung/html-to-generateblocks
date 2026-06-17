@@ -9,6 +9,8 @@
 
 import { chromium, type Browser, type Page } from "playwright";
 import { extractTailwindConfig } from "./tailwind-resolver.js";
+import { emptyDossier, type DesignDossier } from "./design-dossier.js";
+import { buildExtractionScript } from "./design-extractor.js";
 
 // ── Detection ──────────────────────────────────────────
 
@@ -31,6 +33,8 @@ export interface InlinerResult {
   stylesCss: string;
   classNames: string[];  // all class names found in the page
   warnings: string[];
+  /** Design evidence extracted from the live rendered page */
+  dossier: DesignDossier;
 }
 
 // ── Main Entry Point ────────────────────────────────────
@@ -356,15 +360,27 @@ async function compileWithPlaywright(html: string): Promise<InlinerResult> {
       };
     });
 
+    // ── Layer 5: Extract design evidence from live page ────
+    let dossier: DesignDossier;
+    try {
+      const designScript = buildExtractionScript();
+      const designJson = await page.evaluate(designScript);
+      dossier = JSON.parse(designJson);
+    } catch (extractErr: any) {
+      warnings.push(`Design extraction failed: ${extractErr.message}`);
+      dossier = emptyDossier();
+    }
+
     return {
       html,
       stylesCss: payload.css,
       classNames: payload.classNames,
       warnings,
+      dossier,
     };
   } catch (err: any) {
     warnings.push(`Tailwind compiler failed: ${err.message}`);
-    return { html, stylesCss: "", classNames: [], warnings };
+    return { html, stylesCss: "", classNames: [], warnings, dossier: emptyDossier() };
   } finally {
     if (browser) await browser.close();
   }
