@@ -21,6 +21,7 @@ function makeBasicDossier(): DesignDossier {
       { selector: "h1", tagName: "h1", fontSize: "36px", fontWeight: "700", lineHeight: "1.2", fontFamily: "Inter, sans-serif", textTransform: "none", letterSpacing: "-0.01em" },
     ],
     tailwindConfig: null,
+    classFrequency: {},
     extracted: true,
     warnings: [],
   };

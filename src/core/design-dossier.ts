@@ -92,6 +92,8 @@ export interface DesignDossier {
     fontFamily: Record<string, string[]>;
     maxWidth: Record<string, string>;
   } | null;
+  /** Semantic class usage: "bg-primary" → 87, "font-mono" → 40, etc. */
+  classFrequency: Record<string, number>;
   /** true if extraction ran without fatal errors */
   extracted: boolean;
   /** transparency notes: what was missed, why a value was chosen */
@@ -108,6 +110,7 @@ export function emptyDossier(): DesignDossier {
     googleFonts: [],
     typographySamples: [],
     tailwindConfig: null,
+    classFrequency: {},
     extracted: false,
     warnings: [],
   };

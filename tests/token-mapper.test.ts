@@ -31,26 +31,57 @@ function makeMinoDossier(): DesignDossier {
       fontFamily: { sans: ['"DM Sans"', "sans-serif"], display: ["Anybody", "sans-serif"] },
       maxWidth: { container: "1600px" },
     },
+    classFrequency: {
+      "bg-background": 200, "bg-surface": 87, "bg-primary": 45,
+      "text-primary": 30, "text-slate": 120,
+    },
     extracted: true,
     warnings: [],
   };
 }
 
 describe("mapTokensHeuristic", () => {
-  it("picks background from body-bg role", () => {
+  // ── Colors ──────────────────────────────────────────────
+
+  it("picks background from tailwind.config", () => {
     assert.strictEqual(mapTokensHeuristic(makeMinoDossier()).backgroundColor, "#eeeeee");
   });
 
-  it("picks primary from CSS custom property --primary", () => {
+  it("picks primary from tailwind.config (priority 1)", () => {
     const tokens = mapTokensHeuristic(makeMinoDossier());
     assert.strictEqual(tokens.linkColor, "#c5ffd6");
     assert.strictEqual(tokens.globalColors.find((c) => c.slug === "primary")?.color, "#c5ffd6");
   });
 
-  it("picks secondary from CSS custom property --secondary", () => {
+  it("picks secondary from tailwind.config", () => {
     const tokens = mapTokensHeuristic(makeMinoDossier());
     assert.strictEqual(tokens.globalColors.find((c) => c.slug === "secondary")?.color, "#3d3b4f");
   });
+
+  it("accent equals primary", () => {
+    const tokens = mapTokensHeuristic(makeMinoDossier());
+    const accent = tokens.globalColors.find((c) => c.slug === "accent");
+    const primary = tokens.globalColors.find((c) => c.slug === "primary");
+    assert.strictEqual(accent?.color, primary?.color);
+  });
+
+  it("includes all config-declared colors (no artificial cap)", () => {
+    const tokens = mapTokensHeuristic(makeMinoDossier());
+    const slugs = tokens.globalColors.map((c) => c.slug);
+    assert.ok(slugs.includes("background"));
+    assert.ok(slugs.includes("primary"));
+    assert.ok(slugs.includes("secondary"));
+    assert.ok(slugs.includes("slate"), "slate should be included from config");
+  });
+
+  it("includes colors from high-frequency classes", () => {
+    const dossier = makeMinoDossier();
+    // surface has 87 uses via class, should make it in
+    const tokens = mapTokensHeuristic(dossier);
+    assert.ok(tokens.globalColors.length >= 5, `expected >=5 colors, got ${tokens.globalColors.length}`);
+  });
+
+  // ── Typography ──────────────────────────────────────────
 
   it("picks body font from body role", () => {
     const tokens = mapTokensHeuristic(makeMinoDossier());
@@ -66,30 +97,31 @@ describe("mapTokensHeuristic", () => {
     assert.ok(heading.fontFamily.includes("Anybody"));
   });
 
-  it("accent equals primary", () => {
-    const tokens = mapTokensHeuristic(makeMinoDossier());
-    const accent = tokens.globalColors.find((c) => c.slug === "accent");
-    const primary = tokens.globalColors.find((c) => c.slug === "primary");
-    assert.strictEqual(accent?.color, primary?.color);
+  it("includes additional config fonts (mono, script, serif)", () => {
+    const dossier = makeMinoDossier();
+    dossier.tailwindConfig!.fontFamily.mono = ['"Space Mono"', "monospace"];
+    dossier.tailwindConfig!.fontFamily.script = ['"Nanum Pen Script"', "cursive"];
+    const tokens = mapTokensHeuristic(dossier);
+    assert.ok(tokens.typography.length >= 3, `expected >=3 typography entries, got ${tokens.typography.length} — should include body + headings + mono`);
   });
+
+  // ── Fallback ────────────────────────────────────────────
 
   it("falls back to defaults on empty dossier", () => {
     const empty = makeMinoDossier();
     empty.colors = []; empty.fonts = []; empty.containers = [];
     empty.customProperties = []; empty.tailwindConfig = null;
     empty.typographySamples = [];
+    empty.classFrequency = {};
     const tokens = mapTokensHeuristic(empty);
     assert.strictEqual(tokens.backgroundColor, "#ffffff");
     assert.strictEqual(tokens.containerWidth, 1600);
-    assert.ok(tokens.globalColors.length >= 1);
+    assert.ok(tokens.globalColors.length >= 1, "should have at least accent color");
   });
 
-  it("includes background, primary, secondary, accent in global_colors", () => {
-    const tokens = mapTokensHeuristic(makeMinoDossier());
-    const slugs = tokens.globalColors.map((c) => c.slug);
-    assert.ok(slugs.includes("background"));
-    assert.ok(slugs.includes("primary"));
-    assert.ok(slugs.includes("secondary"));
-    assert.ok(slugs.includes("accent"));
+  // ── Container ───────────────────────────────────────────
+
+  it("picks container width from tailwind.config", () => {
+    assert.strictEqual(mapTokensHeuristic(makeMinoDossier()).containerWidth, 1600);
   });
 });

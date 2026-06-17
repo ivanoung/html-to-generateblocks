@@ -303,6 +303,7 @@ export function buildExtractionScript(): string {
       googleFonts: [],
       typographySamples: [],
       tailwindConfig: null,
+      classFrequency: {},
       extracted: true,
       warnings: []
     };
@@ -330,7 +331,7 @@ export function buildExtractionScript(): string {
 
         var existing = colorMap.get(hex);
         if (existing) {
-          existing.count++;
+          existing.usageCount++;
           if (existing.roles.length < 5) {
             var role = idx === 0 ? classifyBgRole(el) : classifyTextRole(el);
             if (existing.roles.indexOf(role) === -1) existing.roles.push(role);
@@ -341,7 +342,7 @@ export function buildExtractionScript(): string {
         } else {
           colorMap.set(hex, {
             hex: hex,
-            count: 1,
+            usageCount: 1,
             roles: [idx === 0 ? classifyBgRole(el) : classifyTextRole(el)],
             examples: [getElementPath(el)]
           });
@@ -350,7 +351,7 @@ export function buildExtractionScript(): string {
     }
 
     result.colors = Array.from(colorMap.values()).sort(function(a, b) {
-      return b.count - a.count;
+      return b.usageCount - a.usageCount;
     });
 
     // ── 2. Font families on semantic elements ──────────────
@@ -402,10 +403,13 @@ export function buildExtractionScript(): string {
     document.querySelectorAll('link[rel="stylesheet"]').forEach(function(link) {
       var href = link.getAttribute('href') || '';
       if (href.indexOf('fonts.googleapis.com') !== -1) {
-        result.googleFonts.push({
-          family: extractGoogleFontFamily(href),
-          variants: extractGoogleFontVariants(href),
-          href: href
+        var families = extractGoogleFontFamilies(href);
+        families.forEach(function(f) {
+          result.googleFonts.push({
+            family: f,
+            variants: extractGoogleFontVariants(href),
+            href: href
+          });
         });
       }
     });
@@ -449,6 +453,21 @@ export function buildExtractionScript(): string {
         textTransform: cs.textTransform, letterSpacing: cs.letterSpacing
       });
     });
+
+    // ── 7. Class frequency (semantic Tailwind classes) ─────
+    var classFreq = {};
+    var allClassEls = document.querySelectorAll('[class]');
+    for (var ci = 0; ci < Math.min(allClassEls.length, 1000); ci++) {
+      var clsStr = allClassEls[ci].className;
+      if (typeof clsStr === 'string') {
+        clsStr.split(/\s+/).forEach(function(c) {
+          if (/^(?:bg|text|border|font|ring|outline|fill|stroke|shadow|decoration|from|via|to|placeholder|caret|accent|divide)-/.test(c)) {
+            classFreq[c] = (classFreq[c] || 0) + 1;
+          }
+        });
+      }
+    }
+    result.classFrequency = classFreq;
 
     } catch(e) {
       result.warnings.push('Extraction error: ' + e.message);
@@ -571,9 +590,17 @@ export function buildExtractionScript(): string {
       return sel;
     }
 
-    function extractGoogleFontFamily(href) {
-      var m = href.match(/family=([^&:]+)/);
-      return m ? decodeURIComponent(m[1].replace(/\\+/g, ' ')) : '';
+    function extractGoogleFontFamilies(href) {
+      var families = [];
+      var re = /family=([^&]+)/g;
+      var m;
+      while ((m = re.exec(href)) !== null) {
+        var name = m[1];
+        var colonIdx = name.indexOf(':');
+        if (colonIdx !== -1) name = name.substring(0, colonIdx);
+        families.push(decodeURIComponent(name.replace(/\\+/g, ' ')));
+      }
+      return families.length > 0 ? families : [''];
     }
 
     function extractGoogleFontVariants(href) {
