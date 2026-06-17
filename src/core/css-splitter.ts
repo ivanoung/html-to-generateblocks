@@ -1,32 +1,40 @@
 // ── CSS Splitter ───────────────────────────────────────────
 //
-// Splits compiled CSS into unique CSS (non-class rules: preflight,
-// element selectors, @keyframes, @media, pseudo-elements, transforms,
-// filters) and the structured counterpart via global-styles-data.
+// Splits compiled CSS into three layers:
+//   1. structuredStyles  → editable GenerateBlocks Global Styles
+//   2. utilityCss        → tailwind-utilities.css (static Tailwind utilities)
+//   3. uniqueCss         → styles-unique.css (non-utility raw CSS:
+//                          element selectors, @keyframes, @media,
+//                          unsupported properties, compound selectors)
 //
-// All classification is delegated to CssClassifier. This module is
-// a thin adapter for the styles-unique.css output file.
+// All classification is delegated to CssClassifier.
 
 import { CssClassifier } from "./css-classifier.js";
 
 export interface CssSplitResult {
   globalStyles: Array<{ selector: string; name: string; css: string }>;
+  utilityCss: string;
   uniqueCss: string;
 }
 
 /**
  * Split compiled CSS using the canonicalized PostCSS classifier.
- * Returns styles-unique.css content and a rejection log string.
+ * Returns tailwind-utilities.css content, styles-unique.css content,
+ * and a rejection log string.
  */
 export function splitCss(compiledCss: string): {
+  utilityCss: string;
   uniqueCss: string;
   rejectionJson: string;
 } {
   const result = CssClassifier.classify(compiledCss);
-  const totalRules = result.structuredStyles.length +
-    (result.rawCss.match(/\{/g) || []).length;
+  const totalRules =
+    result.structuredStyles.length +
+    (result.utilityCss.match(/\{/g) || []).length +
+    (result.uniqueCss.match(/\{/g) || []).length;
   return {
-    uniqueCss: result.rawCss,
+    utilityCss: result.utilityCss,
+    uniqueCss: result.uniqueCss,
     rejectionJson: result.rejectionLog.toJSON(totalRules),
   };
 }

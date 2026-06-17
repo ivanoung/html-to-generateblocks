@@ -98,15 +98,19 @@ export function prepareVerification(
       warnings.push("styles.css contains relative url() references — these may not resolve when injected as inline CSS");
     }
   } else {
-    // Pass 2: combined global-styles.json CSS + styles-unique.css
+    // Pass 2: combined global-styles.json CSS + tailwind-utilities.css + styles-unique.css
     const setupDir = resolve(outDir, "setup");
 
     // Read global-styles.json and extract CSS from structured entries
     const gsPath = resolve(setupDir, "global-styles.json");
+    const utilitiesPath = resolve(setupDir, "tailwind-utilities.css");
     const uniquePath = resolve(setupDir, "styles-unique.css");
 
     if (!existsSync(gsPath)) {
       throw new Error(`global-styles.json not found: ${gsPath}. Run Phase 2 first.`);
+    }
+    if (!existsSync(utilitiesPath)) {
+      throw new Error(`tailwind-utilities.css not found: ${utilitiesPath}. Run Phase 2 first.`);
     }
     if (!existsSync(uniquePath)) {
       throw new Error(`styles-unique.css not found: ${uniquePath}. Run Phase 2 first.`);
@@ -126,9 +130,10 @@ export function prepareVerification(
       }
     }
 
+    const utilityCss = readFileSync(utilitiesPath, "utf-8");
     const uniqueCss = readFileSync(uniquePath, "utf-8");
-    cssPayload = gsCssParts.join("\n") + "\n" + uniqueCss;
-    cssSource = "global-styles.json + styles-unique.css";
+    cssPayload = gsCssParts.join("\n") + "\n" + utilityCss + "\n" + uniqueCss;
+    cssSource = "global-styles.json + tailwind-utilities.css + styles-unique.css";
   }
 
   return { pages, cssPayload, cssSource, warnings };

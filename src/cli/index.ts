@@ -147,7 +147,7 @@ async function main(): Promise<void> {
     console.log("  fixtures:run-all           Run all fixtures");
     console.log("  convert <input.html|dir/>  Convert HTML page(s) to GB blocks");
     console.log("    --skip-shared            Skip shared files (styles.css, manual-steps)");
-    console.log("    --split                  Also generate setup/ (global-styles.json + styles-unique.css + rejected.json)");
+    console.log("    --split                  Also generate setup/ (global-styles.json + tailwind-utilities.css + styles-unique.css + rejected.json)");
     console.log("  regression                 Check M1 vs snapshots");
     process.exit(0);
   }
@@ -528,7 +528,10 @@ async function main(): Promise<void> {
         "utf-8",
       );
 
-      // Phase 2: Split styles.css into global-styles.json + styles-unique.css
+      // Phase 2: Split styles.css into three layers:
+      //   - global-styles.json / global-styles-import.json
+      //   - tailwind-utilities.css (static Tailwind utilities)
+      //   - styles-unique.css (non-utility raw CSS)
       // Only runs when --split flag is passed. Monolithic styles.css at
       // project root is always the canonical pixel-perfect fallback.
       const doSplit = args.includes("--split");
@@ -545,8 +548,10 @@ async function main(): Promise<void> {
           name: s.name,
           styles: s.styles,
         }));
+
+        // Unique (non-utility) raw CSS only — utilities live in their own file
         const rawSelectors = [...new Set(
-          [...result.rawCss.matchAll(/^([.#][^\s{]+)\s*\{/gm)].map((m) => m[1])
+          [...result.uniqueCss.matchAll(/^([.#][^\s{]+)\s*\{/gm)].map((m) => m[1])
         )];
         const rawEntries = rawSelectors.map((sel) => ({
           selector: sel,
@@ -554,12 +559,17 @@ async function main(): Promise<void> {
           styles: {} as Record<string, unknown>,
           raw: true,
         }));
+
         const manifest = buildGlobalStylesManifest(structuredStyles, rawEntries, []);
         writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(manifest, null, 2) + "\n", "utf-8");
-        writeFileSync(resolve(setupDir, "styles-unique.css"), result.rawCss, "utf-8");
-        writeFileSync(resolve(setupDir, "rejected.json"), result.rejectionLog.toJSON(
-          structuredStyles.length + rawEntries.length,
-        ), "utf-8");
+        writeFileSync(resolve(setupDir, "tailwind-utilities.css"), result.utilityCss, "utf-8");
+        writeFileSync(resolve(setupDir, "styles-unique.css"), result.uniqueCss, "utf-8");
+
+        const totalRules =
+          structuredStyles.length +
+          rawEntries.length +
+          (result.utilityCss.match(/\{/g) || []).length;
+        writeFileSync(resolve(setupDir, "rejected.json"), result.rejectionLog.toJSON(totalRules), "utf-8");
 
         // GB-importable format: flat array of {selector, css, data}
         const importFormat = generateGbImportFormat(result.structuredStyles);
@@ -570,6 +580,8 @@ async function main(): Promise<void> {
         );
 
         console.log(`  Global Styles: ${structuredStyles.length} structured (editable), ${rawEntries.length} raw (CSS-only)`);
+        console.log(`  Tailwind CSS:  setup/tailwind-utilities.css`);
+        console.log(`  Unique CSS:    setup/styles-unique.css`);
         console.log(`  Rejections:    setup/rejected.json`);
         console.log(`  Import:        setup/global-styles-import.json`);
       }

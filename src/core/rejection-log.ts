@@ -4,7 +4,7 @@ export interface RejectionEntry {
   property?: string;
   detail?: string;
   severity: "expected" | "warning" | "error";
-  destination: "styles-unique.css";
+  destination: "styles-unique.css" | "tailwind-utilities.css";
 }
 
 export interface RejectionJson {
@@ -28,7 +28,7 @@ export class RejectionLog {
     reason: string,
     property?: string,
     severity: RejectionEntry["severity"] = "expected",
-    destination: "styles-unique.css" = "styles-unique.css",
+    destination: RejectionEntry["destination"] = "styles-unique.css",
     detail?: string,
   ): void {
     this.entries.push({ selector, reason, property, severity, destination, detail });

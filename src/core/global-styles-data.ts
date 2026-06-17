@@ -43,9 +43,11 @@ export function generateGlobalStylesData(compiledCss: string): {
     styles: s.styles,
   }));
 
+  // Raw entries come from uniqueCss only — utilityCss is a separate static file
+  // and does not appear as editable Global Styles.
   const raw: GbStyleDataEntry[] = [];
   const rawSelectors = new Set<string>();
-  const selectorMatches = result.rawCss.matchAll(/^([.#][^\s{]+)\s*\{/gm);
+  const selectorMatches = result.uniqueCss.matchAll(/^([.#][^\s{]+)\s*\{/gm);
   for (const m of selectorMatches) {
     rawSelectors.add(m[1]);
   }

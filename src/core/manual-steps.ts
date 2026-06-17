@@ -73,14 +73,26 @@ const STEPS: Step[] = [
     ],
   },
   {
+    id: "import-css-utilities",
+    category: "import",
+    render: () => [
+      "Add setup/tailwind-utilities.css via WPCodeBox.",
+      "This loads all Tailwind utility classes (mt-4,",
+      "flex, text-slate-700, hover:opacity-80, etc.)",
+      "that the block markup references via class=\"...\".",
+      "Load this BEFORE styles-unique.css if ordering matters.",
+    ],
+  },
+  {
     id: "import-css-unique",
     category: "import",
     render: () => [
       "Add setup/styles-unique.css via WPCodeBox (NOT",
       "Additional CSS — WordPress strips * selectors,",
       "escaped colons, and some pseudo-elements).",
-      "This covers: preflight reset, @keyframes,",
-      "@media blocks, transforms, filters, gradients.",
+      "This covers non-utility CSS: @keyframes,",
+      "@media blocks, transforms, filters, gradients,",
+      "and raw declarations from design components.",
     ],
   },
   {
@@ -241,7 +253,8 @@ export function generateManualStepsReport(ctx: ManualStepsContext): string {
 function stepTitle(id: string): string {
   const titles: Record<string, string> = {
     "import-global-styles": "Import Global Styles",
-    "import-css-unique":    "Add Remaining CSS",
+    "import-css-utilities": "Add Tailwind Utilities CSS",
+    "import-css-unique":    "Add Remaining Unique CSS",
     "import-js":            "Add JavaScript",
     "import-customizer":    "Import Customizer Settings",
     "enqueue-fonts":        "Enqueue Google Fonts",

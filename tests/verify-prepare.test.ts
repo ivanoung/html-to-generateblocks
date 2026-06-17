@@ -113,6 +113,7 @@ describe("prepareVerification", () => {
         { selector: ".text-lg", name: "Text Lg", styles: { fontSize: "1.125rem", lineHeight: "1.75rem" }, raw: false },
       ],
     }), "utf-8");
+    writeFileSync(resolve(setupDir, "tailwind-utilities.css"), ".pt-4 { padding-top: 1rem; }\n", "utf-8");
     writeFileSync(resolve(setupDir, "styles-unique.css"), "@keyframes fade { 0% { opacity: 0; } }\n", "utf-8");
 
     // Pass 1: styles.css
@@ -135,9 +136,10 @@ describe("prepareVerification", () => {
     const result2 = prepareVerification(session2);
 
     assert.strictEqual(result2.pages.length, 2, "should have 2 pages");
-    assert.strictEqual(result2.cssSource, "global-styles.json + styles-unique.css", "should use split CSS source");
+    assert.strictEqual(result2.cssSource, "global-styles.json + tailwind-utilities.css + styles-unique.css", "should use split CSS source");
     assert.ok(result2.cssPayload.includes(".bg-blue"), "CSS should include .bg-blue from global-styles.json");
     assert.ok(result2.cssPayload.includes("font-size: 1.125rem"), "CSS should include font-size from global-styles.json");
+    assert.ok(result2.cssPayload.includes(".pt-4"), "CSS should include .pt-4 from tailwind-utilities.css");
     assert.ok(result2.cssPayload.includes("@keyframes fade"), "CSS should include keyframes from styles-unique.css");
   });
 });

@@ -17,9 +17,14 @@ export { disablePreflight } from "./tailwind-resolver.js";
 /** Variant prefix chain: hover:, focus:, sm:, dark:, group-hover:, etc. */
 const VARIANT =
   "(?:hover|focus|active|focus-within|focus-visible|group-hover|group-focus|" +
-  "peer-checked|peer-hover|first|last|odd|even|visited|target|disabled|" +
+  "peer-checked|peer-hover|peer-focus|peer-invalid|peer-required|peer-disabled|" +
+  "first|last|odd|even|visited|target|disabled|enabled|" +
   "checked|indeterminate|required|valid|invalid|autofill|placeholder-shown|" +
-  "open|motion-safe|motion-reduce|dark|rtl|ltr|sm|md|lg|xl|2xl|" +
+  "open|close|in-range|out-of-range|read-only|" +
+  "selection|placeholder|file|marker|backdrop|before|after|" +
+  "details|default|" +
+  "motion-safe|motion-reduce|dark|rtl|ltr|" +
+  "sm|md|lg|xl|2xl|" +
   "min-\\[[^\\]]+\\]|max-\\[[^\\]]+\\]|portrait|landscape|contrast-more|" +
   "contrast-less|supports-\\[[^\\]]+\\]|aria-\\[[^\\]]+\\]|data-\\[[^\\]]+\\])";
 const VARIANT_CHAIN = `(?:${VARIANT}:)*`;
@@ -30,10 +35,10 @@ function utility(...suffixes: string[]): RegExp {
 }
 
 const UTILITY_PATTERNS: RegExp[] = [
-  // Spacing
+  // Spacing (negative values handled in isTailwindUtility)
   utility("[mp][tblrxy]?-", "space-[xy]?-", "gap-", "inset-[xy]?-"),
   // Sizing
-  utility("[wh]-(?:auto|full|screen|min|max|fit|\\d|\\[)", "min-[wh]-", "max-[wh]-", "size-"),
+  utility("[wh]-(?:auto|full|screen|min|max|fit|px|\\d|\\[)", "min-[wh]-", "max-[wh]-", "size-"),
   // Typography
   utility(
     "text-(?:xs|sm|base|lg|xl|[2-9]xl|left|center|right|justify|start|end|wrap|nowrap|balance|pretty|clip|ellipsis|\\[)",
@@ -54,6 +59,7 @@ const UTILITY_PATTERNS: RegExp[] = [
   // Flex/Grid
   utility(
     "flex-(?:row|col|wrap|nowrap|1|auto|initial|none|shrink|grow)",
+    "shrink", "grow",
     "items-", "justify-(?:start|end|center|between|around|evenly|normal|stretch)",
     "justify-items-", "justify-self-", "place-(?:content|items|self)-", "self-",
     "content-", "order-", "grid-cols-", "grid-rows-", "col-", "row-",
@@ -61,11 +67,12 @@ const UTILITY_PATTERNS: RegExp[] = [
   ),
   // Overflow
   utility("overflow-"),
-  // Effects
+  // Effects / Borders
   utility(
     "opacity-", "shadow-", "rounded(?:-[tblr][lrb]?)?", "blur-", "brightness-",
     "contrast-", "grayscale", "invert", "sepia", "saturate-", "hue-rotate-",
     "drop-shadow-", "backdrop-", "mix-blend-", "bg-blend-",
+    "border(?:-[tblrxy](?:-[0-9]+)?|-[0-9]+)?$", "divide-[xy]-",
   ),
   // Transforms
   utility("scale-", "rotate-", "translate-[xy]-", "skew-[xy]-", "origin-"),
@@ -102,6 +109,15 @@ export function isTailwindUtility(className: string): boolean {
     if (pattern.test(c)) return true;
   }
 
+  // Tailwind negative values: -mx-4, -translate-x-4, -rotate-45, -space-x-4
+  // Strip a single leading minus and re-test the rest.
+  if (c.startsWith("-") && c.length > 1) {
+    const positive = c.slice(1);
+    for (const pattern of UTILITY_PATTERNS) {
+      if (pattern.test(positive)) return true;
+    }
+  }
+
   // Note: we intentionally do NOT use a catch-all for lowercase hyphenated
   // names — it would false-positive on custom design classes like
   // .blueprint-bg, .ruler-x, .hover-shadow-md. The explicit patterns above
@@ -120,7 +136,10 @@ export interface StructuredStyle {
 
 export interface ClassificationResult {
   structuredStyles: StructuredStyle[];
-  rawCss: string;
+  /** Non-utility raw CSS: element selectors, @rules, unsupported props, compound selectors */
+  uniqueCss: string;
+  /** Tailwind utility classes routed to static CSS */
+  utilityCss: string;
   rejectionLog: RejectionLog;
 }
 
@@ -232,19 +251,20 @@ export class CssClassifier {
   static classify(css: string): ClassificationResult {
     const root = postcss.parse(css, { from: undefined });
     const structured: StructuredStyle[] = [];
-    const rawParts: string[] = [];
+    const uniqueParts: string[] = [];
+    const utilityParts: string[] = [];
     const rejectionLog = new RejectionLog();
     const seenRawSelectors = new Set<string>();
 
-    // Process root-level children only (skip @media internals — those go to raw CSS wholesale)
+    // Process root-level children only (skip @media internals — those go to unique CSS wholesale)
     function processNodes(nodes: any[]) {
       for (const node of nodes) {
         if (node.type === "rule") {
           processRule(node as postcss.Rule);
         } else if (node.type === "atrule") {
           const atRule = node as postcss.AtRule;
-          // @media, @supports, @layer, @container, @import: entire block → raw CSS
-          rawParts.push(atRule.toString());
+          // @media, @supports, @layer, @container, @import: entire block → unique CSS
+          uniqueParts.push(atRule.toString());
           if (atRule.name === "keyframes") {
             rejectionLog.add(`@keyframes ${atRule.params}`, "ATRULE_KEYFRAMES", undefined, "expected");
           }
@@ -255,33 +275,33 @@ export class CssClassifier {
     function processRule(rule: postcss.Rule) {
       const selector = rule.selector.trim();
 
-      // Route non-class selectors to raw CSS
+      // Route non-class selectors to unique CSS (element selectors like body, h1, html)
       if (!selector.startsWith(".")) {
-        rawParts.push(rule.toString());
+        uniqueParts.push(rule.toString());
         rejectionLog.add(selector, "NON_CLASS_SELECTOR", undefined, "expected");
         return;
       }
 
-      // Route compound selectors to raw CSS
+      // Route compound selectors to unique CSS (.foo .bar, .foo > .bar)
       if (/\s/.test(selector) || />|~|\+|,/.test(selector)) {
-        rawParts.push(rule.toString());
+        uniqueParts.push(rule.toString());
         rejectionLog.add(selector, "COMPOUND_SELECTOR", undefined, "expected");
         return;
       }
 
-      // Route Tailwind utility classes to raw CSS — they're static atomic
-      // classes with zero design value as editable GB Global Styles.
+      // Route Tailwind utility classes to their own static CSS file — they're
+      // atomic classes with zero design value as editable GB Global Styles.
       // Only custom design component classes proceed to GB canonicalization.
       if (isTailwindUtility(selector)) {
-        rawParts.push(rule.toString());
-        rejectionLog.add(selector, "TAILWIND_UTILITY", undefined, "expected");
+        utilityParts.push(rule.toString());
+        rejectionLog.add(selector, "TAILWIND_UTILITY", undefined, "expected", "tailwind-utilities.css");
         return;
       }
 
       // Canonicalize
       const canonResult = canonicalizeRule(rule);
       if (canonResult.skipped) {
-        rawParts.push(rule.toString());
+        uniqueParts.push(rule.toString());
         rejectionLog.add(selector, "CANONICALIZE_SKIPPED", undefined, "expected");
         return;
       }
@@ -324,10 +344,10 @@ export class CssClassifier {
         });
       }
 
-      // If raw declarations exist, add a rule with only raw decls to raw CSS
+      // If raw declarations exist, add a rule with only raw decls to unique CSS
       if (rawDecls.length > 0) {
         const rawRule = `${selector} {\n  ${rawDecls.join(";\n  ")};\n}`;
-        rawParts.push(rawRule);
+        uniqueParts.push(rawRule);
       }
     }
 
@@ -349,7 +369,8 @@ export class CssClassifier {
 
     return {
       structuredStyles: [...merged.values()],
-      rawCss: rawParts.join("\n\n") + "\n",
+      uniqueCss: uniqueParts.join("\n\n") + "\n",
+      utilityCss: utilityParts.join("\n\n") + "\n",
       rejectionLog,
     };
   }

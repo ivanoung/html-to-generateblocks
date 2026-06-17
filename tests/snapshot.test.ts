@@ -14,10 +14,10 @@ describe("Golden Snapshots — mino", () => {
   it("Tailwind utility classes are filtered to raw CSS, not structured", () => {
     const result = CssClassifier.classify(minoCss);
 
-    // These are Tailwind utilities — should be in rawCss, NOT structured
-    assert.ok(result.rawCss.includes(".text-orange"), "text-orange should be in raw CSS (utility)");
-    assert.ok(result.rawCss.includes(".bg-primary"), "bg-primary should be in raw CSS (utility)");
-    assert.ok(result.rawCss.includes(".text-surface"), "text-surface should be in raw CSS (utility)");
+    // These are Tailwind utilities — should be in utilityCss, NOT structured
+    assert.ok(result.utilityCss.includes(".text-orange"), "text-orange should be in utility CSS");
+    assert.ok(result.utilityCss.includes(".bg-primary"), "bg-primary should be in utility CSS");
+    assert.ok(result.utilityCss.includes(".text-surface"), "text-surface should be in utility CSS");
 
     // Verify they are NOT in structured styles
     assert.ok(!result.structuredStyles.find((s) => s.selector === ".text-orange"), "text-orange should not be structured");

@@ -98,6 +98,40 @@ describe("isTailwindUtility", () => {
     assert.ok(isTailwindUtility(".animate-spin"));
   });
 
+  it("detects negative spacing and sizing utilities", () => {
+    assert.ok(isTailwindUtility(".-mx-4"));
+    assert.ok(isTailwindUtility(".-mt-1"));
+    assert.ok(isTailwindUtility(".-translate-x-4"));
+    assert.ok(isTailwindUtility(".-rotate-45"));
+  });
+
+  it("detects px sizing and flex shrink/grow utilities", () => {
+    assert.ok(isTailwindUtility(".h-px"));
+    assert.ok(isTailwindUtility(".w-px"));
+    assert.ok(isTailwindUtility(".min-h-px"));
+    assert.ok(isTailwindUtility(".shrink-0"));
+    assert.ok(isTailwindUtility(".grow"));
+  });
+
+  it("detects border utilities", () => {
+    assert.ok(isTailwindUtility(".border"));
+    assert.ok(isTailwindUtility(".border-t"));
+    assert.ok(isTailwindUtility(".border-2"));
+    assert.ok(isTailwindUtility(".border-t-2"));
+  });
+
+  it("detects selection, placeholder, and file variants", () => {
+    assert.ok(isTailwindUtility(".selection\\:bg-primary::selection"));
+    assert.ok(isTailwindUtility(".placeholder\\:text-gray-400::placeholder"));
+    assert.ok(isTailwindUtility(".file\\:bg-blue-50::file-selector-button"));
+  });
+
+  it("detects arbitrary opacity utilities with escaped slash", () => {
+    assert.ok(isTailwindUtility(".text-fog\\/20"));
+    assert.ok(isTailwindUtility(".bg-primary\\/50"));
+    assert.ok(isTailwindUtility(".placeholder\\:text-fog\\/20::placeholder"));
+  });
+
   // Variant prefixes
   it("detects hover/focus/active variants", () => {
     assert.ok(isTailwindUtility(".hover\\:opacity-80"));
