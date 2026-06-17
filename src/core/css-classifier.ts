@@ -223,8 +223,15 @@ export class CssClassifier {
       }
     });
 
+    // Deduplicate structured styles by selector — last write wins (cascade priority).
+    // Same class can appear in both <style> blocks and CDN compilation output.
+    const deduped = new Map<string, StructuredStyle>();
+    for (const s of structured) {
+      deduped.set(s.selector, s);
+    }
+
     return {
-      structuredStyles: structured,
+      structuredStyles: [...deduped.values()],
       rawCss: rawParts.join("\n\n") + "\n",
       rejectionLog,
     };
@@ -241,9 +248,15 @@ export class CssClassifier {
 export function generateGbImportFormat(
   structuredStyles: StructuredStyle[],
 ): Array<{ selector: string; css: string; data: Record<string, unknown> }> {
-  return structuredStyles.map((s) => ({
-    selector: s.selector,
-    css: s.canonicalizedCss,
-    data: s.styles,
-  }));
+  // Deduplicate by selector — same class from both <style> blocks
+  // and CDN compilation creates duplicates. Keep last (cascade priority).
+  const seen = new Map<string, { selector: string; css: string; data: Record<string, unknown> }>();
+  for (const s of structuredStyles) {
+    seen.set(s.selector, {
+      selector: s.selector,
+      css: s.canonicalizedCss,
+      data: s.styles,
+    });
+  }
+  return [...seen.values()];
 }
