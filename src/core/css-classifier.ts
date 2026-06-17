@@ -126,11 +126,25 @@ export class CssClassifier {
     const structured: StructuredStyle[] = [];
     const rawParts: string[] = [];
     const rejectionLog = new RejectionLog();
-
     const seenRawSelectors = new Set<string>();
 
-    // Walk all rules
-    root.walkRules((rule) => {
+    // Process root-level children only (skip @media internals — those go to raw CSS wholesale)
+    function processNodes(nodes: any[]) {
+      for (const node of nodes) {
+        if (node.type === "rule") {
+          processRule(node as postcss.Rule);
+        } else if (node.type === "atrule") {
+          const atRule = node as postcss.AtRule;
+          // @media, @supports, @layer, @container, @import: entire block → raw CSS
+          rawParts.push(atRule.toString());
+          if (atRule.name === "keyframes") {
+            rejectionLog.add(`@keyframes ${atRule.params}`, "ATRULE_KEYFRAMES", undefined, "expected");
+          }
+        }
+      }
+    }
+
+    function processRule(rule: postcss.Rule) {
       const selector = rule.selector.trim();
 
       // Route non-class selectors to raw CSS
@@ -167,8 +181,10 @@ export class CssClassifier {
         const decl = node as postcss.Declaration;
         const camelProp = kebabToCamel(decl.prop);
 
-        // Skip custom properties (--tw-*, --brand-*, etc.)
-        if (decl.prop.startsWith("--")) continue;
+        if (decl.prop.startsWith("--")) {
+          rawDecls.push(`${decl.prop}: ${decl.value}`);
+          continue;
+        }
 
         if (isGbSupported(camelProp, decl.value)) {
           structuredDecls[camelProp] = decl.value;
@@ -178,8 +194,7 @@ export class CssClassifier {
         }
       }
 
-      // Capture canonicalized CSS string for the import format (after var resolution,
-      // before splitting GB-compatible from GB-incompatible declarations)
+      // Capture canonicalized CSS string for the import format
       const canonicalizedCss = rule.toString();
 
       // If structured declarations exist, add to structured styles
@@ -197,31 +212,10 @@ export class CssClassifier {
         const rawRule = `${selector} {\n  ${rawDecls.join(";\n  ")};\n}`;
         rawParts.push(rawRule);
       }
-    });
+    }
 
-    // Capture @keyframes, @layer etc. for raw CSS
-    root.walk((node) => {
-      if (node.type === "atrule") {
-        const atRule = node as postcss.AtRule;
-        if (atRule.name === "keyframes") {
-          rawParts.push(atRule.toString());
-          rejectionLog.add(`@keyframes ${atRule.params}`, "ATRULE_KEYFRAMES", undefined, "expected");
-        }
-      }
-    });
-
-    // Collect remaining non-class selectors from root (body, html, *, ::selection)
-    root.walkRules((rule) => {
-      const selector = rule.selector.trim();
-      if (/^[a-z*]|^::/.test(selector)) {
-        const ruleStr = rule.toString();
-        // Dedupe — may have been captured above
-        if (!seenRawSelectors.has(selector.substring(0, 50))) {
-          seenRawSelectors.add(selector.substring(0, 50));
-          rawParts.push(ruleStr);
-        }
-      }
-    });
+    // Process root-level nodes
+    processNodes(root.nodes);
 
     // Merge duplicate selectors: same class from <style> blocks + CDN compilation.
     // Later properties override earlier ones (CSS cascade semantics).
@@ -229,9 +223,7 @@ export class CssClassifier {
     for (const s of structured) {
       const existing = merged.get(s.selector);
       if (existing) {
-        // Merge data: later values override earlier
         Object.assign(existing.styles, s.styles);
-        // Keep the last canonicalizedCss (most complete representation)
         existing.canonicalizedCss = s.canonicalizedCss;
       } else {
         merged.set(s.selector, { ...s });

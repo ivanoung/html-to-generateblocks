@@ -1,8 +1,8 @@
 {
   "version": "1.0",
-  "totalRules": 906,
-  "rejectedRules": 399,
-  "rejectionRate": "44.0%",
+  "totalRules": 790,
+  "rejectedRules": 342,
+  "rejectionRate": "43.3%",
   "rejections": [
     {
       "selector": "body",
@@ -958,8 +958,8 @@
       "destination": "styles-unique.css"
     },
     {
-      "selector": "to",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes spin",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
@@ -971,8 +971,8 @@
       "destination": "styles-unique.css"
     },
     {
-      "selector": "75%, 100%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes ping",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
@@ -984,8 +984,8 @@
       "destination": "styles-unique.css"
     },
     {
-      "selector": "50%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes pulse",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
@@ -2062,244 +2062,6 @@
       "destination": "styles-unique.css"
     },
     {
-      "selector": ".sm\\:aspect-\\[21\\/9\\]",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "aspectRatio",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".sm\\:grid-cols-2",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridTemplateColumns",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".sm\\:p-8",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "padding",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".md\\:col-span-2",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridColumn",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".md\\:grid-cols-2",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridTemplateColumns",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".md\\:grid-cols-3",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridTemplateColumns",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".md\\:grid-cols-4",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridTemplateColumns",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".md\\:border-b-0",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "borderBottomWidth",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".md\\:border-r",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "borderRightWidth",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".md\\:p-8",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "padding",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".md\\:p-12",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "padding",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".md\\:p-14",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "padding",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".md\\:p-10",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "padding",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:top-32",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "top",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:col-span-5",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridColumn",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:col-span-7",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridColumn",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:col-span-3",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridColumn",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:col-span-9",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridColumn",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:col-span-2",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridColumn",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:col-span-4",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridColumn",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:col-span-8",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridColumn",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:grid-cols-4",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridTemplateColumns",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:grid-cols-12",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridTemplateColumns",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:grid-cols-3",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridTemplateColumns",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:grid-cols-6",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridTemplateColumns",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:grid-cols-2",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridTemplateColumns",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:border-b-0",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "borderBottomWidth",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:border-r",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "borderRightWidth",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:border-l",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "borderLeftWidth",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:border-t-0",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "borderTopWidth",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".lg\\:p-8",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "padding",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".xl\\:col-span-1",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridColumn",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".xl\\:grid-cols-3",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "gridTemplateColumns",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": ".xl\\:border-r",
-      "reason": "UNSUPPORTED_PROPERTY",
-      "property": "borderRightWidth",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
       "selector": ".cal-embed",
       "reason": "UNSUPPORTED_PROPERTY",
       "property": "border",
@@ -2321,26 +2083,14 @@
       "destination": "styles-unique.css"
     },
     {
-      "selector": "0%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes marquee-left",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
     {
-      "selector": "100%",
-      "reason": "NON_CLASS_SELECTOR",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "0%",
-      "reason": "NON_CLASS_SELECTOR",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "100%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes marquee-right",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
@@ -2365,26 +2115,14 @@
       "destination": "styles-unique.css"
     },
     {
-      "selector": "0%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes marquee-left",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
     {
-      "selector": "100%",
-      "reason": "NON_CLASS_SELECTOR",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "0%",
-      "reason": "NON_CLASS_SELECTOR",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "100%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes marquee-right",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
@@ -2409,26 +2147,14 @@
       "destination": "styles-unique.css"
     },
     {
-      "selector": "0%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes marquee-left",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
     {
-      "selector": "100%",
-      "reason": "NON_CLASS_SELECTOR",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "0%",
-      "reason": "NON_CLASS_SELECTOR",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "100%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes marquee-right",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
@@ -2453,26 +2179,14 @@
       "destination": "styles-unique.css"
     },
     {
-      "selector": "0%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes marquee-left",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
     {
-      "selector": "100%",
-      "reason": "NON_CLASS_SELECTOR",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "0%",
-      "reason": "NON_CLASS_SELECTOR",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "100%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes marquee-right",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
@@ -2497,26 +2211,14 @@
       "destination": "styles-unique.css"
     },
     {
-      "selector": "0%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes marquee-left",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
     {
-      "selector": "100%",
-      "reason": "NON_CLASS_SELECTOR",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "0%",
-      "reason": "NON_CLASS_SELECTOR",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "100%",
-      "reason": "NON_CLASS_SELECTOR",
+      "selector": "@keyframes marquee-right",
+      "reason": "ATRULE_KEYFRAMES",
       "severity": "expected",
       "destination": "styles-unique.css"
     },
@@ -2566,91 +2268,13 @@
       "property": "scrollbarWidth",
       "severity": "expected",
       "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes spin",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes ping",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes pulse",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes marquee-left",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes marquee-right",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes marquee-left",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes marquee-right",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes marquee-left",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes marquee-right",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes marquee-left",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes marquee-right",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes marquee-left",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
-    },
-    {
-      "selector": "@keyframes marquee-right",
-      "reason": "ATRULE_KEYFRAMES",
-      "severity": "expected",
-      "destination": "styles-unique.css"
     }
   ],
   "summaryByReason": {
-    "NON_CLASS_SELECTOR": 65,
-    "UNSUPPORTED_PROPERTY": 247,
+    "NON_CLASS_SELECTOR": 42,
+    "UNSUPPORTED_PROPERTY": 213,
+    "ATRULE_KEYFRAMES": 13,
     "COMPOUND_SELECTOR": 62,
-    "CANONICALIZE_SKIPPED": 12,
-    "ATRULE_KEYFRAMES": 13
+    "CANONICALIZE_SKIPPED": 12
   }
 }
