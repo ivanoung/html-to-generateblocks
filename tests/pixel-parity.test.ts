@@ -81,7 +81,7 @@ describe("Pixel Parity Verification", () => {
   it("manual-steps.md includes global document style inventory", () => {
     assert.ok(existsSync(MANUAL_STEPS), "manual-steps.md should exist");
     const md = readFileSync(MANUAL_STEPS, "utf-8");
-    assert.ok(md.includes("GLOBAL DOCUMENT STYLES"), "should have global document styles section");
+    assert.ok(md.includes("Global Document Styles"), "should have global document styles section");
     assert.ok(md.includes("bg-background"), "should mention bg-background fallback");
   });
 

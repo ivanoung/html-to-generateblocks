@@ -1,27 +1,41 @@
 // ── Manual Steps Reporter ──────────────────────────────
 //
-// Analyzes the source HTML and generates a checklist of
-// manual steps needed after conversion. Written as a
-// human-readable report alongside other output files.
+// Generates a post-conversion checklist organized by category.
+// Steps auto-number based on registration order and conditions.
 
 import type { GlobalSelectorInventory } from "./global-selector-inventory.js";
 
-export interface ManualSteps {
+// ── Types ──────────────────────────────────────────────
+
+export interface ManualStepsContext {
   fonts: string[];
-  externalScripts: string[];
-  hasNav: boolean;
-  hasFooter: boolean;
-  hasIconify: boolean;
-  imageCount: number;
   externalImages: string[];
+  hasNav: boolean;
+  hasIconify: boolean;
+  inventory?: GlobalSelectorInventory;
+  customizerExists: boolean;
+  appJsExists: boolean;
 }
 
-export function analyzeSource(html: string): ManualSteps {
+interface Step {
+  id: string;
+  category: "import" | "enqueue" | "per-page";
+  condition?: (ctx: ManualStepsContext) => boolean;
+  render: (ctx: ManualStepsContext) => string[];
+}
+
+// ── Source Analysis ────────────────────────────────────
+
+export function analyzeSource(html: string): {
+  fonts: string[];
+  externalImages: string[];
+  hasNav: boolean;
+  hasIconify: boolean;
+} {
   const fonts: string[] = [];
   const fontMatch = html.match(/fonts\.googleapis\.com\/css2\?family=([^"'\s]+)/);
   if (fontMatch) {
     fontMatch[1].split("&").forEach((f) => {
-      // The first entry is the value of ?family=, subsequent entries have family= prefix
       const name = f.startsWith("family=") ? f.replace("family=", "") : f;
       if (name && !name.startsWith("display=") && !name.startsWith("subset=")) {
         fonts.push(decodeURIComponent(name));
@@ -29,216 +43,212 @@ export function analyzeSource(html: string): ManualSteps {
     });
   }
 
-  const externalScripts: string[] = [];
-  const scriptMatches = html.matchAll(/<script[^>]*src="([^"]+)"/g);
-  for (const m of scriptMatches) {
-    const url = m[1];
-    if (!url.includes("tailwindcss")) {
-      externalScripts.push(url);
-    }
-  }
-
-  const hasNav = /<nav[\s>]/.test(html);
-  const hasFooter = /<footer[\s>]/.test(html);
-  const hasIconify = /iconify-icon/.test(html);
-
   const imageMatches = [...html.matchAll(/<img[^>]*src="([^"]+)"/g)];
   const externalImages = imageMatches.map((m) => m[1]).filter((url) => url.startsWith("http"));
-  const imageCount = imageMatches.length;
 
-  return {
-    fonts,
-    externalScripts,
-    hasNav,
-    hasFooter,
-    hasIconify,
-    imageCount,
-    externalImages,
-  };
+  const hasNav = /<nav[\s>]/.test(html);
+  const hasIconify = /iconify-icon/.test(html);
+
+  return { fonts, externalImages, hasNav, hasIconify };
 }
 
-export function generateManualStepsReport(steps: ManualSteps, inventory?: GlobalSelectorInventory): string {
-  const autoFixable: string[] = [];
-  const judgment: string[] = [];
-  const pureManual: string[] = [];
+// ── Step Registry ──────────────────────────────────────
 
+const CATEGORY_LABELS: Record<Step["category"], string> = {
+  "import":    "IMPORT — One-Time Setup",
+  "enqueue":   "ENQUEUE — Site-Wide",
+  "per-page":  "PER PAGE — For Each Page",
+};
+
+const STEPS: Step[] = [
+  // ── IMPORT ────────────────────────────────────────
+  {
+    id: "import-global-styles",
+    category: "import",
+    render: () => [
+      "Import setup/global-styles-import.json into",
+      "GenerateBlocks → Global Styles. This imports all",
+      "editable utility classes with --tw-* variables",
+      "resolved to concrete CSS values.",
+    ],
+  },
+  {
+    id: "import-css-unique",
+    category: "import",
+    render: () => [
+      "Add setup/styles-unique.css via WPCodeBox (NOT",
+      "Additional CSS — WordPress strips * selectors,",
+      "escaped colons, and some pseudo-elements).",
+      "This covers: preflight reset, @keyframes,",
+      "@media blocks, transforms, filters, gradients.",
+    ],
+  },
+  {
+    id: "import-js",
+    category: "import",
+    condition: (ctx) => ctx.appJsExists,
+    render: () => [
+      "Add setup/global.js via WPCodeBox to preserve",
+      "all interactions, animations, and scripts.",
+    ],
+  },
+  {
+    id: "import-customizer",
+    category: "import",
+    condition: (ctx) => ctx.customizerExists,
+    render: () => [
+      "Import customizer-import.json into Appearance →",
+      "Customize → Import/Export (or use a plugin like",
+      '"Customizer Export/Import"). This sets up theme',
+      "colors, fonts, container width, and backgrounds",
+      "matching the source design.",
+    ],
+  },
+
+  // ── ENQUEUE ───────────────────────────────────────
+  {
+    id: "enqueue-nav",
+    category: "enqueue",
+    condition: (ctx) => ctx.hasNav,
+    render: () => [
+      "The source has a <nav> element. It's been converted",
+      "as part of each page. If you want reusable navigation:",
+      "Option A: Keep as-is (each page has its own nav).",
+      "Option B: Create a reusable block from one page's nav",
+      "          and replace nav in other pages.",
+    ],
+  },
+  {
+    id: "enqueue-fonts",
+    category: "enqueue",
+    condition: (ctx) => ctx.fonts.length > 0,
+    render: (ctx) => [
+      "The following Google Fonts were detected:",
+      ...ctx.fonts.map((f) => `  - ${f}`),
+      "Option A: Use a fonts plugin (Fonts Plugin |",
+      "          Google Fonts Typography).",
+      "Option B: Add to functions.php with wp_enqueue_style.",
+      "Option C: Use GeneratePress Typography module.",
+    ],
+  },
+  {
+    id: "enqueue-global-css",
+    category: "enqueue",
+    condition: (ctx) => !!(ctx.inventory && ctx.inventory.rules.length > 0),
+    render: (ctx) => {
+      const inv = ctx.inventory!;
+      const lines: string[] = [
+        "The following CSS rules target <html>, <body>,",
+        ":root, or pseudo-elements. They are preserved in",
+        "styles.css but only apply when enqueued globally:",
+      ];
+      for (const rule of inv.rules) {
+        lines.push(`  - ${rule.selector}`);
+      }
+      if (inv.hasBackgroundColor) {
+        lines.push(
+          "",
+          '⚠ The source page body has a background-color.',
+          '  If your theme overrides body styles, add',
+          '  class="bg-background" to the outermost GB',
+          "  container block.",
+        );
+      }
+      return lines;
+    },
+  },
+
+  // ── PER PAGE ──────────────────────────────────────
+  {
+    id: "per-page-blocks",
+    category: "per-page",
+    render: () => [
+      "Open the WordPress Code Editor (Ctrl+Shift+Alt+M).",
+      "For each page in pages/, copy the entire contents",
+      "and paste into the corresponding WP page.",
+      "Save, reload, confirm no \"Attempt Recovery\" prompt.",
+    ],
+  },
+  {
+    id: "per-page-images",
+    category: "per-page",
+    condition: (ctx) => ctx.externalImages.length > 0,
+    render: (ctx) => {
+      const lines: string[] = [
+        `Replace ${ctx.externalImages.length} external image(s):`,
+      ];
+      ctx.externalImages.slice(0, 5).forEach((url) => {
+        lines.push(`  - ${url.substring(0, 70)}${url.length > 70 ? "..." : ""}`);
+      });
+      if (ctx.externalImages.length > 5) {
+        lines.push(`  ... and ${ctx.externalImages.length - 5} more`);
+      }
+      return lines;
+    },
+  },
+];
+
+// ── Report Generator ──────────────────────────────────
+
+export function generateManualStepsReport(ctx: ManualStepsContext): string {
   const header = [
     "============================================",
     "  MANUAL STEPS — Post-Conversion Checklist",
     "============================================",
     "",
-    "Categories:",
-    "  [AUTO]     — Can be automated in future updates",
-    "  [JUDGMENT] — Requires human decision",
-    "  [MANUAL]   — Must be done by hand",
+    "Files referenced below are in the output/",
+    "directory alongside this document.",
     "",
   ];
 
-  // ── AUTO-FIXABLE ────────────────────────────────────
-
-  // 1. JavaScript
-  autoFixable.push(
-    "1. ADD JAVASCRIPT",
-    "   Add setup/global.js to your site via WPCode plugin",
-    "   or enqueue in functions.php. This preserves all",
-    "   interactions, animations, and scripts.",
-    "",
-  );
-
-  // 2. Global Styles
-  autoFixable.push(
-    "2. IMPORT GLOBAL STYLES",
-    "   Import setup/global-styles.json into GenerateBlocks →",
-    "   Global Styles. Structured entries (non-raw) are",
-    "   fully editable through the GB Styles UI.",
-    "",
-  );
-
-  // 3. CSS
-  autoFixable.push(
-    "3. ADD REMAINING CSS",
-    "   Paste setup/styles-unique.css into Appearance →",
-    "   Customize → Additional CSS for non-class styles",
-    "   (keyframes, media queries, pseudo-elements).",
-    "   Tip: styles.css at project root is the complete",
-    "   master fallback if global-styles isn't enough.",
-    "",
-  );
-
-  // 4. Customizer
-  autoFixable.push(
-    "4. IMPORT CUSTOMIZER SETTINGS",
-    "   Import setup/customizer-import.json via Appearance →",
-    "   Customize → Import/Export (or a plugin like",
-    "   \"Customizer Export/Import\").",
-    "",
-  );
-
-  // ── JUDGMENT-REQUIRED ────────────────────────────────
-
-  // Fonts
-  if (steps.fonts.length > 0) {
-    judgment.push(
-      "5. ENQUEUE GOOGLE FONTS",
-      "   The following fonts were detected. Choose a method:",
-    );
-    for (const f of steps.fonts) {
-      judgment.push(`     - ${f}`);
-    }
-    judgment.push(
-      "   Option A: Use a fonts plugin (e.g., Fonts Plugin |",
-      "             Google Fonts Typography).",
-      "   Option B: Add to functions.php with wp_enqueue_style.",
-      "   Option C: Use GeneratePress Typography module.",
-      "",
-    );
-  }
-
-  // Navigation
-  if (steps.hasNav) {
-    judgment.push(
-      `${steps.fonts.length > 0 ? 6 : 5}. NAVIGATION PRESENT`,
-      "   The source has a <nav> element. It's been converted",
-      "   as part of each page. If you want reusable navigation:",
-      "   Option A: Keep as-is (each page has its own nav).",
-      "   Option B: Create a reusable block from one page's nav",
-      "             and replace nav in other pages.",
-      "",
-    );
-  }
-
-  // ── Global Selector Rules Inventory ──────────────────
-  if (inventory && inventory.rules.length > 0) {
-    let inventoryNum = 5;
-    if (steps.fonts.length > 0) inventoryNum = 6;
-    autoFixable.push(
-      `${inventoryNum}. GLOBAL DOCUMENT STYLES`,
-      "   The following CSS rules target <html>, <body>, :root,",
-      "   or pseudo-elements like ::selection. These are preserved",
-      "   in styles.css but only apply when enqueued globally.",
-    );
-    for (const rule of inventory.rules) {
-      autoFixable.push(`   - ${rule.selector}`);
-    }
-    if (inventory.hasBackgroundColor) {
-      autoFixable.push(
-        "   ⚠ The source body has a background-color. If your theme",
-        '     overrides body styles, add class="bg-background" to',
-        "     the outermost GB container block.",
-      );
-    }
-    autoFixable.push("");
-  }
-
-  // ── PURE MANUAL ───────────────────────────────────────
-
-  const manualBase = steps.fonts.length > 0
-    ? (steps.hasNav ? 7 : 6)
-    : (steps.hasNav ? 6 : 5);
-
-  // Paste blocks
-  pureManual.push(
-    `${manualBase}. PASTE BLOCKS PER PAGE`,
-    "   Open the WordPress Code Editor (Ctrl+Shift+Alt+M).",
-    "   For each page in setup/pages/, copy the entire",
-    "   contents and paste into the corresponding WP page.",
-    "   Save, reload, confirm no \"Attempt Recovery\" prompt.",
-    "",
-  );
-
-  // Iconify
-  if (steps.hasIconify) {
-    pureManual.push(
-      `${manualBase + 1}. ICONIFY ICONS`,
-      "   The original uses <iconify-icon> web components.",
-      "   They've been auto-resolved to inline SVGs where",
-      "   possible. Any unresolved icons need manual handling:",
-    );
-    const iconifyScripts = steps.externalScripts.filter((s) => s.includes("iconify"));
-    if (iconifyScripts.length > 0) {
-      pureManual.push("   Option A: Enqueue the Iconify script:");
-      iconifyScripts.forEach((s) => pureManual.push(`     ${s}`));
-    }
-    pureManual.push(
-      "   Option B: Replace icons with GenerateBlocks",
-      "             Shape blocks + SVGs manually.",
-      "",
-    );
-  }
-
-  // Images
-  if (steps.externalImages.length > 0) {
-    const imgNum = steps.hasIconify ? manualBase + 2 : manualBase + 1;
-    pureManual.push(
-      `${imgNum}. REPLACE EXTERNAL IMAGES (${steps.externalImages.length} total)`,
-    );
-    steps.externalImages.slice(0, 5).forEach((url) => {
-      pureManual.push(`   - ${url.substring(0, 70)}${url.length > 70 ? "..." : ""}`);
-    });
-    if (steps.externalImages.length > 5) {
-      pureManual.push(`   ... and ${steps.externalImages.length - 5} more`);
-    }
-    pureManual.push("");
-  }
-
-  // ── Assemble report ───────────────────────────────────
-
   const lines: string[] = [...header];
 
-  if (autoFixable.length > 0) {
-    lines.push("─── AUTO-FIXABLE ───", "");
-    lines.push(...autoFixable);
+  // Group active steps by category
+  const activeByCategory = new Map<Step["category"], { step: Step; ctx: ManualStepsContext; num: number }[]>();
+
+  let n = 0;
+  for (const step of STEPS) {
+    if (step.condition && !step.condition(ctx)) continue;
+    n++;
+    const cat = step.category;
+    if (!activeByCategory.has(cat)) activeByCategory.set(cat, []);
+    activeByCategory.get(cat)!.push({ step, ctx, num: n });
   }
 
-  if (judgment.length > 0) {
-    lines.push("─── JUDGMENT REQUIRED ───", "");
-    lines.push(...judgment);
-  }
+  // Render by category
+  for (const cat of ["import", "enqueue", "per-page"] as const) {
+    const entries = activeByCategory.get(cat);
+    if (!entries || entries.length === 0) continue;
 
-  if (pureManual.length > 0) {
-    lines.push("─── PURE MANUAL ───", "");
-    lines.push(...pureManual);
+    const range = entries.length === 1
+      ? `${entries[0].num}`
+      : `${entries[0].num}-${entries[entries.length - 1].num}`;
+
+    lines.push(`=== ${CATEGORY_LABELS[cat]} (${range}) ===`, "");
+
+    for (const { step, ctx: stepCtx, num } of entries) {
+      lines.push(`${num}. ${stepTitle(step.id)}`);
+      for (const textLine of step.render(stepCtx)) {
+        lines.push(`   ${textLine}`);
+      }
+      lines.push("");
+    }
   }
 
   return lines.join("\n");
+}
+
+function stepTitle(id: string): string {
+  const titles: Record<string, string> = {
+    "import-global-styles": "Import Global Styles",
+    "import-css-unique":    "Add Remaining CSS",
+    "import-js":            "Add JavaScript",
+    "import-customizer":    "Import Customizer Settings",
+    "enqueue-fonts":        "Enqueue Google Fonts",
+    "enqueue-nav":          "Navigation Present",
+    "enqueue-global-css":   "Global Document Styles",
+    "per-page-blocks":      "Paste Blocks Per Page",
+    "per-page-images":      "Replace External Images",
+  };
+  return titles[id] || id;
 }

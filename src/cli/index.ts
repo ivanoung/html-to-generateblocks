@@ -503,13 +503,22 @@ async function main(): Promise<void> {
       const cssPath = resolve(outDir, "styles.css");
       const { analyzeSource, generateManualStepsReport } = await import("../core/manual-steps.js");
       const { inventoryGlobalSelectors } = await import("../core/global-selector-inventory.js");
-      const manualSteps = analyzeSource(pageContents[0].html);
+      const src = analyzeSource(pageContents[0].html);
       const inventory = inventoryGlobalSelectors(
         existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "",
       );
+      const ctx = {
+        fonts: src.fonts,
+        externalImages: src.externalImages,
+        hasNav: src.hasNav,
+        hasIconify: src.hasIconify,
+        inventory: inventory.rules.length > 0 ? inventory : undefined,
+        customizerExists: existsSync(resolve(outDir, "customizer-import.json")),
+        appJsExists: uniqueScripts.length > 0,
+      };
       writeFileSync(
         resolve(outDir, "manual-steps.md"),
-        generateManualStepsReport(manualSteps, inventory) + "\n",
+        generateManualStepsReport(ctx) + "\n",
         "utf-8",
       );
 
