@@ -23,7 +23,7 @@ import { resolveIconifyIcons } from "../core/iconify-resolver.js";
 import { checkContentLoss } from "../core/content-verifier.js";
 import { compileTailwindOffline, extractTailwindConfig, validateTailwindConfig, expandColorPalettes } from "../core/tailwind-resolver.js";
 import { buildGlobalStylesManifest } from "../core/global-styles-data.js";
-import { CssClassifier } from "../core/css-classifier.js";
+import { CssClassifier, generateGbImportFormat } from "../core/css-classifier.js";
 import { extractScripts, deduplicateScripts, formatGlobalJs } from "../core/script-extractor.js";
 import { createSession, readSession, updateSession, deleteSession, hasActiveSession, validateEnv, checkStagingUrl } from "../core/verify-session.js";
 import { prepareVerification } from "../core/verify-prepare.js";
@@ -546,8 +546,17 @@ async function main(): Promise<void> {
           structuredStyles.length + rawEntries.length,
         ), "utf-8");
 
+        // GB-importable format: flat array of {selector, css, data}
+        const importFormat = generateGbImportFormat(result.structuredStyles);
+        writeFileSync(
+          resolve(setupDir, "global-styles-import.json"),
+          JSON.stringify(importFormat, null, 2) + "\n",
+          "utf-8",
+        );
+
         console.log(`  Global Styles: ${structuredStyles.length} structured (editable), ${rawEntries.length} raw (CSS-only)`);
         console.log(`  Rejections:    setup/rejected.json`);
+        console.log(`  Import:        setup/global-styles-import.json`);
       }
 
       // Write app.js at project root with all scripts
