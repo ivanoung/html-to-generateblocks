@@ -15,6 +15,7 @@ import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
 import { resolveIconifyIcons } from "./iconify-resolver.js";
 import { generateCustomizerSettings } from "./customizer-generator.js";
 import { emptyDossier, type DesignDossier } from "./design-dossier.js";
+import { extractConfigFromHtml } from "./design-extractor.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
 import { checkContentLoss } from "./content-verifier.js";
 
@@ -61,6 +62,13 @@ export async function convert(
     if (!input.dossier && compiled.dossier?.extracted) {
       dossier = compiled.dossier;
     }
+  }
+
+  // Merge tailwind.config from HTML <script> parser into dossier
+  // (Playwright CDN doesn't expose user config via window.tailwind)
+  if (!dossier.tailwindConfig) {
+    const config = extractConfigFromHtml(input.rawHtml);
+    if (config) dossier.tailwindConfig = config;
   }
 
   // Stage 0.5: Resolve <iconify-icon> to inline SVG (always run)
