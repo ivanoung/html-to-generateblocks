@@ -223,15 +223,23 @@ export class CssClassifier {
       }
     });
 
-    // Deduplicate structured styles by selector — last write wins (cascade priority).
-    // Same class can appear in both <style> blocks and CDN compilation output.
-    const deduped = new Map<string, StructuredStyle>();
+    // Merge duplicate selectors: same class from <style> blocks + CDN compilation.
+    // Later properties override earlier ones (CSS cascade semantics).
+    const merged = new Map<string, StructuredStyle>();
     for (const s of structured) {
-      deduped.set(s.selector, s);
+      const existing = merged.get(s.selector);
+      if (existing) {
+        // Merge data: later values override earlier
+        Object.assign(existing.styles, s.styles);
+        // Keep the last canonicalizedCss (most complete representation)
+        existing.canonicalizedCss = s.canonicalizedCss;
+      } else {
+        merged.set(s.selector, { ...s });
+      }
     }
 
     return {
-      structuredStyles: [...deduped.values()],
+      structuredStyles: [...merged.values()],
       rawCss: rawParts.join("\n\n") + "\n",
       rejectionLog,
     };
@@ -248,15 +256,20 @@ export class CssClassifier {
 export function generateGbImportFormat(
   structuredStyles: StructuredStyle[],
 ): Array<{ selector: string; css: string; data: Record<string, unknown> }> {
-  // Deduplicate by selector — same class from both <style> blocks
-  // and CDN compilation creates duplicates. Keep last (cascade priority).
+  // Merge duplicates by selector with cascade semantics
   const seen = new Map<string, { selector: string; css: string; data: Record<string, unknown> }>();
   for (const s of structuredStyles) {
-    seen.set(s.selector, {
-      selector: s.selector,
-      css: s.canonicalizedCss,
-      data: s.styles,
-    });
+    const existing = seen.get(s.selector);
+    if (existing) {
+      Object.assign(existing.data, s.styles);
+      existing.css = s.canonicalizedCss;
+    } else {
+      seen.set(s.selector, {
+        selector: s.selector,
+        css: s.canonicalizedCss,
+        data: { ...s.styles },
+      });
+    }
   }
   return [...seen.values()];
 }
