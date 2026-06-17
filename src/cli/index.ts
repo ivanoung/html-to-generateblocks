@@ -326,6 +326,7 @@ async function main(): Promise<void> {
     let tailwindCss = "";
     const firstHtml = pageContents[0].html;
     const tailwindConfig = extractTailwindConfig(firstHtml);
+    let sharedDossier = undefined;
     if (tailwindConfig) {
       const expandedConfig = expandColorPalettes(tailwindConfig);
       console.log(`  Compiling Tailwind CSS from ${pageContents.length} page(s) via CDN...`);
@@ -336,6 +337,7 @@ async function main(): Promise<void> {
         expandedConfig,
       );
       tailwindCss = compiled.stylesCss;
+      sharedDossier = compiled.dossier;
       console.log(`    ✓ Compiled (${(compiled.stylesCss.length / 1024).toFixed(1)} KB)`);
     }
 
@@ -346,6 +348,7 @@ async function main(): Promise<void> {
       projectDir,
       isFirstPage: true,
       cssAlreadyCompiled: true,
+      dossier: sharedDossier,
     });
 
     // Prepend compiled Tailwind CSS to styles.css
@@ -426,6 +429,7 @@ async function main(): Promise<void> {
       // Stage 2: Compile Tailwind CSS via CDN (Playwright, live DOM)
       let inlinerCss = "";
       const tailwindConfig = extractTailwindConfig(pageContents[0]?.html || "");
+      let sharedDossier = undefined;
 
       if (tailwindConfig) {
         const expandedConfig = expandColorPalettes(tailwindConfig);
@@ -440,6 +444,7 @@ async function main(): Promise<void> {
           for (const w of compiled.warnings) console.log(`    [WARN] ${w}`);
         }
         inlinerCss = compiled.stylesCss;
+        sharedDossier = compiled.dossier;
         console.log(`    ✓ Compiled (${(compiled.stylesCss.length / 1024).toFixed(1)} KB)`);
 
         // Validate config for known patterns
@@ -480,6 +485,7 @@ async function main(): Promise<void> {
           projectDir,
           isFirstPage: firstPage,  // shared files only from first page
           cssAlreadyCompiled: true, // CSS already compiled once for all pages
+          dossier: sharedDossier,
         });
 
         // On first page: prepend Tailwind CSS to styles.css

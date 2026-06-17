@@ -14,6 +14,7 @@ import { resetIds } from "./id-generator.js";
 import { usesTailwind, inlineTailwindStyles } from "./tailwind-inliner.js";
 import { resolveIconifyIcons } from "./iconify-resolver.js";
 import { generateCustomizerSettings } from "./customizer-generator.js";
+import { emptyDossier, type DesignDossier } from "./design-dossier.js";
 import type { InlinerResult } from "./tailwind-inliner.js";
 import { checkContentLoss } from "./content-verifier.js";
 
@@ -25,6 +26,7 @@ export interface ConversionInput {
   projectDir?: string;
   isFirstPage?: boolean;  // write shared files (styles.css, customizer) only on first page
   cssAlreadyCompiled?: boolean; // CSS compiled once for all pages via multi-page CDN
+  dossier?: DesignDossier; // pre-extracted design evidence (multi-page flow)
 }
 
 export interface ConversionOutput {
@@ -45,6 +47,7 @@ export async function convert(
   let rawHtml = input.rawHtml;
   const inlinerWarnings: { code: string; message: string }[] = [];
   let compiledCss = "";
+  let dossier = input.dossier ?? emptyDossier();
 
   if (!input.cssAlreadyCompiled && usesTailwind(rawHtml)) {
     const compiled = await inlineTailwindStyles(rawHtml);
@@ -54,6 +57,10 @@ export async function convert(
       );
     }
     compiledCss = compiled.stylesCss;
+    // Prefer dossier from compilation if not explicitly provided
+    if (!input.dossier && compiled.dossier?.extracted) {
+      dossier = compiled.dossier;
+    }
   }
 
   // Stage 0.5: Resolve <iconify-icon> to inline SVG (always run)
@@ -167,7 +174,7 @@ export async function convert(
     }
 
     // customizer-import.json — GeneratePress Customizer settings
-    const customizer = generateCustomizerSettings(input.rawHtml);
+    const customizer = generateCustomizerSettings(dossier);
     if (customizer) {
       writeFileSync(
         resolve(outDir, "customizer-import.json"),
