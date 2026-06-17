@@ -27,7 +27,7 @@ describe("splitCss (canonicalized)", () => {
   });
 
   it("produces valid rejectionJson", () => {
-    const css = ".text-orange{--tw-text-opacity:1;color:rgb(255 127 89 / var(--tw-text-opacity, 1))}";
+    const css = ".mycustom-text{--tw-text-opacity:1;color:rgb(255 127 89 / var(--tw-text-opacity, 1))}";
     const result = splitCss(css);
     const rejection = JSON.parse(result.rejectionJson);
     assert.strictEqual(typeof rejection.version, "string");
@@ -39,9 +39,9 @@ describe("splitCss (canonicalized)", () => {
   });
 
   it("canonicalizes --tw-text-opacity in class rules (they go to globalStyles, not unique)", () => {
-    const css = ".text-orange{--tw-text-opacity:1;color:rgb(255 127 89 / var(--tw-text-opacity, 1))}";
+    const css = ".mycustom-text{--tw-text-opacity:1;color:rgb(255 127 89 / var(--tw-text-opacity, 1))}";
     const result = splitCss(css);
     // The class is canonicalized and fully GB-compatible, so it should NOT appear in unique CSS
-    assert.ok(!result.uniqueCss.includes("text-orange"), "canonicalized class should not be in unique css");
+    assert.ok(!result.uniqueCss.includes("mycustom-text"), "canonicalized class should not be in unique css");
   });
 });

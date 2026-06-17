@@ -3,6 +3,114 @@ import { canonicalizeRule } from "./css-canonicalizer.js";
 import { isGbSupported } from "./gb-whitelist.js";
 import { RejectionLog } from "./rejection-log.js";
 
+// Re-export for convenience (tests import both from here)
+export { disablePreflight } from "./tailwind-resolver.js";
+
+// ── Tailwind Utility Detection ────────────────────────────
+//
+// Detects Tailwind v3 utility classes by naming pattern so they can be
+// routed to static CSS instead of editable GB Global Styles. Utilities are
+// generic atomic classes (.mt-4, .flex, .hover\:opacity-80) with zero
+// design value as editable tokens. Custom design component classes
+// (.blueprint-bg, .ruler-x, .hover-shadow-md) do NOT match these patterns.
+
+/** Variant prefix chain: hover:, focus:, sm:, dark:, group-hover:, etc. */
+const VARIANT =
+  "(?:hover|focus|active|focus-within|focus-visible|group-hover|group-focus|" +
+  "peer-checked|peer-hover|first|last|odd|even|visited|target|disabled|" +
+  "checked|indeterminate|required|valid|invalid|autofill|placeholder-shown|" +
+  "open|motion-safe|motion-reduce|dark|rtl|ltr|sm|md|lg|xl|2xl|" +
+  "min-\\[[^\\]]+\\]|max-\\[[^\\]]+\\]|portrait|landscape|contrast-more|" +
+  "contrast-less|supports-\\[[^\\]]+\\]|aria-\\[[^\\]]+\\]|data-\\[[^\\]]+\\])";
+const VARIANT_CHAIN = `(?:${VARIANT}:)*`;
+
+/** Compile a utility pattern with variant prefix support */
+function utility(...suffixes: string[]): RegExp {
+  return new RegExp(`^${VARIANT_CHAIN}(?:${suffixes.join("|")})`, "i");
+}
+
+const UTILITY_PATTERNS: RegExp[] = [
+  // Spacing
+  utility("[mp][tblrxy]?-", "space-[xy]?-", "gap-", "inset-[xy]?-"),
+  // Sizing
+  utility("[wh]-(?:auto|full|screen|min|max|fit|\\d|\\[)", "min-[wh]-", "max-[wh]-", "size-"),
+  // Typography
+  utility(
+    "text-(?:xs|sm|base|lg|xl|[2-9]xl|left|center|right|justify|start|end|wrap|nowrap|balance|pretty|clip|ellipsis|\\[)",
+    "font-(?:sans|serif|mono|display|script|thin|extralight|light|normal|medium|semibold|bold|extrabold|black|\\[)",
+    "tracking-", "leading-", "whitespace-", "break-", "truncate", "indent-",
+    "align-", "list-", "decoration-", "underline", "overline", "line-through",
+    "no-underline", "uppercase", "lowercase", "capitalize", "normal-case",
+  ),
+  // Colors
+  utility("(?:bg|text|border|ring|ring-offset|outline|fill|stroke|placeholder|caret|accent|decoration|divide|shadow|from|via|to)-"),
+  // Layout
+  utility(
+    "block", "inline-block", "inline", "flex", "inline-flex", "grid", "inline-grid",
+    "hidden", "contents", "flow-root", "table", "table-row", "table-cell", "container",
+  ),
+  // Position
+  utility("static", "fixed", "absolute", "relative", "sticky"),
+  // Flex/Grid
+  utility(
+    "flex-(?:row|col|wrap|nowrap|1|auto|initial|none|shrink|grow)",
+    "items-", "justify-(?:start|end|center|between|around|evenly|normal|stretch)",
+    "justify-items-", "justify-self-", "place-(?:content|items|self)-", "self-",
+    "content-", "order-", "grid-cols-", "grid-rows-", "col-", "row-",
+    "auto-cols-", "auto-rows-",
+  ),
+  // Overflow
+  utility("overflow-"),
+  // Effects
+  utility(
+    "opacity-", "shadow-", "rounded(?:-[tblr][lrb]?)?", "blur-", "brightness-",
+    "contrast-", "grayscale", "invert", "sepia", "saturate-", "hue-rotate-",
+    "drop-shadow-", "backdrop-", "mix-blend-", "bg-blend-",
+  ),
+  // Transforms
+  utility("scale-", "rotate-", "translate-[xy]-", "skew-[xy]-", "origin-"),
+  // Transitions/Animation
+  utility("transition-", "duration-", "ease-", "delay-", "animate-"),
+  // Interactivity
+  utility(
+    "cursor-", "select-", "resize", "scroll-", "sr-only", "not-sr-only",
+    "pointer-events-", "appearance-",
+  ),
+  // SVG
+  utility("(?:fill|stroke)-(?:current|none|inherit|transparent|\\[)", "stroke-\\d"),
+  // Misc
+  utility("forced-color-", "z-", "object-", "aspect-", "columns-", "box-decoration-", "box-(?:border|content)"),
+  // Arbitrary values: w-[300px], text-[#fff], [&_>*]:block
+  new RegExp(`^${VARIANT_CHAIN}\\[`, "i"),
+];
+
+/**
+ * Detect Tailwind utility classes by naming pattern.
+ * Returns true for atomic utilities (.mt-4, .flex, .hover\:opacity-80) that
+ * should be routed to static CSS. Returns false for custom design component
+ * classes (.blueprint-bg, .ruler-x) and BEM/semantic names.
+ */
+export function isTailwindUtility(className: string): boolean {
+  // Strip leading dot and unescape CSS selector escaping (\: → :, \[ → [, etc.)
+  // Tailwind class names in compiled CSS have escaped special chars:
+  //   .hover\:opacity-80  →  hover:opacity-80
+  //   .w-\[300px\]        →  w-[300px]
+  const c = className.replace(/^\./, "").replace(/\\([:\[\]\(\)\#\%\>\<\{\}\$\&\*\@\!\+\,\.\/\'])/g, "$1");
+
+  // Check explicit patterns
+  for (const pattern of UTILITY_PATTERNS) {
+    if (pattern.test(c)) return true;
+  }
+
+  // Note: we intentionally do NOT use a catch-all for lowercase hyphenated
+  // names — it would false-positive on custom design classes like
+  // .blueprint-bg, .ruler-x, .hover-shadow-md. The explicit patterns above
+  // cover all Tailwind v3 default utilities. Custom utilities defined via
+  // theme.extend may need a manual override (config/global-style-classes.json).
+
+  return false;
+}
+
 export interface StructuredStyle {
   selector: string;
   name: string;
@@ -158,6 +266,15 @@ export class CssClassifier {
       if (/\s/.test(selector) || />|~|\+|,/.test(selector)) {
         rawParts.push(rule.toString());
         rejectionLog.add(selector, "COMPOUND_SELECTOR", undefined, "expected");
+        return;
+      }
+
+      // Route Tailwind utility classes to raw CSS — they're static atomic
+      // classes with zero design value as editable GB Global Styles.
+      // Only custom design component classes proceed to GB canonicalization.
+      if (isTailwindUtility(selector)) {
+        rawParts.push(rule.toString());
+        rejectionLog.add(selector, "TAILWIND_UTILITY", undefined, "expected");
         return;
       }
 

@@ -251,3 +251,25 @@ export function validateTailwindConfig(
 
   return warnings;
 }
+
+/**
+ * Inject corePlugins: { preflight: false } into a tailwind config JSON string.
+ * Handles existing corePlugins objects by merging. Suppresses Tailwind's
+ * massive normalize/reset block (*, ::before, ::after { --tw-*:... }) at the
+ * CDN source so it never enters styles.css downstream.
+ */
+export function disablePreflight(configJson: string): string {
+  // If config already has corePlugins, merge preflight:false into it
+  if (/corePlugins\s*:/.test(configJson)) {
+    return configJson.replace(
+      /(corePlugins\s*:\s*\{)/,
+      '$1"preflight":false,',
+    );
+  }
+
+  // Inject corePlugins right after the opening brace
+  return configJson.replace(
+    /^(\s*\{)/,
+    '$1"corePlugins":{"preflight":false},',
+  );
+}

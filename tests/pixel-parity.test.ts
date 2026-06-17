@@ -53,7 +53,9 @@ describe("Pixel Parity Verification", () => {
     const css = readFileSync(STYLES_CSS, "utf-8");
     const missing: string[] = [];
     for (const cls of REQUIRED_CLASSES) {
-      if (!css.includes(cls + "{")) {
+      // Check class appears as a selector (may have space before {)
+      const re = new RegExp(cls.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\{");
+      if (!re.test(css)) {
         missing.push(cls);
       }
     }
