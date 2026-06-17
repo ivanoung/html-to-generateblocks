@@ -13,17 +13,20 @@ export interface CustomizerExport {
   options: Record<string, unknown>;
 }
 
+import { extractTailwindConfig } from "./tailwind-resolver.js";
+
 export function generateCustomizerSettings(
   rawHtml: string,
-  bodyBackgroundColor?: string,
 ): CustomizerExport | null {
-  const config = extractTailwindConfig(rawHtml);
-  if (!config) return null;
+  const configStr = extractTailwindConfig(rawHtml);
+  if (!configStr) return null;
+
+  const config = parseConfigValues(configStr);
 
   const colors = extractColors(config);
   const fonts = extractFonts(config);
   const containerWidth = extractContainerWidth(config);
-  const bgColor = bodyBackgroundColor || colors.find((c) => c.slug === "background")?.color || "#ffffff";
+  const bgColor = colors.find((c) => c.slug === "background")?.color || "#ffffff";
 
   return {
     modules: {
@@ -90,23 +93,8 @@ interface TailwindConfig {
   maxWidth?: Record<string, string>;
 }
 
-function extractTailwindConfig(html: string): TailwindConfig | null {
-  const match = html.match(/tailwind\.config\s*=\s*/);
-  if (!match) return null;
-
-  let depth = 0;
-  let startIdx = (match.index || 0) + match[0].length;
-  let endIdx = startIdx;
-  for (let i = startIdx; i < html.length; i++) {
-    if (html[i] === "{") depth++;
-    else if (html[i] === "}") { depth--; if (depth === 0) { endIdx = i + 1; break; } }
-  }
-
-  const configStr = html.substring(startIdx, endIdx)
-    .replace(/,(\s*[}\]])/g, "$1")  // trailing commas
-    .replace(/(['"])?([a-zA-Z0-9_-]+)(['"])?\s*:/g, '"$2":'); // quote keys
-
-  // Extract only the extend block values
+/** Parse the expanded config JSON string into structured values */
+function parseConfigValues(configStr: string): TailwindConfig {
   const colors: Record<string, string> = {};
   const fontFamily: Record<string, string[]> = {};
   const maxWidth: Record<string, string> = {};

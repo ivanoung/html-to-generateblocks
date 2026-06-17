@@ -344,8 +344,8 @@ async function main(): Promise<void> {
       rawHtml: firstHtml,
       pageName: "_setup",
       projectDir,
-      skipShared: false,
-      skipInliner: true,
+      isFirstPage: true,
+      cssAlreadyCompiled: true,
     });
 
     // Prepend compiled Tailwind CSS to styles.css
@@ -478,8 +478,8 @@ async function main(): Promise<void> {
           rawHtml: pc.html,
           pageName: pc.name,
           projectDir,
-          skipShared: !firstPage,  // shared files only from first page
-          skipInliner: true,       // CSS already compiled once for all pages
+          isFirstPage: firstPage,  // shared files only from first page
+          cssAlreadyCompiled: true, // CSS already compiled once for all pages
         });
 
         // On first page: prepend Tailwind CSS to styles.css
@@ -621,7 +621,7 @@ async function main(): Promise<void> {
       pageName = basename(fullPath, extname(fullPath));
     }
 
-    const output = await convert({ rawHtml, pageName, projectDir, resolveCss: args.includes("--resolve-css"), skipShared });
+    const output = await convert({ rawHtml, pageName, projectDir, isFirstPage: !skipShared });
 
     const outputPrefix = projectDir ? `output/${projectDir}/` : "output/";
     console.log(`\nConverted: ${projectDir ? projectDir + "/" : ""}${pageName}`);

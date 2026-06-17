@@ -23,9 +23,8 @@ export interface ConversionInput {
   rawHtml: string;
   pageName: string;
   projectDir?: string;
-  resolveCss?: boolean;
-  skipShared?: boolean;  // skip styles.css, customizer, manual-steps
-  skipInliner?: boolean; // skip Tailwind inliner + iconify resolver (CSS already compiled)
+  isFirstPage?: boolean;  // write shared files (styles.css, customizer) only on first page
+  cssAlreadyCompiled?: boolean; // CSS compiled once for all pages via multi-page CDN
 }
 
 export interface ConversionOutput {
@@ -46,9 +45,8 @@ export async function convert(
   let rawHtml = input.rawHtml;
   const inlinerWarnings: { code: string; message: string }[] = [];
   let compiledCss = "";
-  let outputCss = "";
 
-  if (!input.skipInliner && usesTailwind(rawHtml)) {
+  if (!input.cssAlreadyCompiled && usesTailwind(rawHtml)) {
     const compiled = await inlineTailwindStyles(rawHtml);
     if (compiled.warnings.length > 0) {
       inlinerWarnings.push(
@@ -159,7 +157,7 @@ export async function convert(
   // Single styles.css: compiled Tailwind CSS + custom CSS
   const combinedCss = [compiledCss, prepResult.customCss]
     .filter(Boolean).join("\n");
-  if (!input.skipShared) {
+  if (input.isFirstPage !== false) {
     if (combinedCss.trim()) {
       writeFileSync(
         resolve(outDir, "styles.css"),
