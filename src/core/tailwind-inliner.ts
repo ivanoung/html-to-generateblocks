@@ -8,7 +8,7 @@
 // pass through to blocks as-is.
 
 import { chromium, type Browser, type Page } from "playwright";
-import { extractTailwindConfig, disablePreflight } from "./tailwind-resolver.js";
+import { extractTailwindConfig } from "./tailwind-resolver.js";
 import { emptyDossier, type DesignDossier } from "./design-dossier.js";
 import { buildExtractionScript } from "./design-extractor.js";
 
@@ -140,9 +140,7 @@ export async function inlineTailwindMultiPage(
   const combinedHead = uniqueHeadResources.join("\n");
 
   // Use pre-expanded config if provided, otherwise extract from first page
-  const configJson = disablePreflight(
-    preExpandedConfig || extractTailwindConfig(pageHtmls[0]) || "{}"
-  );
+  const configJson = preExpandedConfig || extractTailwindConfig(pageHtmls[0]) || "{}";
 
   // Inject hidden proxy div with all body classes so Tailwind CDN
   // compiles utilities like selection:bg-primary that only appear on <body>
