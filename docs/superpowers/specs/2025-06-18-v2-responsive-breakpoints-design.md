@@ -54,14 +54,16 @@ Verified: `default` and `@media (min-width: 1025px)` produce identical visual re
 
 | Prefix | Min-width | GB Equivalent |
 |---|---|---|
-| `default` (no prefix) | 0px | Mobile |
-| `sm:` | 640px | Mobile |
+| `default` (no prefix) | 0px | Mobile (0–767px) |
+| `sm:` | 640px | Cascades to Tablet/Desktop (768px+) |
 | `md:` | 768px | Tablet (768–1024) |
 | `lg:` | 1024px | All Screens / Desktop (≥1025) |
 | `xl:` | 1280px | All Screens / Desktop (≥1280) |
 | `2xl:` | 1536px | All Screens / Desktop (≥1536) |
 
-**Note:** 1px boundary mismatch (TW `lg:1024` vs GB `Desktop≥1025`) is inherent to mixing mobile-first and desktop-first frameworks. At 1024px exactly, TW's `lg:` has just fired but GB shows the Tablet value. Documented trade-off — not a bug worth engineering around.
+**Important: sm: placement.** `sm:640px` falls inside GB's Mobile range (≤767px) BUT its cascade position is ABOVE default. Mobile tier always picks the default (0px) value — small-screen breakpoint. sm's value cascades forward into Tablet and Desktop. This avoids ambiguity about which value wins in the 640–767px overlap.
+
+**1px boundary:** TW `lg:1024` vs GB `Desktop≥1025` is inherent to mixing frameworks. At exactly 1024px, TW's `lg:` has just fired but GB shows Tablet. Documented — not worth engineering around.
 
 ## Algorithm: Breakpoint Cascade with Tier Collapse
 
@@ -93,16 +95,27 @@ xl     (1280px): "repeat(4, minmax(0, 1fr))"  ← inherited from lg
 
 ### Step 3: Map to GB tiers
 
-| GB Tier | Picks value from TW breakpoint |
+| GB Tier | Picks value from |
 |---|---|
-| **Desktop** (All Screens) | Highest breakpoint with an explicit value (2xl → xl → lg → md → default) |
-| **Tablet** (768–1024) | md value (after cascade) |
-| **Mobile** (≤767) | default or sm value (after cascade) |
+| **Desktop** (All Screens) | Largest breakpoint with an explicit value. Walk 2xl→xl→lg→md→default, first match wins. |
+| **Tablet** (768–1024) | md value (after cascade). Falls back to cascade-inherited if md not set. |
+| **Mobile** (≤767) | default (0px) value. sm: cascades forward, does NOT change Mobile. |
+
+**Desktop rule reasoning:** If a page has `xl:grid-cols-5` but no `2xl:grid-cols-*`, the Desktop value is `xl`. If only `lg:grid-cols-4` is set, Desktop uses `lg`. If neither is set, it walks down until it finds a value. This ensures xl/2xl variants are never silently dropped.
+
+**sm: rule reasoning:** `sm:flex-row` means "flex-row at 640px and up." In GB, Mobile tier shows the default (0px) value. sm cascades into Tablet and Desktop. Example: `flex-col sm:flex-row` → Mobile = column, Tablet/Desktop = row.
 
 ```
-Desktop (All Screens):  lg → "repeat(4, minmax(0, 1fr))"
+default (0px):   "repeat(1, minmax(0, 1fr))"
+sm     (640px):  "repeat(1, minmax(0, 1fr))"  ← inherited from default
+md     (768px):  "repeat(2, minmax(0, 1fr))"  ← explicit
+lg     (1024px): "repeat(4, minmax(0, 1fr))"  ← explicit
+xl     (1280px): "repeat(4, minmax(0, 1fr))"  ← inherited from lg
+2xl    (1536px): "repeat(4, minmax(0, 1fr))"  ← inherited from lg
+
+Desktop (All Screens):  lg → "repeat(4, minmax(0, 1fr))"     ← highest breakpoint with explicit value
 Tablet (768–1024):      md → "repeat(2, minmax(0, 1fr))"
-Mobile (≤767):          default → "repeat(1, minmax(0, 1fr))"
+Mobile (≤767):          default → "repeat(1, minmax(0, 1fr))" ← sm value cascades forward, not used here
 ```
 
 ### Step 4: Emit only diffs
@@ -174,15 +187,44 @@ Result:
 
 ## Edge Cases
 
-### 1. Desktop picks highest breakpoint
+### 1. Desktop picks highest breakpoint with explicit value
+
+Walk 2xl→xl→lg→md→default. First breakpoint that has an explicit value (not inherited) wins.
 
 ```
 Input: "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3"
 
 Desktop = xl → "repeat(3, minmax(0, 1fr))"  ← NOT lg
+Tablet  = — (md not set, cascade inherits from default) → "repeat(1, ...)"
+Mobile  = default → "repeat(1, minmax(0, 1fr))"
+
+Result: only emit Desktop default + Mobile @media (Tablet = Mobile = same value → skip)
+{
+  "gridTemplateColumns": "repeat(3, minmax(0, 1fr))",
+  "@media (max-width: 767px)": {
+    "gridTemplateColumns": "repeat(1, minmax(0, 1fr))"
+  }
+}
 ```
 
-If we naively pick lg, the xl: value disappears. Always resolve the cascade and pick the last (largest) breakpoint with a non-inherited value.
+### 1b. sm: cascades forward, doesn't change Mobile
+
+sm: (640px) sits inside GB's Mobile range (≤767px) but its cascade position is ABOVE default. Mobile always uses the default (0px) value. sm: value cascades into Tablet and Desktop.
+
+```
+Input: "flex-col sm:flex-row"
+
+default: flexDirection = "column"   → Mobile (≤767):  "column"
+sm:      flexDirection = "row"      → cascades to md/lg → Tablet: "row", Desktop: "row"
+
+Result: Mobile = column, Tablet/Desktop = row. Tablet = Desktop → no Tablet @media.
+{
+  "flexDirection": "row",
+  "@media (max-width: 767px)": {
+    "flexDirection": "column"
+  }
+}
+```
 
 ### 2. Value resets are intentional overrides
 
@@ -246,17 +288,17 @@ Tablet = md         → emit Tablet @media
 Desktop = lg        → All Screens default
 ```
 
-### 6. xl/2xl — mapped to All Screens with lg as fallback
+### 6. xl/2xl — same rule as edge case 1 (no separate mapping)
+
+Edge case 1 already covers this. Since Desktop = largest breakpoint with an explicit value, the Desktop default automatically picks xl or 2xl if either is set. No additional logic needed.
 
 ```
 Input: "grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
 
-Desktop = xl → "repeat(4, minmax(0, 1fr))"
+Desktop = xl → "repeat(4, minmax(0, 1fr))"  ← xl picked over lg/md (not set)
 Tablet  = md → "repeat(2, minmax(0, 1fr))"
 Mobile  = default → "repeat(1, minmax(0, 1fr))"
 ```
-
-`lg` was never set — the cascade inherits md's value at lg, then xl overrides. Desktop picks xl.
 
 ### 7. 2xl (1536px) has no dedicated GB tier
 
@@ -284,11 +326,17 @@ Result:
 
 ## What's NOT in V2
 
-- Tailwind arbitrary responsive values (`md:[&>*]:flex`) — pass through
-- Container queries / @container — pass through
-- Print / prefers-reduced-motion / dark mode variants — pass through
-- RTL properties (`ltr:`, `rtl:`) — pass through
-- Non-layout properties at responsive breakpoints (`sm:text-lg`, `md:bg-blue-500`) — cosmetic, not editor-critical, pass through in V1/V2
+V2 only converts breakpoint-prefixed classes that match entries in the existing `MAPPING_TABLE` (the same table used by V1). The MAPPING_TABLE IS the layout vs cosmetic boundary:
+- **Layout** (converted): Any breakpoint-prefixed class matching a MAPPING_TABLE entry → becomes a nested @media style
+- **Cosmetic** (pass through): Any breakpoint-prefixed class NOT matching a MAPPING_TABLE entry → stays as a CSS class in globalClasses
+
+Specifically excluded from responsive conversion:
+- Typography (`sm:text-lg`, `md:font-bold`) — cosmetic, not editor-critical
+- Colors (`md:bg-blue-500`, `lg:text-white`) — cosmetic
+- Borders/radius (`sm:rounded-lg`, `md:border-2`) — cosmetic
+- Shadows/opacity/filters/transforms/transitions — cosmetic
+- Arbitrary responsive values (`md:[&>*]:flex`) — pass through
+- Container queries, print, dark mode, reduced-motion, RTL variants — pass through
 
 ## Implementation Notes
 
