@@ -9,6 +9,17 @@ const SPACING: Record<string, string> = {
   "60": "240px", "64": "256px", "72": "288px", "80": "320px", "96": "384px",
 };
 
+// ── V2 Responsive Types ──────────────────────────────────────
+
+/** GenerateBlocks supports nested @media keys in styles. */
+type GbStyles = Record<string, string | GbStyles>;
+
+/** Tailwind breakpoint prefixes in cascade order (smallest → largest). */
+const BREAKPOINTS: string[] = ["", "sm", "md", "lg", "xl", "2xl"];
+
+/** Regex matching a Tailwind responsive prefix: sm:, md:, lg:, xl:, 2xl: */
+const BP_RE = /^(sm|md|lg|xl|2xl):/;
+
 type MapperEntry = {
   pattern: RegExp;
   apply: (match: RegExpMatchArray) => Record<string, string> | null;
@@ -70,7 +81,7 @@ const MAPPING_TABLE: MapperEntry[] = [
   { pattern: /^shrink$/, apply: () => ({ flexShrink: "1" }) },
   { pattern: /^shrink-0$/, apply: () => ({ flexShrink: "0" }) },
 
-  // ── Gap (directional first, then bidirectional) ──
+  // ── Gap + Space Between (directional first, then bidirectional) ──
   { pattern: /^gap-x-(.+)$/, apply: (m) => SPACING[m[1]] ? { columnGap: SPACING[m[1]] } : null },
   { pattern: /^gap-y-(.+)$/, apply: (m) => SPACING[m[1]] ? { rowGap: SPACING[m[1]] } : null },
   { pattern: /^gap-(.+)$/, apply: (m) => SPACING[m[1]] ? { columnGap: SPACING[m[1]], rowGap: SPACING[m[1]] } : null },
@@ -187,46 +198,146 @@ const MAPPING_TABLE: MapperEntry[] = [
   { pattern: /^basis-(.+)$/, apply: (m) => SPACING[m[1]] ? { flexBasis: SPACING[m[1]] } : null },
 ];
 
+// ── V2 Helpers ──────────────────────────────────────────────
+
+/**
+ * Parse a Tailwind class token into its breakpoint prefix and remaining class name.
+ */
+function parseBreakpointPrefix(token: string): { bp: string; rest: string } {
+  const match = token.match(BP_RE);
+  return match
+    ? { bp: match[1], rest: token.slice(match[0].length) }
+    : { bp: "", rest: token };
+}
+
+function mapTokens(tokens: string[]): { styles: Record<string, string>; leftover: string[] } {
+  const styles: Record<string, string> = {};
+  const leftover: string[] = [];
+  const seen = new Set<string>();
+  for (const token of tokens) {
+    if (seen.has(token)) continue;
+    seen.add(token);
+    let matched = false;
+    for (const entry of MAPPING_TABLE) {
+      const match = token.match(entry.pattern);
+      if (!match) continue;
+      const result = entry.apply(match);
+      if (result === null) continue;
+      Object.assign(styles, result);
+      matched = true;
+      break;
+    }
+    if (!matched) leftover.push(token);
+  }
+  return { styles, leftover };
+}
+
+function groupByProperty(bpStyles: Map<string, Record<string, string>>): Map<string, Map<string, string>> {
+  const byProp = new Map<string, Map<string, string>>();
+  for (const [bp, styles] of bpStyles) {
+    for (const [prop, value] of Object.entries(styles)) {
+      if (!byProp.has(prop)) byProp.set(prop, new Map());
+      byProp.get(prop)!.set(bp, value);
+    }
+  }
+  return byProp;
+}
+
+function resolveCascade(perBp: Map<string, string>): Map<string, string> {
+  const resolved = new Map<string, string>();
+  let lastValue: string | undefined;
+  for (const bp of BREAKPOINTS) {
+    if (perBp.has(bp)) lastValue = perBp.get(bp)!;
+    if (lastValue !== undefined) resolved.set(bp, lastValue);
+  }
+  return resolved;
+}
+
+const GB_TABLET = "(max-width: 1024px) and (min-width: 768px)";
+const GB_MOBILE = "(max-width: 767px)";
+
+function collapseToGbTiers(propKey: string, resolved: Map<string, string>): GbStyles {
+  let desktopValue: string | undefined;
+  for (const bp of [...BREAKPOINTS].reverse()) {
+    if (resolved.has(bp)) { desktopValue = resolved.get(bp)!; break; }
+  }
+  if (desktopValue === undefined) return {};
+  const tabletValue = resolved.get("md") ?? desktopValue;
+  const mobileValue = resolved.get("") ?? tabletValue;
+  const styles: GbStyles = { [propKey]: desktopValue };
+  if (tabletValue !== desktopValue) {
+    styles[`@media ${GB_TABLET}`] = { [propKey]: tabletValue };
+  }
+  if (mobileValue !== tabletValue) {
+    styles[`@media ${GB_MOBILE}`] = { [propKey]: mobileValue };
+  }
+  return styles;
+}
+
+function mergeGbStyles(target: GbStyles, source: GbStyles): void {
+  for (const [key, value] of Object.entries(source)) {
+    if (key.startsWith("@media") && typeof value === "object" && value !== null) {
+      if (!target[key] || typeof target[key] !== "object") target[key] = {};
+      mergeGbStyles(target[key] as GbStyles, value as GbStyles);
+    } else {
+      target[key] = value;
+    }
+  }
+}
+
+function dedupe(arr: string[]): string[] { return [...new Set(arr)]; }
+
+// ── Main Export ─────────────────────────────────────────────
+
 /**
  * Convert Tailwind layout classes to GenerateBlocks element block styles.
- *
- * Processes classes left-to-right in original order. Matched classes are
- * consumed (removed from class list) and converted to GB styles keys.
- * Unmatched classes pass through as leftoverClasses.
+ * Supports responsive prefixes (sm:, md:, lg:, xl:, 2xl:) mapped to GB @media.
  */
 export function tailwindLayoutToGbAttributes(
   classString: string,
-): { styles: Record<string, string>; leftoverClasses: string } {
+): { styles: GbStyles; leftoverClasses: string } {
   if (!classString || !classString.trim()) {
     return { styles: {}, leftoverClasses: "" };
   }
 
   const tokens = classString.trim().split(/\s+/);
-  const styles: Record<string, string> = {};
-  const seenTokens = new Set<string>();
-  const leftover: string[] = [];
+  const seen = new Set<string>();
+  const tokenOrigins = new Map<string, string>();
+  const byBp = new Map<string, string[]>();
+  for (const bp of BREAKPOINTS) byBp.set(bp, []);
 
   for (const token of tokens) {
-    if (seenTokens.has(token)) continue;
-    seenTokens.add(token);
-
-    let matched = false;
-    for (const entry of MAPPING_TABLE) {
-      const match = token.match(entry.pattern);
-      if (!match) continue;
-
-      const result = entry.apply(match);
-      if (result === null) continue;
-
-      Object.assign(styles, result);
-      matched = true;
-      break;
-    }
-
-    if (!matched) {
-      leftover.push(token);
-    }
+    if (seen.has(token)) continue;
+    seen.add(token);
+    const { bp, rest } = parseBreakpointPrefix(token);
+    byBp.get(bp)!.push(rest);
+    if (bp !== "") tokenOrigins.set(rest, token);
   }
 
-  return { styles, leftoverClasses: leftover.join(" ") };
+  const bpStyles = new Map<string, Record<string, string>>();
+  const rawLeftover: string[] = [];
+  for (const bp of BREAKPOINTS) {
+    const bpTokens = byBp.get(bp)!;
+    if (bpTokens.length === 0) continue;
+    const result = mapTokens(bpTokens);
+    bpStyles.set(bp, result.styles);
+    rawLeftover.push(...result.leftover);
+  }
+
+  // Restore original tokens for leftovers that lost their breakpoint prefix
+  const leftoverAll = rawLeftover.map(t => tokenOrigins.get(t) || t);
+
+  const hasResponsive = [...bpStyles.keys()].some(bp => bp !== "");
+  if (!hasResponsive) {
+    return { styles: bpStyles.get("") || {}, leftoverClasses: dedupe(leftoverAll).join(" ") };
+  }
+
+  const byProp = groupByProperty(bpStyles);
+  const finalStyles: GbStyles = {};
+  for (const [prop, perBp] of byProp) {
+    const resolved = resolveCascade(perBp);
+    mergeGbStyles(finalStyles, collapseToGbTiers(prop, resolved));
+  }
+
+  return { styles: finalStyles, leftoverClasses: dedupe(leftoverAll).join(" ") };
 }
