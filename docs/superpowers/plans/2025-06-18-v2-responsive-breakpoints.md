@@ -601,6 +601,19 @@ describe("V2 — responsive breakpoints", () => {
     assert.ok(result.leftoverClasses.includes(":broken-prefix"));
   });
 
+  // ── Edge: stacked prefix (md:hover:flex) ──
+  it("stacked breakpoint+state prefix — breaks on bp, state survives", () => {
+    const result = tailwindLayoutToGbAttributes(
+      "md:hover:flex md:hover:bg-primary"
+    );
+    // md:hover:flex → bp=md, rest="hover:flex" → doesn't match MAPPING_TABLE
+    // class survives intact in leftoverClasses
+    assert.ok(result.leftoverClasses.includes("md:hover:flex"));
+    assert.ok(result.leftoverClasses.includes("md:hover:bg-primary"));
+    // No @media emitted (no mappable layout class at md breakpoint)
+    assert.strictEqual(result.styles.display, undefined);
+  });
+
   // ── Integration: GbStyles survive dom-walker spread ──
   it("nested @media keys survive shallow merge with existing styles", () => {
     // Simulate applyLayoutMapper: { ...existingStyles, ...result.styles }

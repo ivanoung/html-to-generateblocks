@@ -120,7 +120,7 @@ Mobile (≤767):          default → "repeat(1, minmax(0, 1fr))" ← sm value c
 
 ### Step 4: Emit only diffs
 
-Only emit `@media` when the tier's value differs from the tier above:
+Only emit `@media` when the tier's value differs from the tier above. **Flat keys (desktop defaults) are always emitted first, then @media blocks.** CSS output order is deterministic — defaults before overrides ensures correct cascade within GB's renderer.
 
 ```
 All Screens:  "repeat(4, minmax(0, 1fr))"           ← always emitted
@@ -322,6 +322,24 @@ Result:
   "styles": { "display": "flex" },
   "globalClasses": ["md:gap-[13px]"]
 }
+```
+
+### 9. Stacked prefixes — breakpoint + state (md:hover:flex)
+
+Tailwind supports stacking breakpoint prefixes with state prefixes. The breakpoint parser extracts ONLY the recognized breakpoint (sm/md/lg/xl/2xl) and the `rest` is processed through MAPPING_TABLE:
+
+```
+Input: "md:hover:flex"
+
+Parser: bp="md", rest="hover:flex"
+Mapper: "hover:flex" doesn't match any MAPPING_TABLE entry → leftover
+
+Result: class survives as "md:hover:flex" in globalClasses.
+The responsive prefix was consumed (bp="md") but the state prefix
+prevents mapper matching — safe passthrough.
+
+Intentionally NOT stripped in V2. The full class "md:hover:flex"
+preserves both the breakpoint and state semantics in the CSS fallback.
 ```
 
 ## What's NOT in V2
