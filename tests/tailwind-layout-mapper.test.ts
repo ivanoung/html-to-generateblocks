@@ -307,4 +307,58 @@ describe("V2 — responsive breakpoints", () => {
     assert.strictEqual(r.styles.columnGap, "16px");
     assert.ok(r.leftoverClasses.includes("shadow-lg"));
   });
+
+  // ── Regression: downward-leak prevention ──
+
+  it("gridColumn lg-only — NOT in All Screens", () => {
+    const r = tailwindLayoutToGbAttributes("lg:col-span-7");
+    assert.strictEqual(r.styles.gridColumn, undefined);
+    const d = r.styles["@media (min-width: 1025px)"] as any;
+    assert.strictEqual(d.gridColumn, "span 7");
+  });
+
+  it("gap md-only — NOT in All Screens", () => {
+    const r = tailwindLayoutToGbAttributes("md:gap-4");
+    assert.strictEqual(r.styles.columnGap, undefined);
+    const d = r.styles["@media (min-width: 1025px)"] as any;
+    assert.strictEqual(d.columnGap, "16px");
+  });
+
+  it("flexBasis sm-only — NOT in mobile", () => {
+    const r = tailwindLayoutToGbAttributes("sm:basis-8");
+    assert.strictEqual(r.styles.flexBasis, undefined);
+    const d = r.styles["@media (min-width: 1025px)"] as any;
+    assert.strictEqual(d.flexBasis, "32px");
+    assert.strictEqual(r.styles["@media (max-width: 767px)"], undefined);
+  });
+
+  it("overflow md-only — NOT in mobile", () => {
+    const r = tailwindLayoutToGbAttributes("md:overflow-hidden");
+    assert.strictEqual(r.styles.overflowX, undefined);
+    const d = r.styles["@media (min-width: 1025px)"] as any;
+    assert.strictEqual(d.overflowX, "hidden");
+  });
+
+  it("gap with default — flat property, no redundant mobile @media", () => {
+    const r = tailwindLayoutToGbAttributes("gap-4 lg:gap-8");
+    assert.strictEqual(r.styles.columnGap, "32px");
+    // Mobile = Tablet = 16px (inherited) → same value, skip both @media
+  });
+
+  it("col-span with default — all tiers", () => {
+    const r = tailwindLayoutToGbAttributes("col-span-1 md:col-span-2 lg:col-span-4");
+    assert.strictEqual(r.styles.gridColumn, "span 4");
+    const t = r.styles["@media (max-width: 1024px)"] as any;
+    assert.strictEqual(t.gridColumn, "span 2");
+    const m = r.styles["@media (max-width: 767px)"] as any;
+    assert.strictEqual(m.gridColumn, "span 1");
+  });
+
+  it("flexDirection with default — flat + tablet override", () => {
+    const r = tailwindLayoutToGbAttributes("flex-col lg:flex-row");
+    assert.strictEqual(r.styles.flexDirection, "row");
+    // Mobile = Tablet = column (inherited) → same value, only Tablet @media
+    const t = r.styles["@media (max-width: 1024px)"] as any;
+    assert.strictEqual(t.flexDirection, "column");
+  });
 });
