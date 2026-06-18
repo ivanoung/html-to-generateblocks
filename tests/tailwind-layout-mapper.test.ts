@@ -218,9 +218,13 @@ describe("V2 — responsive breakpoints", () => {
 
   it("multi-property responsive: display + gap", () => {
     const r = tailwindLayoutToGbAttributes("flex flex-col md:flex-row md:gap-4 lg:gap-8");
+    // display has default → flat property
     assert.strictEqual(r.styles.display, "flex");
+    // flexDirection has default → flat property
     assert.strictEqual(r.styles.flexDirection, "row");
-    assert.strictEqual(r.styles.columnGap, "32px");
+    // gap has NO default → goes into @media (min-width: 1025px)
+    const d = r.styles["@media (min-width: 1025px)"] as any;
+    assert.strictEqual(d.columnGap, "32px");
     const t = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t.columnGap, "16px");
     const m = r.styles["@media (max-width: 767px)"] as any;
@@ -229,18 +233,25 @@ describe("V2 — responsive breakpoints", () => {
 
   it("merges multiple properties into same @media block", () => {
     const r = tailwindLayoutToGbAttributes("flex-col sm:flex-row sm:gap-4 lg:gap-8");
+    // flexDirection has default → flat property
     assert.strictEqual(r.styles.flexDirection, "row");
-    assert.strictEqual(r.styles.columnGap, "32px");
+    // gap has NO default → goes into @media (min-width: 1025px)
+    const d = r.styles["@media (min-width: 1025px)"] as any;
+    assert.strictEqual(d.columnGap, "32px");
     const t = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t.columnGap, "16px");
     const m = r.styles["@media (max-width: 767px)"] as any;
     assert.strictEqual(m.flexDirection, "column");
+    // No gap at mobile (no default value was set)
+    assert.strictEqual(m.columnGap, undefined);
   });
 
-  it("sm:-only with no default — Desktop gets sm value", () => {
+  it("sm:-only with no default — Desktop gets sm value in @media (min-width: 1025px)", () => {
     const r = tailwindLayoutToGbAttributes("sm:flex sm:gap-4");
-    assert.strictEqual(r.styles.display, "flex");
-    assert.strictEqual(r.styles.columnGap, "16px");
+    // No default value → desktop goes into @media (min-width: 1025px)
+    const d = r.styles["@media (min-width: 1025px)"] as any;
+    assert.strictEqual(d.display, "flex");
+    assert.strictEqual(d.columnGap, "16px");
     assert.strictEqual(r.styles["@media (max-width: 767px)"], undefined);
   });
 

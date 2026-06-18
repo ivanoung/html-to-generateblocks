@@ -253,24 +253,58 @@ function resolveCascade(perBp: Map<string, string>): Map<string, string> {
   return resolved;
 }
 
+const GB_DESKTOP = "(min-width: 1025px)";
 const GB_TABLET = "(max-width: 1024px)";
 const GB_MOBILE = "(max-width: 767px)";
 
+/**
+ * Map cascade-resolved breakpoint values to GB's 3-tier responsive structure.
+ *
+ * Desktop: largest breakpoint with a value. If a default (0px) value exists,
+ * desktop goes into All Screens. If ONLY larger breakpoints have values
+ * (e.g., lg:col-span-7 with no default), desktop goes into @media (min-width: 1025px)
+ * so it doesn't leak to mobile.
+ */
 function collapseToGbTiers(propKey: string, resolved: Map<string, string>): GbStyles {
+  // Find highest breakpoint with a value
   let desktopValue: string | undefined;
   for (const bp of [...BREAKPOINTS].reverse()) {
     if (resolved.has(bp)) { desktopValue = resolved.get(bp)!; break; }
   }
   if (desktopValue === undefined) return {};
-  const tabletValue = resolved.get("md") ?? desktopValue;
-  const mobileValue = resolved.get("") ?? tabletValue;
-  const styles: GbStyles = { [propKey]: desktopValue };
-  if (tabletValue !== desktopValue) {
-    styles[`@media ${GB_TABLET}`] = { [propKey]: tabletValue };
+
+  const hasDefault = resolved.has("");
+  const tabletValue = resolved.get("md");
+  const mobileValue = resolved.get("");
+
+  const styles: GbStyles = {};
+
+  if (hasDefault) {
+    // Default value exists → desktop goes into All Screens
+    styles[propKey] = desktopValue;
+  } else {
+    // No default value → desktop goes into @media (min-width: 1025px) only
+    styles[`@media ${GB_DESKTOP}`] = { [propKey]: desktopValue };
   }
-  if (mobileValue !== tabletValue) {
-    styles[`@media ${GB_MOBILE}`] = { [propKey]: mobileValue };
+
+  // Tablet: only emit if md has a value AND it differs from what users would see without it.
+  // If hasDefault: compare vs desktop. If !hasDefault: emit if md has a value.
+  if (tabletValue !== undefined) {
+    if (hasDefault && tabletValue !== desktopValue) {
+      styles[`@media ${GB_TABLET}`] = { [propKey]: tabletValue };
+    } else if (!hasDefault && tabletValue !== desktopValue) {
+      styles[`@media ${GB_TABLET}`] = { [propKey]: tabletValue };
+    }
   }
+
+  // Mobile: only emit if default exists and differs from tablet, or from desktop if no tablet.
+  if (mobileValue !== undefined) {
+    const compareValue = tabletValue ?? desktopValue;
+    if (mobileValue !== compareValue) {
+      styles[`@media ${GB_MOBILE}`] = { [propKey]: mobileValue };
+    }
+  }
+
   return styles;
 }
 
