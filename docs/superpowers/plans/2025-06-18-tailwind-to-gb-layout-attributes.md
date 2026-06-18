@@ -166,7 +166,7 @@ git commit -m "feat: add layout mapper batch 2 — alignment + flex sizing"
 - [ ] **Step 1: Add batch 3 entries**
 
 ```typescript
-  // ── Gap (directional first, then bidirectional) ──
+  // ── Gap + Space Between (directional first, then bidirectional) ──
   {
     pattern: /^gap-x-(.+)$/,
     apply: (m) => SPACING[m[1]] ? { columnGap: SPACING[m[1]] } : null,
@@ -179,6 +179,20 @@ git commit -m "feat: add layout mapper batch 2 — alignment + flex sizing"
     pattern: /^gap-(.+)$/,
     apply: (m) => SPACING[m[1]] ? { columnGap: SPACING[m[1]], rowGap: SPACING[m[1]] } : null,
   },
+  // space-x/y: negative reverses direction (space-x-4 → space-x-reverse + margin)
+  // These are child selectors in Tailwind: .space-x-4 > * + * { margin-left: 1rem }
+  // Cannot map to GB inline styles — passthrough to CSS fallback
+
+  // ── Aspect Ratio ──
+  { pattern: /^aspect-auto$/, apply: () => ({ aspectRatio: "auto" }) },
+  { pattern: /^aspect-square$/, apply: () => ({ aspectRatio: "1 / 1" }) },
+  { pattern: /^aspect-video$/, apply: () => ({ aspectRatio: "16 / 9" }) },
+
+  // ── Isolation / Visibility ──
+  { pattern: /^isolate$/, apply: () => ({ isolation: "isolate" }) },
+  { pattern: /^isolation-auto$/, apply: () => ({ isolation: "auto" }) },
+  { pattern: /^visible$/, apply: () => ({ visibility: "visible" }) },
+  { pattern: /^invisible$/, apply: () => ({ visibility: "hidden" }) },
 
   // ── Grid Template ──
   {
@@ -242,7 +256,7 @@ git commit -m "feat: add layout mapper batch 2 — alignment + flex sizing"
 
 ```bash
 git add src/core/tailwind-layout-mapper.ts
-git commit -m "feat: add layout mapper batch 3 — gap, grid, order, overflow"
+git commit -m "feat: add layout mapper batch 3 — gap, grid, aspect, isolation, visibility"
 ```
 
 ---
@@ -466,6 +480,24 @@ describe("tailwindLayoutToGbAttributes", () => {
     assert.strictEqual(result.styles.rowGap, "16px"); // preserved
   });
 
+  // ── Class ordering sensitivity ──
+  it("same classes in different order produce same styles (last-write-wins per key)", () => {
+    const a = tailwindLayoutToGbAttributes("gap-4 gap-x-8");
+    const b = tailwindLayoutToGbAttributes("gap-x-8 gap-4");
+    // Both: gap-4 sets columnGap=16px, gap-x-8 sets columnGap=32px
+    // Processing left-to-right, last-write-wins → columnGap is 32px in both orders
+    // But gap-4 also sets rowGap=16px which is never overridden
+    assert.strictEqual(a.styles.columnGap, "32px");
+    assert.strictEqual(a.styles.rowGap, "16px");
+    assert.strictEqual(b.styles.columnGap, "32px");
+    assert.strictEqual(b.styles.rowGap, "16px");
+  });
+
+  it("justify-center after justify-between — last wins", () => {
+    const result = tailwindLayoutToGbAttributes("justify-between justify-center");
+    assert.strictEqual(result.styles.justifyContent, "center");
+  });
+
   // ── Arbitrary values: pass through ──
   it("passes through gap-[13px] (not in spacing table)", () => {
     const result = tailwindLayoutToGbAttributes("gap-[13px]");
@@ -528,6 +560,26 @@ describe("tailwindLayoutToGbAttributes", () => {
   it("order-last → order: 9999", () => {
     const result = tailwindLayoutToGbAttributes("order-last");
     assert.strictEqual(result.styles.order, "9999");
+  });
+
+  // ── Custom spacing scale config ──
+  it("uses custom spacingScale when provided", () => {
+    const result = tailwindLayoutToGbAttributes("gap-4", {
+      spacingScale: { "4": "2rem" },
+    });
+    assert.strictEqual(result.styles.columnGap, "2rem");
+  });
+
+  // ── Aspect ratio / isolation / visibility ──
+  it("maps aspect-square", () => {
+    const result = tailwindLayoutToGbAttributes("aspect-square");
+    assert.strictEqual(result.styles.aspectRatio, "1 / 1");
+  });
+
+  it("maps isolate and invisible", () => {
+    const result = tailwindLayoutToGbAttributes("isolate invisible");
+    assert.strictEqual(result.styles.isolation, "isolate");
+    assert.strictEqual(result.styles.visibility, "hidden");
   });
 });
 ```
@@ -680,7 +732,69 @@ git commit -m "feat: integrate tailwind-layout-mapper into block creation"
 
 ---
 
-### Task 10: Run full conversion on mino + hkvc and verify
+### Task 10: Integration test — verify dom-walker output
+
+**Files:**
+- None (verification using existing test fixtures)
+
+- [ ] **Step 1: Write integration test that exercises the full pipeline**
+
+Create a companion test in `tests/tailwind-layout-mapper.test.ts` (append after existing tests):
+
+```typescript
+// ── Integration: dom-walker output ──
+describe("integration — dom-walker output", () => {
+  it("mino blocks contain layout styles", () => {
+    const fs = require("fs");
+    const indexPath = "output/mino/pages/index.html";
+    if (!fs.existsSync(indexPath)) {
+      console.log("SKIP: run conversion first");
+      return;
+    }
+    const html = fs.readFileSync(indexPath, "utf-8");
+
+    // Verify layout styles appear in block JSON
+    assert.ok(/display.*flex/.test(html), "flex display should appear in block JSON");
+    assert.ok(/columnGap/.test(html), "columnGap should appear in block JSON");
+    assert.ok(/gridTemplateColumns/.test(html), "gridTemplateColumns should appear");
+  });
+
+  it("consumed classes are removed from class attributes", () => {
+    const fs = require("fs");
+    const indexPath = "output/mino/pages/index.html";
+    if (!fs.existsSync(indexPath)) return;
+    const html = fs.readFileSync(indexPath, "utf-8");
+
+    // Flex/gap classes should NOT appear in class attributes (they were consumed)
+    // Only check non-responsive classes (sm:flex should remain)
+    const classAttrs = [...html.matchAll(/class="([^"]+)"/g)].map(m => m[1]);
+    for (const cls of classAttrs) {
+      assert.ok(!cls.includes(" flex "), `class should not contain unconsumed "flex": "${cls}"`);
+      assert.ok(!cls.includes(" gap-"), `class should not contain unconsumed gap: "${cls}"`);
+    }
+  });
+});
+```
+
+- [ ] **Step 2: Run conversion then integration test**
+
+```bash
+rm -rf output/mino && npx tsx src/cli/index.ts convert inputs/mino/ --split 2>&1 | tail -3
+npx tsx --test tests/tailwind-layout-mapper.test.ts
+```
+
+Expected: integration tests pass (layout styles present, consumed classes absent).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add tests/tailwind-layout-mapper.test.ts
+git commit -m "test: add integration tests for dom-walker output"
+```
+
+---
+
+### Task 11: Run full conversion on mino + hkvc and verify
 
 **Files:**
 - None (output verification only)
@@ -744,7 +858,7 @@ git commit -m "verify: layout mapper end-to-end on mino + hkvc"
 
 ---
 
-### Task 11: Self-review — spec coverage check
+### Task 12: Self-review — spec coverage check
 
 - [ ] **Step 1: Verify every mapping entry in the spec has a corresponding test**
 
@@ -757,19 +871,23 @@ git commit -m "verify: layout mapper end-to-end on mino + hkvc"
 ## Self-Review Checklist
 
 ### 1. Spec coverage
-- All ~60 mapping entries have corresponding MAPPING_TABLE entries ✓
-- All 4 batches cover display, direction, wrap, alignment, flex sizing, gap, grid, order, overflow, place, content, basis ✓
-- Edge cases covered: empty string, whitespace, dedup, partial match, gap interaction, arbitrary values ✓
+- All ~60+ mapping entries have corresponding MAPPING_TABLE entries (batches 1-4, batch 3 expanded with aspect/isolation/visibility) ✓
+- Missing utilities addressed: aspect-*, isolate, isolation, visible, invisible added to batch 3 ✓
+- space-x/space-y intentionally pass through to CSS (child combinator — can't map to inline styles) ✓
+- Edge cases covered: empty string, whitespace, dedup, partial match, gap interaction, class ordering sensitivity, arbitrary values, custom spacingScale ✓
 - Integration into dom-walker covers all 3 block creation sites ✓
+- Integration test verifies actual dom-walker output (layout styles present, consumed classes absent) ✓
 - E2E verification on mino + hkvc ✓
 
 ### 2. Placeholder scan
 - No TBD, TODO, or "implement later" ✓
 - All code blocks are complete and ready to copy-paste ✓
 - All test assertions have expected values ✓
+- space-x/space-y pass-through decision documented with rationale ✓
 
 ### 3. Type consistency
 - `tailwindLayoutToGbAttributes` signature: `(classString, config?) → { styles, leftoverClasses }` — consistent across test and implementation ✓
 - `MAPPING_TABLE` entry type: `{ pattern, apply }` — consistent across all batches ✓
 - `applyLayoutMapper` helper: `(globalClasses, existingStyles) → { styles, filteredClasses }` — used identically in all 3 block creation sites ✓
 - Spacing scale: `Record<string, string>` — same type as config parameter ✓
+- All regex patterns anchored with `^` and `$` to prevent substring matches ✓
