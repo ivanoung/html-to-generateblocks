@@ -10,6 +10,7 @@
 
 import * as cheerio from "cheerio";
 import type { Block, BlockStyles } from "./types.js";
+import { tailwindLayoutToGbAttributes } from "./tailwind-layout-mapper.js";
 import { nextId } from "./id-generator.js";
 import { parseStyleString } from "./style-parser.js";
 import type { GlobalStylesCollector } from "./global-styles-collector.js";
@@ -236,6 +237,7 @@ function makeTextBlock(
 
   const htmlAttributes = extractHtmlAttributes($el);
   const globalClasses = extractGlobalClasses($el, opts);
+  const layoutResult = applyLayoutMapper(globalClasses, styles);
 
   // Content is innerHTML (preserves inline formatting, strips comments)
   const content = stripHtmlComments($el.html()) || $el.text() || "";
@@ -245,9 +247,9 @@ function makeTextBlock(
     uniqueId: nextId("text"),
     tagName: tag,
     content,
-    styles,
+    styles: layoutResult.styles,
     css,
-    globalClasses: globalClasses.length > 0 ? globalClasses : undefined,
+    globalClasses: layoutResult.filteredClasses.length > 0 ? layoutResult.filteredClasses : undefined,
     htmlAttributes:
       Object.keys(htmlAttributes).length > 0 ? htmlAttributes : undefined,
     innerBlocks: [],
@@ -266,14 +268,15 @@ function makeElementBlock(
 
   const htmlAttributes = extractHtmlAttributes($el);
   const globalClasses = extractGlobalClasses($el, opts);
+  const layoutResult = applyLayoutMapper(globalClasses, styles);
 
   return {
     blockName: "generateblocks/element",
     uniqueId: nextId("elem"),
     tagName: tag,
-    styles,
+    styles: layoutResult.styles,
     css,
-    globalClasses: globalClasses.length > 0 ? globalClasses : undefined,
+    globalClasses: layoutResult.filteredClasses.length > 0 ? layoutResult.filteredClasses : undefined,
     htmlAttributes:
       Object.keys(htmlAttributes).length > 0 ? htmlAttributes : undefined,
     innerBlocks: [],
@@ -299,14 +302,15 @@ function makeMediaBlock(
   if (height) htmlAttributes.height = height;
 
   const globalClasses = extractGlobalClasses($el, opts);
+  const layoutResult = applyLayoutMapper(globalClasses, styles);
 
   return {
     blockName: "generateblocks/media",
     uniqueId: nextId("img"),
     tagName: "img",
-    styles,
+    styles: layoutResult.styles,
     css,
-    globalClasses: globalClasses.length > 0 ? globalClasses : undefined,
+    globalClasses: layoutResult.filteredClasses.length > 0 ? layoutResult.filteredClasses : undefined,
     htmlAttributes,
     mediaId: 0,
     innerBlocks: [],
@@ -465,6 +469,32 @@ function extractGlobalClasses(
   });
 
   return result;
+}
+
+/**
+ * Apply the Tailwind layout mapper to extracted global classes.
+ * Returns merged styles and filtered class list.
+ */
+function applyLayoutMapper(
+  globalClasses: string[],
+  existingStyles: Record<string, string>,
+): { styles: Record<string, string>; filteredClasses: string[] } {
+  if (globalClasses.length === 0) {
+    return { styles: { ...existingStyles }, filteredClasses: [] };
+  }
+
+  const classString = globalClasses.join(" ");
+  const result = tailwindLayoutToGbAttributes(classString);
+
+  // Merge mapper styles into existing styles (mapper wins on conflicts)
+  const mergedStyles = { ...existingStyles, ...result.styles };
+
+  // Filter classes
+  const leftover = result.leftoverClasses
+    ? result.leftoverClasses.split(/\s+/).filter((c) => c.length > 0)
+    : [];
+
+  return { styles: mergedStyles, filteredClasses: leftover };
 }
 
 // ── Entry point ────────────────────────────────────────────
