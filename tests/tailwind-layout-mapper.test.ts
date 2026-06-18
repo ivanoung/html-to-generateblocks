@@ -169,7 +169,7 @@ describe("V2 — responsive breakpoints", () => {
   it("maps md:grid-cols-2 lg:grid-cols-4 with cascade", () => {
     const r = tailwindLayoutToGbAttributes("grid-cols-1 md:grid-cols-2 lg:grid-cols-4");
     assert.strictEqual(r.styles.gridTemplateColumns, "repeat(4, minmax(0, 1fr))");
-    const t = r.styles["@media (max-width: 1024px) and (min-width: 768px)"] as any;
+    const t = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t.gridTemplateColumns, "repeat(2, minmax(0, 1fr))");
     const m = r.styles["@media (max-width: 767px)"] as any;
     assert.strictEqual(m.gridTemplateColumns, "repeat(1, minmax(0, 1fr))");
@@ -182,28 +182,28 @@ describe("V2 — responsive breakpoints", () => {
     const m = r.styles["@media (max-width: 767px)"] as any;
     assert.strictEqual(m.flexDirection, "column");
     // Tablet = Desktop = row → no Tablet @media
-    assert.strictEqual(r.styles["@media (max-width: 1024px) and (min-width: 768px)"], undefined);
+    assert.strictEqual(r.styles["@media (max-width: 1024px)"], undefined);
   });
 
   it("xl: overrides lg — Desktop picks highest breakpoint", () => {
     const r = tailwindLayoutToGbAttributes("grid-cols-1 lg:grid-cols-2 xl:grid-cols-3");
     assert.strictEqual(r.styles.gridTemplateColumns, "repeat(3, minmax(0, 1fr))");
-    const t = r.styles["@media (max-width: 1024px) and (min-width: 768px)"] as any;
+    const t = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t.gridTemplateColumns, "repeat(1, minmax(0, 1fr))");
   });
 
   it("skips redundant @media when value unchanged across tiers", () => {
     const r = tailwindLayoutToGbAttributes("grid-cols-2 md:grid-cols-2 lg:grid-cols-4");
-    const t2 = r.styles["@media (max-width: 1024px) and (min-width: 768px)"] as any;
+    const t2 = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t2.gridTemplateColumns, "repeat(2, minmax(0, 1fr))");
-    const t3 = r.styles["@media (max-width: 1024px) and (min-width: 768px)"] as any;
+    const t3 = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t3.gridTemplateColumns, "repeat(2, minmax(0, 1fr))");
   });
 
   it("handles lg:grid-cols-none as intentional reset", () => {
     const r = tailwindLayoutToGbAttributes("grid-cols-4 md:grid-cols-2 lg:grid-cols-none");
     assert.strictEqual(r.styles.gridTemplateColumns, "none");
-    const t = r.styles["@media (max-width: 1024px) and (min-width: 768px)"] as any;
+    const t = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t.gridTemplateColumns, "repeat(2, minmax(0, 1fr))");
     const m = r.styles["@media (max-width: 767px)"] as any;
     assert.strictEqual(m.gridTemplateColumns, "repeat(4, minmax(0, 1fr))");
@@ -221,7 +221,7 @@ describe("V2 — responsive breakpoints", () => {
     assert.strictEqual(r.styles.display, "flex");
     assert.strictEqual(r.styles.flexDirection, "row");
     assert.strictEqual(r.styles.columnGap, "32px");
-    const t = r.styles["@media (max-width: 1024px) and (min-width: 768px)"] as any;
+    const t = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t.columnGap, "16px");
     const m = r.styles["@media (max-width: 767px)"] as any;
     assert.strictEqual(m.flexDirection, "column");
@@ -231,7 +231,7 @@ describe("V2 — responsive breakpoints", () => {
     const r = tailwindLayoutToGbAttributes("flex-col sm:flex-row sm:gap-4 lg:gap-8");
     assert.strictEqual(r.styles.flexDirection, "row");
     assert.strictEqual(r.styles.columnGap, "32px");
-    const t = r.styles["@media (max-width: 1024px) and (min-width: 768px)"] as any;
+    const t = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t.columnGap, "16px");
     const m = r.styles["@media (max-width: 767px)"] as any;
     assert.strictEqual(m.flexDirection, "column");
@@ -247,14 +247,14 @@ describe("V2 — responsive breakpoints", () => {
   it("2xl:-only — Desktop picks 2xl", () => {
     const r = tailwindLayoutToGbAttributes("grid-cols-2 2xl:grid-cols-4");
     assert.strictEqual(r.styles.gridTemplateColumns, "repeat(4, minmax(0, 1fr))");
-    const t3 = r.styles["@media (max-width: 1024px) and (min-width: 768px)"] as any;
+    const t3 = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t3.gridTemplateColumns, "repeat(2, minmax(0, 1fr))");
   });
 
   it("mixed breakpoints: sm: md: lg: xl: all on same property", () => {
     const r = tailwindLayoutToGbAttributes("gap-1 sm:gap-2 md:gap-4 lg:gap-8 xl:gap-12");
     assert.strictEqual(r.styles.columnGap, "48px");
-    const t = r.styles["@media (max-width: 1024px) and (min-width: 768px)"] as any;
+    const t = r.styles["@media (max-width: 1024px)"] as any;
     assert.strictEqual(t.columnGap, "16px");
     const m = r.styles["@media (max-width: 767px)"] as any;
     assert.strictEqual(m.columnGap, "4px");

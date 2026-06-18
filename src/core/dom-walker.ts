@@ -237,18 +237,22 @@ function makeTextBlock(
 
   const htmlAttributes = extractHtmlAttributes($el);
   const globalClasses = extractGlobalClasses($el, opts);
-  const layoutResult = applyLayoutMapper(globalClasses, styles);
+  const textId = nextId("text");
+  const layoutResult = applyLayoutMapper(globalClasses, styles, textId);
+
+  // Append mapper-generated CSS to the block's css field
+  const blockCss = css + layoutResult.cssAddition;
 
   // Content is innerHTML (preserves inline formatting, strips comments)
   const content = stripHtmlComments($el.html()) || $el.text() || "";
 
   return {
     blockName: "generateblocks/text",
-    uniqueId: nextId("text"),
+    uniqueId: textId,
     tagName: tag,
     content,
     styles: layoutResult.styles,
-    css,
+    css: blockCss,
     globalClasses: layoutResult.filteredClasses.length > 0 ? layoutResult.filteredClasses : undefined,
     htmlAttributes:
       Object.keys(htmlAttributes).length > 0 ? htmlAttributes : undefined,
@@ -268,14 +272,18 @@ function makeElementBlock(
 
   const htmlAttributes = extractHtmlAttributes($el);
   const globalClasses = extractGlobalClasses($el, opts);
-  const layoutResult = applyLayoutMapper(globalClasses, styles);
+  const elemId = nextId("elem");
+  const layoutResult = applyLayoutMapper(globalClasses, styles, elemId);
+
+  // Append mapper-generated CSS to the block's css field
+  const blockCss = css + layoutResult.cssAddition;
 
   return {
     blockName: "generateblocks/element",
-    uniqueId: nextId("elem"),
+    uniqueId: elemId,
     tagName: tag,
     styles: layoutResult.styles,
-    css,
+    css: blockCss,
     globalClasses: layoutResult.filteredClasses.length > 0 ? layoutResult.filteredClasses : undefined,
     htmlAttributes:
       Object.keys(htmlAttributes).length > 0 ? htmlAttributes : undefined,
@@ -302,14 +310,18 @@ function makeMediaBlock(
   if (height) htmlAttributes.height = height;
 
   const globalClasses = extractGlobalClasses($el, opts);
-  const layoutResult = applyLayoutMapper(globalClasses, styles);
+  const imgId = nextId("img");
+  const layoutResult = applyLayoutMapper(globalClasses, styles, imgId);
+
+  // Append mapper-generated CSS to the block's css field
+  const blockCss = css + layoutResult.cssAddition;
 
   return {
     blockName: "generateblocks/media",
-    uniqueId: nextId("img"),
+    uniqueId: imgId,
     tagName: "img",
     styles: layoutResult.styles,
-    css,
+    css: blockCss,
     globalClasses: layoutResult.filteredClasses.length > 0 ? layoutResult.filteredClasses : undefined,
     htmlAttributes,
     mediaId: 0,
@@ -473,28 +485,64 @@ function extractGlobalClasses(
 
 /**
  * Apply the Tailwind layout mapper to extracted global classes.
- * Returns merged styles and filtered class list.
+ * Returns merged styles, filtered class list, and CSS string mirroring the new styles.
  */
 function applyLayoutMapper(
   globalClasses: string[],
-  existingStyles: Record<string, string>,
-): { styles: Record<string, string>; filteredClasses: string[] } {
+  existingStyles: Record<string, unknown>,
+  uniqueId: string,
+): { styles: Record<string, unknown>; filteredClasses: string[]; cssAddition: string } {
   if (globalClasses.length === 0) {
-    return { styles: { ...existingStyles }, filteredClasses: [] };
+    return { styles: { ...existingStyles }, filteredClasses: [], cssAddition: "" };
   }
 
   const classString = globalClasses.join(" ");
   const result = tailwindLayoutToGbAttributes(classString);
 
-  // Merge mapper styles into existing styles (mapper wins on conflicts)
   const mergedStyles = { ...existingStyles, ...result.styles };
+  const cssAddition = mapperStylesToCss(result.styles as Record<string, unknown>, uniqueId);
 
-  // Filter classes
   const leftover = result.leftoverClasses
     ? result.leftoverClasses.split(/\s+/).filter((c) => c.length > 0)
     : [];
 
-  return { styles: mergedStyles, filteredClasses: leftover };
+  return { styles: mergedStyles, filteredClasses: leftover, cssAddition };
+}
+
+function mapperStylesToCss(styles: Record<string, unknown>, uniqueId: string): string {
+  const selector = `.gb-element-${uniqueId}`;
+  let css = "";
+
+  const flatProps: string[] = [];
+  for (const [key, value] of Object.entries(styles)) {
+    if (key.startsWith("@media")) continue;
+    if (typeof value !== "string") continue;
+    flatProps.push(`${camelToDash(key)}:${value}`);
+  }
+  if (flatProps.length > 0) {
+    css = `${selector}{${flatProps.join(";")}}`;
+  }
+
+  // @media blocks
+  for (const [key, value] of Object.entries(styles)) {
+    if (!key.startsWith("@media")) continue;
+    if (typeof value !== "object" || value === null) continue;
+    const innerProps: string[] = [];
+    for (const [ik, iv] of Object.entries(value as Record<string, unknown>)) {
+      if (typeof iv === "string") {
+        innerProps.push(`${camelToDash(ik)}:${iv}`);
+      }
+    }
+    if (innerProps.length > 0) {
+      css += `${key}{${selector}{${innerProps.join(";")}}}}`;
+    }
+  }
+
+  return css;
+}
+
+function camelToDash(str: string): string {
+  return str.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
 }
 
 // ── Entry point ────────────────────────────────────────────

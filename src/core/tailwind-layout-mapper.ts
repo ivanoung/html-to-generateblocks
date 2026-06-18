@@ -253,7 +253,7 @@ function resolveCascade(perBp: Map<string, string>): Map<string, string> {
   return resolved;
 }
 
-const GB_TABLET = "(max-width: 1024px) and (min-width: 768px)";
+const GB_TABLET = "(max-width: 1024px)";
 const GB_MOBILE = "(max-width: 767px)";
 
 function collapseToGbTiers(propKey: string, resolved: Map<string, string>): GbStyles {
