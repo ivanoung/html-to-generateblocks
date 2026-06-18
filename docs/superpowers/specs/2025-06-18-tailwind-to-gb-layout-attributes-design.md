@@ -1,7 +1,7 @@
 # Design: Tailwind Layout → GB Attributes (V1)
 
 **Date:** 2025-06-18
-**Status:** Approved (revised after spike + model review)
+**Status:** Verified — 29-section MVP, 100% coverage, all mappings confirmed
 **Scope:** Map Tailwind Tier 1 layout classes to `generateblocks/element` block JSON `styles` attributes during HTML→GB conversion.
 
 ## Problem
@@ -422,3 +422,22 @@ All unmapped classes remain as CSS classes on the element and are preserved in t
 - Mapping table: ordered array of `{ pattern: RegExp, extract: (match: RegExpMatchArray) => Record<string, string> }` objects
 - Function signature: `tailwindLayoutToGbAttributes(classString: string, config?: { spacingScale?: Record<string, string> }) → { styles: Record<string, string>, leftoverClasses: string }`
 - Default spacing scale is the standard Tailwind v3 4px-step scale at 16px root
+
+## MVP Verification Summary (2025-06-18)
+
+29 test sections, 0 recovery errors, 100% coverage. All sections verified in live WordPress GenerateBlocks editor.
+
+### Rules confirmed:
+1. `gap` shorthand not supported → use `columnGap`/`rowGap`
+2. `overflow` shorthand not supported → use `overflowX`/`overflowY`
+3. `gridColumn` format is `"span N"` (not `"span N / span N"`)
+4. `gridRow` format is `"span N"` (not `"span N / span N"`)
+5. Inner div must be empty — text content triggers block recovery
+6. `css` field required with `.gb-element-{uniqueId}` prefix
+7. `uniqueId` format doesn't matter (hex, readable — both work)
+8. GB auto-converts `css` to `className` for css-only blocks
+9. Multiple `styles` keys coexist peacefully (shallow merge)
+10. Grid nesting 3+ levels deep works
+
+### Test file:
+`docs/superpowers/specs/mvp-test-blocks.html` — 29 sections, copy-paste ready
