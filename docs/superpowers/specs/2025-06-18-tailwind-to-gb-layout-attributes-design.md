@@ -58,24 +58,35 @@ css field captures leftoverClasses as fallback
 
 The existing `css` field is the unconditional fallback. Anything the function doesn't map survives as a class and lands in `css`. Zero style loss guaranteed.
 
-## Verified GB Block Schema (from live WordPress blocks)
+## Verified GB Block Schema (from MVP testing — all 9 sections pass)
 
-All keys and values below were confirmed working in GenerateBlocks element blocks. Source: `style-parser.ts` mapping table + live block JSON from user's WordPress instance.
+All keys and values below were confirmed working via copy-paste into live WordPress editor.
 
 | GB key | Evidence |
 |---|---|
-| `display` | `"inline-flex"`, `"inline-grid"`, `"flex"`, `"grid"` all confirmed |
-| `gap` | Shorthand works; accepts px, em, rem, %, vw, vh, ch |
-| `columnGap`, `rowGap` | Directional gaps confirmed |
-| `flexDirection`, `flexWrap` | Confirmed via style-parser.ts CSS→GB map |
-| `alignItems`, `alignSelf`, `alignContent` | Confirmed |
-| `justifyContent`, `justifyItems`, `justifySelf` | Confirmed |
-| `gridTemplateColumns` | `"repeat(2, minmax(0, 1fr))"` confirmed (Tailwind's compiled value) |
-| `gridTemplateRows` | Confirmed |
-| `gridColumn`, `gridRow` | Confirmed |
-| `flex`, `flexGrow`, `flexShrink`, `flexBasis` | Confirmed |
-| `order` | Confirmed |
-| Width/height units | px, em, rem, %, vw, vh, ch all accepted |
+| `display` | `"flex"`, `"grid"`, `"inline-flex"`, `"inline-grid"` confirmed |
+| `columnGap`, `rowGap` | `"16px"`, `"32px"` confirmed. `gap` shorthand NOT supported |
+| `flexDirection` | `"row"`, `"column"` confirmed |
+| `flexWrap` | NOT tested (speculative) |
+| `alignItems` | `"center"`, `"flex-start"` confirmed |
+| `alignSelf` | `"flex-start"` confirmed |
+| `justifyContent` | `"space-between"` confirmed |
+| `flex` | `"1 1 0%"`, `"none"` confirmed |
+| `flexGrow` | `"1"` confirmed |
+| `flexShrink` | `"0"` confirmed |
+| `order` | `"9999"` confirmed |
+| `gridTemplateColumns` | `"repeat(N, minmax(0, 1fr))"` confirmed (exact Tailwind compiled value) |
+| `gridColumn` | `"span 3"` confirmed. NOT `"span N / span N"` |
+| `overflow` | NOT supported as shorthand. Use `overflowX`/`overflowY` separately |
+
+## GB Block Format Rules (from MVP testing)
+
+1. **Inner div must be empty:** `<div class="gb-element-xxx"></div>` — text content triggers block recovery
+2. **`css` field required:** with `.gb-element-{uniqueId}` selector prefix
+3. **`uniqueId` format:** any string works (hex, readable — no difference)
+4. **No HTML comments:** `<!-- ... -->` outside block boundaries triggers recovery
+5. **GB auto-normalization:** css-only blocks get converted to `className` format by GB
+6. **Tailwind shorthands ≠ GB shorthands:** `gap`, `overflow`, `place-*` shorthands generally not supported by GB. Always use longhand equivalents.
 
 ## Algorithm Specification
 
@@ -245,20 +256,20 @@ Input is `trim()`ed before splitting. Multiple spaces are collapsed by `split(/\
 
 ### Grid Span / Placement
 
-| Tailwind class | GB styles key | GB styles value |
-|---|---|---|
-| `col-span-1` through `col-span-12` | `gridColumn` | `"span N / span N"` |
-| `col-span-full` | `gridColumn` | `"1 / -1"` |
-| `col-start-1` through `col-start-13` | `gridColumnStart` | `"N"` |
-| `col-start-auto` | `gridColumnStart` | `"auto"` |
-| `col-end-1` through `col-end-13` | `gridColumnEnd` | `"N"` |
-| `col-end-auto` | `gridColumnEnd` | `"auto"` |
-| `row-span-1` through `row-span-6` | `gridRow` | `"span N / span N"` |
-| `row-span-full` | `gridRow` | `"1 / -1"` |
-| `row-start-1` through `row-start-7` | `gridRowStart` | `"N"` |
-| `row-start-auto` | `gridRowStart` | `"auto"` |
-| `row-end-1` through `row-end-7` | `gridRowEnd` | `"N"` |
-| `row-end-auto` | `gridRowEnd` | `"auto"` |
+| Tailwind class | GB styles key | GB styles value | Status |
+|---|---|---|---|
+| `col-span-1` through `col-span-12` | `gridColumn` | `"span N"` | ✓ tested |
+| `col-span-full` | `gridColumn` | `"1 / -1"` | speculative |
+| `col-start-1` through `col-start-13` | `gridColumnStart` | `"N"` | NOT TESTED |
+| `col-start-auto` | `gridColumnStart` | `"auto"` | NOT TESTED |
+| `col-end-1` through `col-end-13` | `gridColumnEnd` | `"N"` | NOT TESTED |
+| `col-end-auto` | `gridColumnEnd` | `"auto"` | NOT TESTED |
+| `row-span-1` through `row-span-6` | `gridRow` | `"span N"` | speculative |
+| `row-span-full` | `gridRow` | `"1 / -1"` | speculative |
+| `row-start-1` through `row-start-7` | `gridRowStart` | `"N"` | NOT TESTED |
+| `row-start-auto` | `gridRowStart` | `"auto"` | NOT TESTED |
+| `row-end-1` through `row-end-7` | `gridRowEnd` | `"N"` | NOT TESTED |
+| `row-end-auto` | `gridRowEnd` | `"auto"` | NOT TESTED |
 
 ### Grid Auto Flow
 
@@ -315,12 +326,14 @@ Input is `trim()`ed before splitting. Multiple spaces are collapsed by `split(/\
 
 ### Overflow
 
+**Note:** `overflow` shorthand NOT supported by GB. Use `overflowX`/`overflowY` separately.
+
 | Tailwind class | GB styles key | GB styles value |
 |---|---|---|
-| `overflow-auto` | `overflow` | `"auto"` |
-| `overflow-hidden` | `overflow` | `"hidden"` |
-| `overflow-visible` | `overflow` | `"visible"` |
-| `overflow-scroll` | `overflow` | `"scroll"` |
+| `overflow-auto` | `overflowX`, `overflowY` | `"auto"` |
+| `overflow-hidden` | `overflowX`, `overflowY` | `"hidden"` |
+| `overflow-visible` | `overflowX`, `overflowY` | `"visible"` |
+| `overflow-scroll` | `overflowX`, `overflowY` | `"scroll"` |
 
 ### Align Content (multi-line flex/grid)
 
