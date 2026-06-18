@@ -129,16 +129,14 @@ Patterns are tested in this explicit order. More specific patterns MUST appear b
 
 ### Gap interaction resolution
 
-`gap-4` maps to `gap: "16px"` (the GB shorthand). Directional gaps map individually:
-- `gap-x-8` → `columnGap: "32px"` (only sets column gap, leaves row gap untouched)
-- `gap-y-4` → `rowGap: "16px"` (only sets row gap, leaves column gap untouched)
+`gap-4` maps to BOTH `columnGap: "16px"` and `rowGap: "16px"` (no shorthand). Directional gaps map individually:
+- `gap-x-8` → `columnGap: "32px"` (only sets column gap)
+- `gap-y-4` → `rowGap: "16px"` (only sets row gap)
 
-If both appear in the same class string (`gap-4 gap-x-8`), `gap` sets both axes first, then `gap-x-8` overrides only column gap:
+If both appear in the same class string (`gap-4 gap-x-8`), processing order (left-to-right, last-write-wins) determines the final `columnGap`: `gap-4` sets both axes, then `gap-x-8` overrides column to 32px:
 ```
-"gap-4 gap-x-8" → { gap: "16px", columnGap: "32px" }
+"gap-4 gap-x-8" → { columnGap: "32px", rowGap: "16px" }
 ```
-
-The `gap` shorthand stays in styles along with the directional override. GB handles this gracefully — the more specific key (`columnGap`) takes precedence.
 
 ### Partial / arbitrary matches
 
@@ -226,11 +224,13 @@ Input is `trim()`ed before splitting. Multiple spaces are collapsed by `split(/\
 
 ### Gap
 
+**Note:** `gap` shorthand is NOT a valid GB styles key (tested in WordPress editor — does not render). Use `columnGap`/`rowGap` always.
+
 | Tailwind class | GB styles key | GB styles value |
 |---|---|---|
-| `gap-0` | `gap` | `"0px"` |
-| `gap-px` | `gap` | `"1px"` |
-| `gap-1` through `gap-96` | `gap` | spacing scale (rem) → px |
+| `gap-0` | `columnGap`, `rowGap` | `"0px"` |
+| `gap-px` | `columnGap`, `rowGap` | `"1px"` |
+| `gap-1` through `gap-96` | `columnGap`, `rowGap` | spacing scale → px |
 | `gap-x-*` | `columnGap` | spacing scale → px |
 | `gap-y-*` | `rowGap` | spacing scale → px |
 

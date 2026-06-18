@@ -1,236 +1,50 @@
-<!-- MVP TEST PAGE — Paste this directly into your WordPress Code Editor (Ctrl+Shift+Alt+M)
-     Each section tests a different layout mapping. Blocks use generateblocks/element
-     with the exact styles keys our mapper will output. -->
+<h3>1. Display Modes — flex, grid, inline-flex, inline-grid</h3>
 
-<!-- ============================================ -->
-<!-- TEST 1: Display Modes                        -->
-<!-- ============================================ -->
-<h3>1. Display Modes</h3>
-
-<!-- flex -->
-<!-- wp:generateblocks/element {"uniqueId":"test-flex","tagName":"div","styles":{"display":"flex","gap":"16px"},"css":".gb-element-test-flex{display:flex;gap:16px;background:#f0f9ff;padding:16px;border-radius:8px}"} -->
-<div class="gb-element-test-flex" style="background:#f0f9ff;padding:16px;border-radius:8px">
-  <div style="background:#3b82f6;color:white;padding:8px 16px;border-radius:4px">Flex item 1</div>
-  <div style="background:#3b82f6;color:white;padding:8px 16px;border-radius:4px">Flex item 2</div>
-  <div style="background:#3b82f6;color:white;padding:8px 16px;border-radius:4px">Flex item 3</div>
+<!-- flex + gap -->
+<!-- wp:generateblocks/element {"uniqueId":"a1b20001","tagName":"div","styles":{"display":"flex","columnGap":"16px","rowGap":"16px"},"css":".gb-element-a1b20001{display:flex;column-gap:16px;row-gap:16px;background:#dbeafe;padding:16px;border-radius:8px}"} -->
+<div class="gb-element-a1b20001">
+<!-- wp:generateblocks/element {"uniqueId":"a1b20011","tagName":"div","styles":{"display":"flex","flexDirection":"row"},"css":".gb-element-a1b20011{display:flex;background:#3b82f6;color:white;padding:12px 24px;border-radius:6px;min-width:80px;text-align:center}"} -->
+<div class="gb-element-a1b20011"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"a1b20012","tagName":"div","styles":{"display":"flex","flexDirection":"row"},"css":".gb-element-a1b20012{display:flex;background:#3b82f6;color:white;padding:12px 24px;border-radius:6px;min-width:80px;text-align:center}"} -->
+<div class="gb-element-a1b20012"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"a1b20013","tagName":"div","styles":{"display":"flex","flexDirection":"row"},"css":".gb-element-a1b20013{display:flex;background:#3b82f6;color:white;padding:12px 24px;border-radius:6px;min-width:80px;text-align:center}"} -->
+<div class="gb-element-a1b20013"></div>
+<!-- /wp:generateblocks/element -->
 </div>
 <!-- /wp:generateblocks/element -->
 
-<p></p>
+<h3>2. Grid — 3 columns, gap</h3>
 
-<!-- grid -->
-<!-- wp:generateblocks/element {"uniqueId":"test-grid","tagName":"div","styles":{"display":"grid","gridTemplateColumns":"repeat(3, minmax(0, 1fr))","gap":"16px"},"css":".gb-element-test-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;background:#f0fdf4;padding:16px;border-radius:8px}"} -->
-<div class="gb-element-test-grid" style="background:#f0fdf4;padding:16px;border-radius:8px">
-  <div style="background:#22c55e;color:white;padding:16px;border-radius:4px;text-align:center">Grid 1</div>
-  <div style="background:#22c55e;color:white;padding:16px;border-radius:4px;text-align:center">Grid 2</div>
-  <div style="background:#22c55e;color:white;padding:16px;border-radius:4px;text-align:center">Grid 3</div>
+<!-- grid-cols-3 + gap -->
+<!-- wp:generateblocks/element {"uniqueId":"a1b20002","tagName":"div","styles":{"display":"grid","gridTemplateColumns":"repeat(3, minmax(0, 1fr))","columnGap":"24px","rowGap":"24px"},"css":".gb-element-a1b20002{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:24px;row-gap:24px;background:#dcfce7;padding:16px;border-radius:8px}"} -->
+<div class="gb-element-a1b20002">
+<!-- wp:generateblocks/element {"uniqueId":"a1b20021","tagName":"div","css":".gb-element-a1b20021{background:#22c55e;min-height:60px;border-radius:6px}"} -->
+<div class="gb-element-a1b20021"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"a1b20022","tagName":"div","css":".gb-element-a1b20022{background:#22c55e;min-height:60px;border-radius:6px}"} -->
+<div class="gb-element-a1b20022"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"a1b20023","tagName":"div","css":".gb-element-a1b20023{background:#22c55e;min-height:60px;border-radius:6px}"} -->
+<div class="gb-element-a1b20023"></div>
+<!-- /wp:generateblocks/element -->
 </div>
 <!-- /wp:generateblocks/element -->
 
-<p></p>
+<h3>3. Flex Direction — column</h3>
 
-<!-- inline-flex -->
-<!-- wp:generateblocks/element {"uniqueId":"test-inline-flex","tagName":"div","styles":{"display":"inline-flex","gap":"8px"},"css":".gb-element-test-inline-flex{display:inline-flex;gap:8px}"} -->
-<div class="gb-element-test-inline-flex">
-  <span style="background:#fbbf24;padding:4px 12px;border-radius:4px">Inline A</span>
-  <span style="background:#fbbf24;padding:4px 12px;border-radius:4px">Inline B</span>
+<!-- flex-col + items-center + gap -->
+<!-- wp:generateblocks/element {"uniqueId":"a1b20003","tagName":"div","styles":{"display":"flex","flexDirection":"column","alignItems":"center","columnGap":"16px","rowGap":"16px"},"css":".gb-element-a1b20003{display:flex;flex-direction:column;align-items:center;column-gap:16px;row-gap:16px;background:#fef3c7;padding:16px;border-radius:8px}"} -->
+<div class="gb-element-a1b20003">
+<!-- wp:generateblocks/element {"uniqueId":"a1b20031","tagName":"div","css":".gb-element-a1b20031{background:#eab308;min-width:200px;min-height:40px;border-radius:6px}"} -->
+<div class="gb-element-a1b20031"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"a1b20032","tagName":"div","css":".gb-element-a1b20032{background:#eab308;min-width:200px;min-height:40px;border-radius:6px}"} -->
+<div class="gb-element-a1b20032"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"a1b20033","tagName":"div","css":".gb-element-a1b20033{background:#eab308;min-width:200px;min-height:40px;border-radius:6px}"} -->
+<div class="gb-element-a1b20033"></div>
+<!-- /wp:generateblocks/element -->
 </div>
 <!-- /wp:generateblocks/element -->
-
-<!-- inline-grid -->
-<!-- wp:generateblocks/element {"uniqueId":"test-inline-grid","tagName":"div","styles":{"display":"inline-grid","gridTemplateColumns":"repeat(2, minmax(0, 1fr))","gap":"8px"},"css":".gb-element-test-inline-grid{display:inline-grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}"} -->
-<div class="gb-element-test-inline-grid">
-  <span style="background:#a78bfa;padding:4px 12px;border-radius:4px">IG 1</span>
-  <span style="background:#a78bfa;padding:4px 12px;border-radius:4px">IG 2</span>
-</div>
-<!-- /wp:generateblocks/element -->
-
-
-<!-- ============================================ -->
-<!-- TEST 2: Flex Direction & Wrap                -->
-<!-- ============================================ -->
-<h3>2. Flex Direction &amp; Wrap</h3>
-
-<!-- flex-row -->
-<!-- wp:generateblocks/element {"uniqueId":"test-flex-row","tagName":"div","styles":{"display":"flex","flexDirection":"row","gap":"16px"},"css":".gb-element-test-flex-row{display:flex;flex-direction:row;gap:16px;background:#fff7ed;padding:16px;border-radius:8px}"} -->
-<div class="gb-element-test-flex-row" style="background:#fff7ed;padding:16px;border-radius:8px">
-  <div style="background:#f97316;color:white;padding:8px 16px;border-radius:4px">Row 1</div>
-  <div style="background:#f97316;color:white;padding:8px 16px;border-radius:4px">Row 2</div>
-</div>
-<!-- /wp:generateblocks/element -->
-
-<p></p>
-
-<!-- flex-col -->
-<!-- wp:generateblocks/element {"uniqueId":"test-flex-col","tagName":"div","styles":{"display":"flex","flexDirection":"column","gap":"16px"},"css":".gb-element-test-flex-col{display:flex;flex-direction:column;gap:16px;background:#fdf4ff;padding:16px;border-radius:8px}"} -->
-<div class="gb-element-test-flex-col" style="background:#fdf4ff;padding:16px;border-radius:8px">
-  <div style="background:#d946ef;color:white;padding:8px 16px;border-radius:4px">Col 1</div>
-  <div style="background:#d946ef;color:white;padding:8px 16px;border-radius:4px">Col 2</div>
-</div>
-<!-- /wp:generateblocks/element -->
-
-<p></p>
-
-<!-- flex-wrap -->
-<!-- wp:generateblocks/element {"uniqueId":"test-flex-wrap","tagName":"div","styles":{"display":"flex","flexWrap":"wrap","gap":"16px"},"css":".gb-element-test-flex-wrap{display:flex;flex-wrap:wrap;gap:16px;background:#f0fdfa;padding:16px;border-radius:8px}"} -->
-<div class="gb-element-test-flex-wrap" style="background:#f0fdfa;padding:16px;border-radius:8px">
-  <div style="background:#14b8a6;color:white;padding:12px 24px;border-radius:4px;width:120px;text-align:center">Wrap A</div>
-  <div style="background:#14b8a6;color:white;padding:12px 24px;border-radius:4px;width:120px;text-align:center">Wrap B</div>
-  <div style="background:#14b8a6;color:white;padding:12px 24px;border-radius:4px;width:120px;text-align:center">Wrap C</div>
-  <div style="background:#14b8a6;color:white;padding:12px 24px;border-radius:4px;width:120px;text-align:center">Wrap D</div>
-  <div style="background:#14b8a6;color:white;padding:12px 24px;border-radius:4px;width:120px;text-align:center">Wrap E</div>
-</div>
-<!-- /wp:generateblocks/element -->
-
-
-<!-- ============================================ -->
-<!-- TEST 3: Alignment (Items & Justify)          -->
-<!-- ============================================ -->
-<h3>3. Alignment</h3>
-
-<!-- items-center + justify-between -->
-<!-- wp:generateblocks/element {"uniqueId":"test-align","tagName":"div","styles":{"display":"flex","alignItems":"center","justifyContent":"space-between","gap":"16px"},"css":".gb-element-test-align{display:flex;align-items:center;justify-content:space-between;gap:16px;background:#fef2f2;padding:16px;border-radius:8px}"} -->
-<div class="gb-element-test-align" style="background:#fef2f2;padding:16px;border-radius:8px">
-  <div style="background:#ef4444;color:white;padding:8px 16px;border-radius:4px">Left</div>
-  <div style="background:#ef4444;color:white;padding:8px 16px;border-radius:4px;height:48px;display:flex;align-items:center">Center (tall)</div>
-  <div style="background:#ef4444;color:white;padding:8px 16px;border-radius:4px">Right</div>
-</div>
-<!-- /wp:generateblocks/element -->
-
-<p></p>
-
-<!-- self-start (align-self) -->
-<!-- wp:generateblocks/element {"uniqueId":"test-self","tagName":"div","styles":{"display":"flex","alignItems":"center","gap":"16px"},"css":".gb-element-test-self{display:flex;align-items:center;gap:16px;background:#fffbeb;padding:16px;border-radius:8px;height:80px}"} -->
-<div class="gb-element-test-self" style="background:#fffbeb;padding:16px;border-radius:8px;height:80px">
-  <div style="background:#f59e0b;color:white;padding:8px 16px;border-radius:4px">Center</div>
-  <!-- wp:generateblocks/element {"uniqueId":"test-self-child","tagName":"div","styles":{"alignSelf":"flex-start"},"css":".gb-element-test-self-child{align-self:flex-start}"} -->
-  <div class="gb-element-test-self-child" style="background:#f59e0b;color:white;padding:8px 16px;border-radius:4px">Self-Start ↑</div>
-  <!-- /wp:generateblocks/element -->
-  <div style="background:#f59e0b;color:white;padding:8px 16px;border-radius:4px">Center</div>
-</div>
-<!-- /wp:generateblocks/element -->
-
-
-<!-- ============================================ -->
-<!-- TEST 4: Flex Child Sizing                    -->
-<!-- ============================================ -->
-<h3>4. Flex Child Sizing (flex-1, grow, shrink)</h3>
-
-<!-- wp:generateblocks/element {"uniqueId":"test-flex-child","tagName":"div","styles":{"display":"flex","gap":"16px"},"css":".gb-element-test-flex-child{display:flex;gap:16px;background:#f8fafc;padding:16px;border-radius:8px}"} -->
-<div class="gb-element-test-flex-child" style="background:#f8fafc;padding:16px;border-radius:8px">
-  <!-- flex-1 -->
-  <!-- wp:generateblocks/element {"uniqueId":"test-flex1","tagName":"div","styles":{"flex":"1 1 0%"},"css":".gb-element-test-flex1{flex:1 1 0%}"} -->
-  <div class="gb-element-test-flex1" style="background:#6366f1;color:white;padding:16px;border-radius:4px;text-align:center">flex-1 (fills space)</div>
-  <!-- /wp:generateblocks/element -->
-  <!-- flex-none -->
-  <!-- wp:generateblocks/element {"uniqueId":"test-flex-none","tagName":"div","styles":{"flex":"none"},"css":".gb-element-test-flex-none{flex:none}"} -->
-  <div class="gb-element-test-flex-none" style="background:#818cf8;color:white;padding:16px;border-radius:4px;text-align:center">flex-none</div>
-  <!-- /wp:generateblocks/element -->
-  <!-- grow -->
-  <!-- wp:generateblocks/element {"uniqueId":"test-grow","tagName":"div","styles":{"flexGrow":"1"},"css":".gb-element-test-grow{flex-grow:1}"} -->
-  <div class="gb-element-test-grow" style="background:#a5b4fc;color:white;padding:16px;border-radius:4px;text-align:center">grow</div>
-  <!-- /wp:generateblocks/element -->
-  <!-- shrink-0 -->
-  <!-- wp:generateblocks/element {"uniqueId":"test-shrink0","tagName":"div","styles":{"flexShrink":"0"},"css":".gb-element-test-shrink0{flex-shrink:0;width:100px}"} -->
-  <div class="gb-element-test-shrink0" style="background:#c7d2fe;color:white;padding:16px;border-radius:4px;text-align:center;width:100px">shrink-0</div>
-  <!-- /wp:generateblocks/element -->
-</div>
-<!-- /wp:generateblocks/element -->
-
-
-<!-- ============================================ -->
-<!-- TEST 5: Grid Columns & Spans                 -->
-<!-- ============================================ -->
-<h3>5. Grid Columns &amp; Spans</h3>
-
-<!-- grid-cols-4 with col-span-2 -->
-<!-- wp:generateblocks/element {"uniqueId":"test-grid-cols","tagName":"div","styles":{"display":"grid","gridTemplateColumns":"repeat(4, minmax(0, 1fr))","gap":"16px"},"css":".gb-element-test-grid-cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;background:#fefce8;padding:16px;border-radius:8px}"} -->
-<div class="gb-element-test-grid-cols" style="background:#fefce8;padding:16px;border-radius:8px">
-  <div style="background:#eab308;color:white;padding:16px;border-radius:4px;text-align:center">Col 1</div>
-  <div style="background:#eab308;color:white;padding:16px;border-radius:4px;text-align:center">Col 2</div>
-  <!-- col-span-2 -->
-  <!-- wp:generateblocks/element {"uniqueId":"test-col-span","tagName":"div","styles":{"gridColumn":"span 2 / span 2"},"css":".gb-element-test-col-span{grid-column:span 2/span 2}"} -->
-  <div class="gb-element-test-col-span" style="background:#ca8a04;color:white;padding:16px;border-radius:4px;text-align:center">col-span-2 (spans 2 columns)</div>
-  <!-- /wp:generateblocks/element -->
-</div>
-<!-- /wp:generateblocks/element -->
-
-
-<!-- ============================================ -->
-<!-- TEST 6: Mixed — real-world pattern           -->
-<!-- ============================================ -->
-<h3>6. Real-world: Cards in a Grid</h3>
-
-<!-- wp:generateblocks/element {"uniqueId":"test-cards","tagName":"div","styles":{"display":"grid","gridTemplateColumns":"repeat(3, minmax(0, 1fr))","gap":"32px"},"css":".gb-element-test-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;padding:16px}"} -->
-<div class="gb-element-test-cards" style="padding:16px">
-  <!-- Card 1 -->
-  <!-- wp:generateblocks/element {"uniqueId":"test-card-1","tagName":"div","styles":{"display":"flex","flexDirection":"column","gap":"16px"},"css":".gb-element-test-card-1{display:flex;flex-direction:column;gap:16px;background:white;padding:24px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}"} -->
-  <div class="gb-element-test-card-1" style="background:white;padding:24px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-    <div style="font-size:1.25rem;font-weight:700">Plan Starter</div>
-    <div style="font-size:2rem;font-weight:800;color:#3b82f6">$29<span style="font-size:1rem;font-weight:400;color:#64748b">/mo</span></div>
-    <div style="color:#64748b">Basic features for small teams</div>
-    <!-- wp:generateblocks/element {"uniqueId":"test-card-1-btn","tagName":"button","styles":{"display":"flex","alignItems":"center","justifyContent":"center","gap":"8px"},"css":".gb-element-test-card-1-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;width:100%}"} -->
-    <button class="gb-element-test-card-1-btn" style="background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;width:100%">Get Started →</button>
-    <!-- /wp:generateblocks/element -->
-  </div>
-  <!-- /wp:generateblocks/element -->
-
-  <!-- Card 2 -->
-  <!-- wp:generateblocks/element {"uniqueId":"test-card-2","tagName":"div","styles":{"display":"flex","flexDirection":"column","gap":"16px"},"css":".gb-element-test-card-2{display:flex;flex-direction:column;gap:16px;background:white;padding:24px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}"} -->
-  <div class="gb-element-test-card-2" style="background:white;padding:24px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-    <div style="font-size:1.25rem;font-weight:700">Plan Pro</div>
-    <div style="font-size:2rem;font-weight:800;color:#8b5cf6">$79<span style="font-size:1rem;font-weight:400;color:#64748b">/mo</span></div>
-    <div style="color:#64748b">Advanced features for growing teams</div>
-    <!-- wp:generateblocks/element {"uniqueId":"test-card-2-btn","tagName":"button","styles":{"display":"flex","alignItems":"center","justifyContent":"center","gap":"8px"},"css":".gb-element-test-card-2-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#8b5cf6;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;width:100%}"} -->
-    <button class="gb-element-test-card-2-btn" style="background:#8b5cf6;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;width:100%">Get Started →</button>
-    <!-- /wp:generateblocks/element -->
-  </div>
-  <!-- /wp:generateblocks/element -->
-
-  <!-- Card 3 -->
-  <!-- wp:generateblocks/element {"uniqueId":"test-card-3","tagName":"div","styles":{"display":"flex","flexDirection":"column","gap":"16px"},"css":".gb-element-test-card-3{display:flex;flex-direction:column;gap:16px;background:white;padding:24px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}"} -->
-  <div class="gb-element-test-card-3" style="background:white;padding:24px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-    <div style="font-size:1.25rem;font-weight:700">Plan Enterprise</div>
-    <div style="font-size:2rem;font-weight:800;color:#ec4899">$199<span style="font-size:1rem;font-weight:400;color:#64748b">/mo</span></div>
-    <div style="color:#64748b">Everything for large organizations</div>
-    <!-- wp:generateblocks/element {"uniqueId":"test-card-3-btn","tagName":"button","styles":{"display":"flex","alignItems":"center","justifyContent":"center","gap":"8px"},"css":".gb-element-test-card-3-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#ec4899;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;width:100%}"} -->
-    <button class="gb-element-test-card-3-btn" style="background:#ec4899;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;width:100%">Get Started →</button>
-    <!-- /wp:generateblocks/element -->
-  </div>
-  <!-- /wp:generateblocks/element -->
-</div>
-<!-- /wp:generateblocks/element -->
-
-
-<!-- ============================================ -->
-<!-- TEST 7: Overflow & Order                     -->
-<!-- ============================================ -->
-<h3>7. Overflow &amp; Order</h3>
-
-<!-- overflow-hidden + order -->
-<!-- wp:generateblocks/element {"uniqueId":"test-order","tagName":"div","styles":{"display":"flex","gap":"16px","overflow":"hidden"},"css":".gb-element-test-order{display:flex;gap:16px;overflow:hidden;background:#f5f5f4;padding:16px;border-radius:8px}"} -->
-<div class="gb-element-test-order" style="background:#f5f5f4;padding:16px;border-radius:8px">
-  <!-- wp:generateblocks/element {"uniqueId":"test-order-last","tagName":"div","styles":{"order":"9999"},"css":".gb-element-test-order-last{order:9999}"} -->
-  <div class="gb-element-test-order-last" style="background:#78716c;color:white;padding:8px 16px;border-radius:4px">order-last (shown last)</div>
-  <!-- /wp:generateblocks/element -->
-  <div style="background:#a8a29e;color:white;padding:8px 16px;border-radius:4px">Default order</div>
-  <div style="background:#a8a29e;color:white;padding:8px 16px;border-radius:4px">Default order</div>
-</div>
-<!-- /wp:generateblocks/element -->
-
-
-<!-- ============================================ -->
-<!-- NOTES                                      -->
-<!-- ============================================ -->
-<hr>
-<h3>🧪 Testing Checklist</h3>
-<p>Verify each section renders with correct layout in the block editor:</p>
-<ul>
-<li><strong>1. Display Modes:</strong> flex → items side-by-side. grid → 3 columns. inline-flex → items inline. inline-grid → 2 columns inline</li>
-<li><strong>2. Flex Direction:</strong> row → horizontal. column → vertical. wrap → items wrap</li>
-<li><strong>3. Alignment:</strong> items centered, justify space-between, self-start sticks to top</li>
-<li><strong>4. Flex Child Sizing:</strong> flex-1 fills remaining space, flex-none stays compact, grow stretches, shrink-0 doesn't shrink</li>
-<li><strong>5. Grid:</strong> 4 columns, third item spans 2 columns</li>
-<li><strong>6. Cards:</strong> 3-card grid, each card is flex-col with centered button</li>
-<li><strong>7. Order:</strong> "order-last" appears after default-order items despite being first in markup</li>
-</ul>
