@@ -65,6 +65,7 @@ function buildElementAttrs(block: Block): Record<string, unknown> {
   if (block.globalClasses && block.globalClasses.length > 0) {
     attrs.globalClasses = block.globalClasses;
   }
+  attrs.className = "";
   if (block.htmlAttributes && Object.keys(block.htmlAttributes).length > 0) {
     attrs.htmlAttributes = block.htmlAttributes;
   }

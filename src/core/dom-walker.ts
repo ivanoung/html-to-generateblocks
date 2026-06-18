@@ -517,28 +517,39 @@ function mapperStylesToCss(styles: Record<string, unknown>, uniqueId: string): s
   for (const [key, value] of Object.entries(styles)) {
     if (key.startsWith("@media")) continue;
     if (typeof value !== "string") continue;
-    flatProps.push(`${camelToDash(key)}:${value}`);
+    const prop = camelToDash(key);
+    const cleanValue = stripFunctionSpaces(value);
+    flatProps.push(`${prop}:${cleanValue}`);
   }
+  // Sort alphabetically by property name (GB requirement)
+  flatProps.sort((a, b) => a.split(":")[0].localeCompare(b.split(":")[0]));
   if (flatProps.length > 0) {
     css = `${selector}{${flatProps.join(";")}}`;
   }
 
-  // @media blocks
   for (const [key, value] of Object.entries(styles)) {
     if (!key.startsWith("@media")) continue;
     if (typeof value !== "object" || value === null) continue;
     const innerProps: string[] = [];
     for (const [ik, iv] of Object.entries(value as Record<string, unknown>)) {
       if (typeof iv === "string") {
-        innerProps.push(`${camelToDash(ik)}:${iv}`);
+        const prop = camelToDash(ik);
+        const cleanValue = stripFunctionSpaces(iv);
+        innerProps.push(`${prop}:${cleanValue}`);
       }
     }
+    innerProps.sort((a, b) => a.split(":")[0].localeCompare(b.split(":")[0]));
     if (innerProps.length > 0) {
       css += `${key}{${selector}{${innerProps.join(";")}}}}`;
     }
   }
 
   return css;
+}
+
+/** Strip spaces after commas in CSS function values: "repeat(4, minmax(0, 1fr))" → "repeat(4,minmax(0,1fr))" */
+function stripFunctionSpaces(value: string): string {
+  return value.replace(/, /g, ",");
 }
 
 function camelToDash(str: string): string {
