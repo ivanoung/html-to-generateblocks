@@ -517,6 +517,104 @@ describe("V2 — responsive breakpoints", () => {
     assert.strictEqual(result.styles.columnGap, "16px");
     assert.ok(result.leftoverClasses.includes("shadow-lg"));
   });
+
+  // ── Multi-property merge ──
+  it("merges multiple properties into same @media block", () => {
+    const result = tailwindLayoutToGbAttributes(
+      "flex-col sm:flex-row sm:gap-4 lg:gap-8"
+    );
+    // Desktop: row + gap 32px
+    assert.strictEqual(result.styles.flexDirection, "row");
+    assert.strictEqual(result.styles.columnGap, "32px");
+    // Mobile: column + gap 16px (sm: values)
+    const mobile = result.styles["@media (max-width: 767px)"] as any;
+    assert.strictEqual(mobile.flexDirection, "column");
+    assert.strictEqual(mobile.columnGap, "16px"); // sm:gap-4
+    assert.strictEqual(mobile.rowGap, "16px");
+  });
+
+  // ── Edge: sm:-only (no default value) ──
+  it("sm:-only with no default — Mobile inherits nothing, Desktop gets sm value", () => {
+    const result = tailwindLayoutToGbAttributes("sm:flex sm:gap-4");
+    // No default set for display or gap → Desktop gets sm values (cascaded up)
+    assert.strictEqual(result.styles.display, "flex");
+    assert.strictEqual(result.styles.columnGap, "16px");
+    // Mobile: no default value → no @media override for Mobile
+    assert.strictEqual(
+      result.styles["@media (max-width: 767px)"],
+      undefined,
+    );
+  });
+
+  // ── Edge: 2xl:-only ──
+  it("2xl:-only — Desktop picks 2xl, no lower breakpoints", () => {
+    const result = tailwindLayoutToGbAttributes(
+      "grid-cols-2 2xl:grid-cols-4"
+    );
+    assert.strictEqual(
+      result.styles.gridTemplateColumns,
+      "repeat(4, minmax(0, 1fr))",
+    );
+    const mobile = result.styles["@media (max-width: 767px)"] as any;
+    assert.strictEqual(
+      mobile.gridTemplateColumns,
+      "repeat(2, minmax(0, 1fr))",
+    );
+  });
+
+  // ── Edge: mixed breakpoints on same property ──
+  it("mixed breakpoints: sm: md: lg: xl: all on same property", () => {
+    const result = tailwindLayoutToGbAttributes(
+      "gap-1 sm:gap-2 md:gap-4 lg:gap-8 xl:gap-12"
+    );
+    assert.strictEqual(result.styles.columnGap, "48px"); // xl:gap-12 = 48px
+    const tablet = result.styles[
+      "@media (max-width: 1024px) and (min-width: 768px)"
+    ] as any;
+    assert.strictEqual(tablet.columnGap, "16px"); // md:gap-4
+    const mobile = result.styles["@media (max-width: 767px)"] as any;
+    assert.strictEqual(mobile.columnGap, "4px"); // default gap-1
+  });
+
+  // ── Edge: non-responsive prefix collision ──
+  it("hover: and focus: prefixes are NOT parsed as breakpoints", () => {
+    const result = tailwindLayoutToGbAttributes(
+      "flex hover:opacity-80 focus:border-blue-500"
+    );
+    assert.strictEqual(result.styles.display, "flex");
+    // hover: and focus: should pass through as leftover classes
+    assert.ok(result.leftoverClasses.includes("hover:opacity-80"));
+    assert.ok(result.leftoverClasses.includes("focus:border-blue-500"));
+    // No @media blocks from false breakpoint matching
+    assert.strictEqual(
+      result.styles["@media (max-width: 767px)"],
+      undefined,
+    );
+  });
+
+  // ── Edge: malformed prefix (bare colon) ──
+  it("bare colon prefix passes through as leftover", () => {
+    const result = tailwindLayoutToGbAttributes(
+      "flex :broken-prefix"
+    );
+    assert.strictEqual(result.styles.display, "flex");
+    assert.ok(result.leftoverClasses.includes(":broken-prefix"));
+  });
+
+  // ── Integration: GbStyles survive dom-walker spread ──
+  it("nested @media keys survive shallow merge with existing styles", () => {
+    // Simulate applyLayoutMapper: { ...existingStyles, ...result.styles }
+    const result = tailwindLayoutToGbAttributes(
+      "flex-col sm:flex-row"
+    );
+    const existingStyles = { backgroundColor: "#fff" };
+    const merged = { ...existingStyles, ...result.styles };
+
+    assert.strictEqual(merged.backgroundColor, "#fff");
+    assert.strictEqual(merged.flexDirection, "row");
+    const mobile = merged["@media (max-width: 767px)"] as any;
+    assert.strictEqual(mobile.flexDirection, "column");
+  });
 });
 ```
 
@@ -570,15 +668,84 @@ git add -A && git commit -m "test: verify V2 tests pass"
 **Files:**
 - Modify: `src/core/dom-walker.ts`
 
-- [ ] **Step 1: Update applyLayoutMapper to accept GbStyles**
+- [ ] **Step 1: Update applyLayoutMapper to deep-merge GbStyles**
 
-Since `GbStyles` is a superset of `Record<string, string>`, the existing integration should work without changes. Verify:
+Replace the current shallow spread with a deep merge for nested @media keys:
 
-```bash
-grep -A5 "applyLayoutMapper" src/core/dom-walker.ts
+```typescript
+/**
+ * Apply the Tailwind layout mapper to extracted global classes.
+ * Returns merged styles (deep-merged for nested @media) and filtered class list.
+ */
+function applyLayoutMapper(
+  globalClasses: string[],
+  existingStyles: Record<string, unknown>,
+): { styles: Record<string, unknown>; filteredClasses: string[] } {
+  if (globalClasses.length === 0) {
+    return { styles: { ...existingStyles }, filteredClasses: [] };
+  }
+
+  const classString = globalClasses.join(" ");
+  const result = tailwindLayoutToGbAttributes(classString);
+
+  // Deep-merge: nested @media keys are merged recursively,
+  // flat keys use last-write-wins (mapper overrides existing).
+  const mergedStyles = deepMergeStyles(
+    existingStyles,
+    result.styles as Record<string, unknown>,
+  );
+
+  const leftover = result.leftoverClasses
+    ? result.leftoverClasses.split(/\s+/).filter(c => c.length > 0)
+    : [];
+
+  return { styles: mergedStyles, filteredClasses: leftover };
+}
+
+/**
+ * Deep-merge two style objects. Nested @media keys are merged recursively.
+ * Flat keys use last-write-wins (source overrides target).
+ */
+function deepMergeStyles(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...target };
+
+  for (const [key, value] of Object.entries(source)) {
+    if (
+      key.startsWith("@media") &&
+      typeof value === "object" &&
+      value !== null &&
+      typeof result[key] === "object" &&
+      result[key] !== null
+    ) {
+      result[key] = deepMergeStyles(
+        result[key] as Record<string, unknown>,
+        value as Record<string, unknown>,
+      );
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
 ```
 
-Expected: `result.styles` is passed to `applyLayoutMapper` which does `{ ...existingStyles, ...result.styles }`. Since `GbStyles` extends `Record<string, string>`, the spread operator handles nested `@media` keys naturally — they flow through to the block JSON.
+The old code:
+```typescript
+const mergedStyles = { ...existingStyles, ...result.styles };
+```
+
+This was a shallow spread. If `existingStyles` had `"@media (max-width: 767px)": { color: "red" }` and `result.styles` had `"@media (max-width: 767px)": { flexDirection: "column" }`, the shallow spread would clobber the color. The deep merge preserves both.
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add src/core/dom-walker.ts
+git commit -m "feat: deep-merge GbStyles in applyLayoutMapper"
+```
 
 - [ ] **Step 2: Run integration test**
 
@@ -669,15 +836,24 @@ git add -A && git commit -m "verify: V2 E2E on mino + hkvc"
 - Tier collapse to 3 GB tiers ✓
 - Desktop picks highest breakpoint ✓
 - sm: cascades forward (Mobile = default) ✓
+- sm:-only (no default) — Desktop gets sm value, Mobile has no override ✓
+- 2xl:-only — Desktop picks 2xl ✓
+- Mixed breakpoints (sm/md/lg/xl all on same property) ✓
 - Value resets (none) handled as override ✓
 - Same-value skip (no redundant @media) ✓
+- Multi-property merge into same @media block ✓
+- Non-responsive prefix collision (hover:, focus: pass through) ✓
+- Malformed prefixes (bare :) pass through ✓
 - Unsupported values pass through ✓
 - Cosmetic responsive classes pass through ✓
-- V1 backward compatible (flat output for non-responsive classes) ✓
+- V1 backward compatible ✓
+- Deep merge in dom-walker (nested @media keys survive) ✓
+- Integration test: nested @media keys survive shallow merge ✓
 
 ### 2. Placeholder scan
+- All 15 test cases documented with expected values ✓
+- Deep merge helpers provided in both mapper and dom-walker ✓
 - No TBD, TODO, or "implement later" ✓
-- All code complete and ready ✓
 - GB media queries confirmed from live blocks ✓
 
 ### 3. Type consistency
