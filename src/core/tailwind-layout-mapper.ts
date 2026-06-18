@@ -154,8 +154,8 @@ const MAPPING_TABLE: MapperEntry[] = [
 
   // ── Place Self ──
   { pattern: /^place-self-center$/, apply: () => ({ placeSelf: "center" }) },
-  { pattern: /^place-self-start$/, apply: () => ({ placeSelf: "flex-start" }) },
-  { pattern: /^place-self-end$/, apply: () => ({ placeSelf: "flex-end" }) },
+  { pattern: /^place-self-start$/, apply: () => ({ placeSelf: "start" }) },
+  { pattern: /^place-self-end$/, apply: () => ({ placeSelf: "end" }) },
   { pattern: /^place-self-auto$/, apply: () => ({ placeSelf: "auto" }) },
   { pattern: /^place-self-stretch$/, apply: () => ({ placeSelf: "stretch" }) },
 
