@@ -1,0 +1,46 @@
+<h3>Test A: default = desktop-min (same value)</h3>
+<p>Both should show flex at all screen sizes — no visual difference.</p>
+
+<!-- wp:generateblocks/element {"uniqueId":"t3-a1","tagName":"div","styles":{"display":"flex","columnGap":"16px","rowGap":"16px","@media (max-width:767px)":{"display":"block"}},"css":".gb-element-t3-a1{display:flex;column-gap:16px;row-gap:16px;background:#dbeafe;padding:16px;border-radius:8px}@media (max-width:767px){.gb-element-t3-a1{display:block}}"} -->
+<div class="gb-element-t3-a1">
+<!-- wp:generateblocks/element {"uniqueId":"t3-a1a","tagName":"div","css":".gb-element-t3-a1a{background:#3b82f6;border-radius:6px;min-height:40px;min-width:80px}"} -->
+<div class="gb-element-t3-a1a"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"t3-a1b","tagName":"div","css":".gb-element-t3-a1b{background:#3b82f6;border-radius:6px;min-height:40px;min-width:80px}"} -->
+<div class="gb-element-t3-a1b"></div>
+<!-- /wp:generateblocks/element -->
+</div>
+<!-- /wp:generateblocks/element -->
+
+<p>vs</p>
+
+<!-- wp:generateblocks/element {"uniqueId":"t3-a2","tagName":"div","styles":{"@media (min-width:1025px)":{"display":"flex","columnGap":"16px","rowGap":"16px"},"@media (max-width:767px)":{"display":"block"}},"css":".gb-element-t3-a2{display:block;background:#dcfce7;padding:16px;border-radius:8px}@media (min-width:1025px){.gb-element-t3-a2{display:flex;column-gap:16px;row-gap:16px}}@media (max-width:767px){.gb-element-t3-a2{display:block}}"} -->
+<div class="gb-element-t3-a2">
+<!-- wp:generateblocks/element {"uniqueId":"t3-a2a","tagName":"div","css":".gb-element-t3-a2a{background:#22c55e;border-radius:6px;min-height:40px;min-width:80px}"} -->
+<div class="gb-element-t3-a2a"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"t3-a2b","tagName":"div","css":".gb-element-t3-a2b{background:#22c55e;border-radius:6px;min-height:40px;min-width:80px}"} -->
+<div class="gb-element-t3-a2b"></div>
+<!-- /wp:generateblocks/element -->
+</div>
+<!-- /wp:generateblocks/element -->
+
+<h3>Test B: 3-tier (All Screens / Tablet / Mobile)</h3>
+<p>Full width: 4 cols. Tablet (768-1024): 2 cols. Mobile (<768): 1 col.</p>
+
+<!-- wp:generateblocks/element {"uniqueId":"t3-b1","tagName":"div","styles":{"display":"grid","gridTemplateColumns":"repeat(4, minmax(0, 1fr))","columnGap":"16px","rowGap":"16px","@media (max-width:1024px) and (min-width:768px)":{"gridTemplateColumns":"repeat(2, minmax(0, 1fr))"},"@media (max-width:767px)":{"gridTemplateColumns":"repeat(1, minmax(0, 1fr))"}},"css":".gb-element-t3-b1{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:16px;row-gap:16px;background:#fef3c7;padding:16px;border-radius:8px}@media (max-width:1024px) and (min-width:768px){.gb-element-t3-b1{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:767px){.gb-element-t3-b1{grid-template-columns:repeat(1,minmax(0,1fr))}}"} -->
+<div class="gb-element-t3-b1">
+<!-- wp:generateblocks/element {"uniqueId":"t3-b1a","tagName":"div","css":".gb-element-t3-b1a{background:#f59e0b;border-radius:6px;min-height:60px}"} -->
+<div class="gb-element-t3-b1a"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"t3-b1b","tagName":"div","css":".gb-element-t3-b1b{background:#f59e0b;border-radius:6px;min-height:60px}"} -->
+<div class="gb-element-t3-b1b"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"t3-b1c","tagName":"div","css":".gb-element-t3-b1c{background:#f59e0b;border-radius:6px;min-height:60px}"} -->
+<div class="gb-element-t3-b1c"></div>
+<!-- /wp:generateblocks/element -->
+<!-- wp:generateblocks/element {"uniqueId":"t3-b1d","tagName":"div","css":".gb-element-t3-b1d{background:#f59e0b;border-radius:6px;min-height:60px}"} -->
+<div class="gb-element-t3-b1d"></div>
+<!-- /wp:generateblocks/element -->
+</div>
+<!-- /wp:generateblocks/element -->
