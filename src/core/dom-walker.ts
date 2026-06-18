@@ -509,7 +509,6 @@ export function walkDom(
   html: string,
   classNameToProperties: Map<string, BlockStyles>,
   collector: GlobalStylesCollector,
-  _allowNavFooter?: boolean,
 ): WalkResult {
   const warnings: string[] = [];
   const hardFails: { code: string; message: string }[] = [];

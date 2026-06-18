@@ -146,10 +146,8 @@ describe("tailwindLayoutToGbAttributes", () => {
     assert.strictEqual(result.styles.order, "9999");
   });
 
-  // ── Custom spacing scale config ──
-  it("uses custom spacingScale when provided", () => {
-    // Note: spacingScale config param is in signature but uses module-level SPACING
-    // Test that the module-level scale works correctly
+  // ── Gap with standard spacing scale ──
+  it("gap-4 maps to 16px", () => {
     const result = tailwindLayoutToGbAttributes("gap-4");
     assert.strictEqual(result.styles.columnGap, "16px");
   });

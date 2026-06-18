@@ -193,12 +193,9 @@ const MAPPING_TABLE: MapperEntry[] = [
  * Processes classes left-to-right in original order. Matched classes are
  * consumed (removed from class list) and converted to GB styles keys.
  * Unmatched classes pass through as leftoverClasses.
- *
- * Configurable spacing scale for projects using non-default Tailwind config.
  */
 export function tailwindLayoutToGbAttributes(
   classString: string,
-  _config?: { spacingScale?: Record<string, string> },
 ): { styles: Record<string, string>; leftoverClasses: string } {
   if (!classString || !classString.trim()) {
     return { styles: {}, leftoverClasses: "" };
