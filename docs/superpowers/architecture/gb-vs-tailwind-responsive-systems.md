@@ -14,11 +14,30 @@
 | **Default applies to** | All screen sizes (desktop) | All screen sizes (mobile) |
 | **Overrides cascade** | DOWNWARD (Mobile > Tablet > All Screens) | UPWARD (2xl > xl > lg > md > sm > default) |
 | **Mental model** | Start rich, strip down for smaller screens | Start minimal, add for larger screens |
-| **Tiers** | 3 fixed (All Screens, Tablet, Mobile) | 5+ configurable (default, sm, md, lg, xl, 2xl) |
+| **Tiers** | 5 selector options (Desktop, Desktop+Tablet, Tablet, Tablet+Mobile, Mobile) | 5+ configurable (default, sm, md, lg, xl, 2xl) |
 
 **Converting between them is not breakpoint relabeling — it requires value-flow analysis: "at which screen ranges should this property hold what value?"**
 
 ## 2. Tier Mapping
+
+### 2.1 GB’s 5 Responsive Selectors
+
+GB's responsive panel offers 5 options, each targeting a different viewport combination:
+
+| GB Selector | Media Query | Viewports Covered |
+|---|---|---|
+| **Desktop** | default (no @media) | All screens |
+| **Desktop & Tablet** | `@media (min-width: 768px)` | ≥768px (desktop + tablet) |
+| **Tablet** | `@media (max-width: 1024px) and (min-width: 768px)` | 768–1024px only |
+| **Tablet & Mobile** | `@media (max-width: 1024px)` | ≤1024px (tablet + mobile) |
+| **Mobile** | `@media (max-width: 767px)` | ≤767px only |
+
+**Converter usage:** We use the 3 most precise selectors:
+- **Desktop** (default) — TW lg/xl/2xl values when a default exists
+- **Tablet** (`max-width: 1024px and min-width: 768px`) — TW md values
+- **Mobile** (`max-width: 767px`) — TW default/sm values
+
+The combined selectors (Desktop & Tablet, Tablet & Mobile) are not used — they create unnecessary overlap with the base tiers.
 
 | Screen Range | GB Tier | TW Breakpoint |
 |---|---|---|
