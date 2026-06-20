@@ -9,6 +9,33 @@ const SPACING: Record<string, string> = {
   "60": "240px", "64": "256px", "72": "288px", "80": "320px", "96": "384px",
 };
 
+// ── M2 Spacing Helper ────────────────────────────────────
+
+const SPACING_SUFFIX_MAP: Record<string, string> = {
+  pt: "paddingTop", pr: "paddingRight", pb: "paddingBottom", pl: "paddingLeft",
+  mt: "marginTop", mr: "marginRight", mb: "marginBottom", ml: "marginLeft",
+};
+
+function resolveSpacing(value: string, suffixes: string[]): Record<string, string> | null {
+  let resolved: string | null = null;
+  if (value === "auto") {
+    resolved = "auto";
+  } else if (SPACING[value]) {
+    resolved = SPACING[value];
+  } else if (/^\d+$/.test(value)) {
+    resolved = `${parseInt(value) * 4}px`;
+  } else if (/^\d+px$/.test(value)) {
+    resolved = value;
+  }
+  if (!resolved) return null;
+  const out: Record<string, string> = {};
+  for (const s of suffixes) {
+    const prop = SPACING_SUFFIX_MAP[s];
+    if (prop) out[prop] = resolved;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 // ── V2 Responsive Types ──────────────────────────────────────
 
 /** GenerateBlocks supports nested @media keys in styles. */
@@ -85,6 +112,24 @@ const MAPPING_TABLE: MapperEntry[] = [
   { pattern: /^gap-x-(.+)$/, apply: (m) => SPACING[m[1]] ? { columnGap: SPACING[m[1]] } : null },
   { pattern: /^gap-y-(.+)$/, apply: (m) => SPACING[m[1]] ? { rowGap: SPACING[m[1]] } : null },
   { pattern: /^gap-(.+)$/, apply: (m) => SPACING[m[1]] ? { columnGap: SPACING[m[1]], rowGap: SPACING[m[1]] } : null },
+
+  // ── Padding ──
+  { pattern: /^p-(.+)$/, apply: (m) => resolveSpacing(m[1], ["pt", "pr", "pb", "pl"]) },
+  { pattern: /^px-(.+)$/, apply: (m) => resolveSpacing(m[1], ["pl", "pr"]) },
+  { pattern: /^py-(.+)$/, apply: (m) => resolveSpacing(m[1], ["pt", "pb"]) },
+  { pattern: /^pt-(.+)$/, apply: (m) => resolveSpacing(m[1], ["pt"]) },
+  { pattern: /^pr-(.+)$/, apply: (m) => resolveSpacing(m[1], ["pr"]) },
+  { pattern: /^pb-(.+)$/, apply: (m) => resolveSpacing(m[1], ["pb"]) },
+  { pattern: /^pl-(.+)$/, apply: (m) => resolveSpacing(m[1], ["pl"]) },
+
+  // ── Margin ──
+  { pattern: /^m-(.+)$/, apply: (m) => resolveSpacing(m[1], ["mt", "mr", "mb", "ml"]) },
+  { pattern: /^mx-(.+)$/, apply: (m) => resolveSpacing(m[1], ["ml", "mr"]) },
+  { pattern: /^my-(.+)$/, apply: (m) => resolveSpacing(m[1], ["mt", "mb"]) },
+  { pattern: /^mt-(.+)$/, apply: (m) => resolveSpacing(m[1], ["mt"]) },
+  { pattern: /^mr-(.+)$/, apply: (m) => resolveSpacing(m[1], ["mr"]) },
+  { pattern: /^mb-(.+)$/, apply: (m) => resolveSpacing(m[1], ["mb"]) },
+  { pattern: /^ml-(.+)$/, apply: (m) => resolveSpacing(m[1], ["ml"]) },
 
   // ── Aspect Ratio ──
   { pattern: /^aspect-auto$/, apply: () => ({ aspectRatio: "auto" }) },
