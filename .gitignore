@@ -12,6 +12,7 @@ fixtures/
 snapshots/
 snippets/
 MEMORY.md
+DEV.md
 dump-dossier.ts
 spike-parse-config.ts
 spike-tailwind-config.ts
