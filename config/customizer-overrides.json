@@ -1,0 +1,9 @@
+{
+  "_comment": "Override specific GeneratePress Customizer tokens here. Non-null values replace auto-detected values. Delete this file or set values to null to use auto-detection.",
+  "container_width": null,
+  "background_color": null,
+  "link_color": null,
+  "link_color_hover": null,
+  "global_colors": null,
+  "typography": null
+}

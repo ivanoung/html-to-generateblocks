@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "framework": "tailwind",
+  "frameworkVersion": "3.4",
+  "patterns": {
+    "opacityVariable": {
+      "declarationPattern": "^--tw-(?<name>\\w+)-opacity:\\s*(?<value>[\\d.]+)",
+      "usagePattern": "var\\(--tw-(?<name>\\w+)-opacity,\\s*[\\d.]+\\)",
+      "colorFunctions": {
+        "rgb": { "channels": ["r", "g", "b"], "separator": "space" },
+        "rgba": { "channels": ["r", "g", "b", "a"], "separator": "comma" }
+      },
+      "outputFormat": {
+        "1": "{fn}({channels})",
+        "other": "rgba({r}, {g}, {b}, {opacity})"
+      }
+    }
+  },
+  "skipIfContains": ["--tw-shadow-colored"]
+}
