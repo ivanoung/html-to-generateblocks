@@ -338,59 +338,75 @@ function getResetValue(propKey: string): string {
   return "initial";
 }
 
-const GB_DESKTOP = "(min-width: 1025px)";
-const GB_TABLET = "(max-width: 1024px)";
-const GB_MOBILE = "(max-width: 767px)";
-
 /**
- * Map cascade-resolved breakpoint values to GB's 3-tier responsive structure.
+ * V3 All-Screens-centric cascade.
  *
- * Desktop: largest breakpoint with a value. If a default (0px) value exists,
- * desktop goes into All Screens. If ONLY larger breakpoints have values
- * (e.g., lg:col-span-7 with no default), desktop goes into @media (min-width: 1025px)
- * so it doesn't leak to mobile.
+ * Largest Tailwind breakpoint value → All Screens.
+ * Each downward value-change → @media(max-width: N−1px) override.
+ * Gaps (smallest bp > 0px) → reset to PROPERTY_RESETS value.
+ * Blocks emitted in ascending max-width order (largest first, smallest last)
+ * so CSS source-order cascade picks the most specific match.
  */
-function collapseToGbTiers(propKey: string, resolved: Map<string, string>): GbStyles {
-  // Find highest breakpoint with a value
-  let desktopValue: string | undefined;
-  for (const bp of [...BREAKPOINTS].reverse()) {
-    if (resolved.has(bp)) { desktopValue = resolved.get(bp)!; break; }
-  }
-  if (desktopValue === undefined) return {};
+function collapseToAllScreensWithResets(
+  propKey: string,
+  resolved: Map<string, string>,
+): GbStyles {
+  // Build sorted entries from the resolved cascade: largest bp → smallest
+  const bpEntries = TW_BP_ORDER
+    .filter(bp => resolved.has(bp.prefix))
+    .map(bp => ({ px: bp.px, val: resolved.get(bp.prefix)! }))
+    .reverse(); // largest → smallest
 
-  const hasDefault = resolved.has("");
-  const tabletValue = resolved.get("md");
-  const mobileValue = resolved.get("");
+  if (bpEntries.length === 0) return {};
 
   const styles: GbStyles = {};
 
-  if (hasDefault) {
-    // Default value exists → desktop goes into All Screens
-    styles[propKey] = desktopValue;
-  } else {
-    // No default value → desktop goes into @media (min-width: 1025px) only
-    styles[`@media ${GB_DESKTOP}`] = { [propKey]: desktopValue };
-  }
+  // 1. All Screens = largest breakpoint's value
+  styles[propKey] = bpEntries[0].val;
 
-  // Tablet: only emit if md has a value AND it differs from what users would see without it.
-  // If hasDefault: compare vs desktop. If !hasDefault: emit if md has a value.
-  if (tabletValue !== undefined) {
-    if (hasDefault && tabletValue !== desktopValue) {
-      styles[`@media ${GB_TABLET}`] = { [propKey]: tabletValue };
-    } else if (!hasDefault && tabletValue !== desktopValue) {
-      styles[`@media ${GB_TABLET}`] = { [propKey]: tabletValue };
+  // 2. Walk downward, emit @media(max-width) at value-change boundaries
+  for (let i = 0; i < bpEntries.length - 1; i++) {
+    const current = bpEntries[i];
+    const below = bpEntries[i + 1];
+    if (current.val !== below.val) {
+      const boundary = `@media (max-width: ${current.px - 1}px)`;
+      styles[boundary] = { [propKey]: below.val };
     }
   }
 
-  // Mobile: only emit if default exists and differs from tablet, or from desktop if no tablet.
-  if (mobileValue !== undefined) {
-    const compareValue = tabletValue ?? desktopValue;
-    if (mobileValue !== compareValue) {
-      styles[`@media ${GB_MOBILE}`] = { [propKey]: mobileValue };
+  // 3. If smallest breakpoint is NOT default (0px), emit a reset at its boundary
+  const smallest = bpEntries[bpEntries.length - 1];
+  if (smallest.px > 0) {
+    const boundary = `@media (max-width: ${smallest.px - 1}px)`;
+    if (!styles[boundary]) {
+      styles[boundary] = { [propKey]: getResetValue(propKey) };
     }
   }
 
-  return styles;
+  // 4. Reorder: @media(max-width) keys descending px (largest first, smallest last)
+  return reorderMaxWidthDescending(styles);
+}
+
+/**
+ * Reorder @media(max-width) keys from largest px to smallest px.
+ * This guarantees CSS source-order: at overlapping max-width ranges,
+ * the last (smallest) block wins → correct cascade.
+ */
+function reorderMaxWidthDescending(styles: GbStyles): GbStyles {
+  const mediaKeys = Object.keys(styles)
+    .filter(k => k.startsWith("@media (max-width:"))
+    .sort((a, b) => {
+      const aPx = parseInt(a.match(/max-width:\s*(\d+)px/)![1], 10);
+      const bPx = parseInt(b.match(/max-width:\s*(\d+)px/)![1], 10);
+      return bPx - aPx; // descending = largest first
+    });
+
+  const flatKeys = Object.keys(styles).filter(k => !k.startsWith("@media"));
+
+  const reordered: GbStyles = {};
+  for (const k of flatKeys) reordered[k] = styles[k];
+  for (const k of mediaKeys) reordered[k] = styles[k];
+  return reordered;
 }
 
 function mergeGbStyles(target: GbStyles, source: GbStyles): void {
@@ -455,7 +471,7 @@ export function tailwindLayoutToGbAttributes(
   const finalStyles: GbStyles = {};
   for (const [prop, perBp] of byProp) {
     const resolved = resolveCascade(perBp);
-    mergeGbStyles(finalStyles, collapseToGbTiers(prop, resolved));
+    mergeGbStyles(finalStyles, collapseToAllScreensWithResets(prop, resolved));
   }
 
   return { styles: finalStyles, leftoverClasses: dedupe(leftoverAll).join(" ") };
