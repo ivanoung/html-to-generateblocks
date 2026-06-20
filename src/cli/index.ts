@@ -508,6 +508,12 @@ async function main(): Promise<void> {
         { mode: "processed", skipMapper: false, runSplit: doSplit },
       ];
 
+      const assetFiles = readdirSync(fullPath).filter((f) => {
+        const ext = f.split(".").pop()?.toLowerCase() || "";
+        return !f.endsWith(".html") && !f.endsWith(".css") && !f.endsWith(".js")
+          && !f.startsWith(".");
+      });
+
       for (const pass of passes) {
         const modeDir = resolve(outDir, pass.mode);
         mkdirSync(resolve(modeDir, "pages"), { recursive: true });
@@ -630,26 +636,26 @@ async function main(): Promise<void> {
         console.log(`  ${pass.mode} Rejections:    ${pass.mode}/setup/rejected.json`);
         console.log(`  ${pass.mode} Import:        ${pass.mode}/setup/global-styles-import.json`);
       }
-      } // end for each pass
 
-      // Write app.js at project root with all scripts
+      // Write app.js into this mode folder (fallback and processed both need scripts)
       if (uniqueScripts.length > 0) {
-        writeFileSync(resolve(outDir, "app.js"), formatGlobalJs(uniqueScripts), "utf-8");
+        writeFileSync(resolve(modeDir, "app.js"), formatGlobalJs(uniqueScripts), "utf-8");
       }
 
-      // Copy non-HTML assets (images, favicons, fonts) verbatim into mirrored output
-      const assetFiles = readdirSync(fullPath).filter((f) => {
-        const ext = f.split(".").pop()?.toLowerCase() || "";
-        return !f.endsWith(".html") && !f.endsWith(".css") && !f.endsWith(".js")
-          && !f.startsWith(".");
-      });
+      // Copy assets (images, etc.) into this mode folder
       for (const asset of assetFiles) {
         const srcAsset = resolve(fullPath, asset);
-        const destAsset = resolve(outDir, asset);
+        const destAsset = resolve(modeDir, asset);
         if (statSync(srcAsset).isFile()) {
-          copyFileSync(srcAsset, destAsset);
-          console.log(`  Asset copied: ${asset}`);
+          try { copyFileSync(srcAsset, destAsset); }
+          catch (e: any) { console.log(`  Asset copy failed: ${asset} — ${e.message}`); }
         }
+      }
+      } // end for each pass
+
+      // Log asset copies once (they go to both mode folders)
+      for (const asset of assetFiles) {
+        console.log(`  Asset copied: ${asset} (fallback + processed)`);
       }
 
       console.log(`\n  Done. ${pageContents.length} page(s) converted.`);
