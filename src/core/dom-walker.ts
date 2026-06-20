@@ -13,7 +13,7 @@ import type { Block, BlockStyles } from "./types.js";
 import { nextId } from "./id-generator.js";
 import { parseStyleString } from "./style-parser.js";
 import type { GlobalStylesCollector } from "./global-styles-collector.js";
-import { tailwindLayoutToGbAttributes } from "./tailwind-layout-mapper.js";
+import { tailwindLayoutToGbAttributes, TailwindLayoutConfig } from "./tailwind-layout-mapper.js";
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -61,6 +61,7 @@ interface WalkerOptions {
   hardFails: { code: string; message: string }[];
   mappedClasses: string[];
   skipMapper: boolean;
+  tailwindConfig?: TailwindLayoutConfig;
 }
 
 // ── Core walker ────────────────────────────────────────────
@@ -475,7 +476,7 @@ function extractGlobalClasses(
     return { globalClasses: classNames, styles: {} };
   }
 
-  const resolveResult = resolveBlockClassAttribute($el);
+  const resolveResult = resolveBlockClassAttribute($el, opts.tailwindConfig);
 
   // Track mapped classes for CSS splitter filtering
   opts.mappedClasses.push(...resolveResult.mappedClassNames);
@@ -497,6 +498,7 @@ function extractGlobalClasses(
  */
 function resolveBlockClassAttribute(
   $el: cheerio.Cheerio<any>,
+  config?: TailwindLayoutConfig,
 ): { styles: Record<string, any>; globalClasses: string[]; mappedClassNames: string[] } {
   const classAttr = ($el.attr("class") || "").trim();
   if (!classAttr) return { styles: {}, globalClasses: [], mappedClassNames: [] };
@@ -504,7 +506,7 @@ function resolveBlockClassAttribute(
   const originalClasses = classAttr.split(/\s+/).filter((c: string) => c.length > 0);
 
   // Call the layout mapper — it converts Tailwind layout classes to GB styles
-  const { styles, leftoverClasses } = tailwindLayoutToGbAttributes(classAttr);
+  const { styles, leftoverClasses } = tailwindLayoutToGbAttributes(classAttr, config);
 
   // leftoverClasses is a space-separated string
   const globalClasses = leftoverClasses
@@ -532,13 +534,14 @@ export function walkDom(
   classNameToProperties: Map<string, BlockStyles>,
   collector: GlobalStylesCollector,
   skipMapper = false,
+  tailwindConfig?: TailwindLayoutConfig,
 ): WalkResult {
   const warnings: string[] = [];
   const hardFails: { code: string; message: string }[] = [];
   const $ = cheerio.load(`<div>${html}</div>`);
 
   const mappedClasses: string[] = [];
-  const opts: WalkerOptions = { classNameToProperties, collector, warnings, hardFails, mappedClasses, skipMapper };
+  const opts: WalkerOptions = { classNameToProperties, collector, warnings, hardFails, mappedClasses, skipMapper, tailwindConfig };
   const blocks: Block[] = [];
 
   // Walk top-level children of the wrapper div only

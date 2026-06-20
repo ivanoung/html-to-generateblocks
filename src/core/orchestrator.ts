@@ -7,6 +7,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { preprocess } from "./preprocessor.js";
 import { walkDom } from "./dom-walker.js";
+import { TailwindLayoutConfig } from "./tailwind-layout-mapper.js";
 import { GlobalStylesCollector } from "./global-styles-collector.js";
 import { serializeBlocks, countBlocks } from "./serializer.js";
 import { validateBlocks } from "./validator.js";
@@ -92,12 +93,19 @@ export async function convert(
     collector.registerDefinition(className, styles);
   });
 
+  // Build layout mapper config from dossier
+  const twConfig = dossier.tailwindConfig;
+  const layoutConfig: TailwindLayoutConfig | undefined = twConfig?.maxWidth
+    ? { maxWidth: twConfig.maxWidth }
+    : undefined;
+
   // Stage 3: DOM walk
   const walkResult = walkDom(
     prepResult.html,
     prepResult.classNameToProperties,
     collector,
     input.skipMapper ?? false,
+    layoutConfig,
   );
 
   // Collect all warnings

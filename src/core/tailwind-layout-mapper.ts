@@ -40,7 +40,11 @@ function resolveSpacing(value: string, suffixes: string[]): Record<string, strin
 
 // ── M3 Sizing Helper ─────────────────────────────────────
 
-function resolveSizing(prop: string, value: string): Record<string, string> | null {
+function resolveSizing(
+  prop: string,
+  value: string,
+  config?: { maxWidth?: Record<string, string> },
+): Record<string, string> | null {
   // Full/screen/auto
   if (value === "full") return { [prop]: "100%" };
   if (value === "screen") return { [prop]: prop.startsWith("min") ? "100vh" : prop.startsWith("max") ? "100vw" : "100vw" };
@@ -50,7 +54,13 @@ function resolveSizing(prop: string, value: string): Record<string, string> | nu
   if (value === "fit") return { [prop]: "fit-content" };
   // Max-width specials
   if (value === "none") return { [prop]: "none" };
-  if (value === "container" && prop === "maxWidth") return { [prop]: "1280px" }; // TW container default
+  if (value === "container" && prop === "maxWidth") {
+    // Use config's container value, fall back to 1280px default
+    const containerValue = config?.maxWidth?.container;
+    if (containerValue) return { [prop]: containerValue };
+    // No config available — keep class in globalClasses for safety
+    return null;
+  }
   // Fractions: w-1/2 → 50%
   const fracMatch = value.match(/^(\d+)\/(\d+)$/);
   if (fracMatch) return { [prop]: `${(parseInt(fracMatch[1]) / parseInt(fracMatch[2])) * 100}%` };
@@ -81,8 +91,13 @@ const BP_RE = /^(sm|md|lg|xl|2xl):/;
 
 type MapperEntry = {
   pattern: RegExp;
-  apply: (match: RegExpMatchArray) => Record<string, string> | null;
+  apply: (match: RegExpMatchArray, config?: TailwindLayoutConfig) => Record<string, string> | null;
 };
+
+/** Config values needed by the layout mapper (subset of full Tailwind config). */
+export interface TailwindLayoutConfig {
+  maxWidth?: Record<string, string>;
+}
 
 const MAPPING_TABLE: MapperEntry[] = [
   // ── Display / Layout Mode ──
@@ -164,12 +179,12 @@ const MAPPING_TABLE: MapperEntry[] = [
   { pattern: /^ml-(.+)$/, apply: (m) => resolveSpacing(m[1], ["ml"]) },
 
   // ── Sizing (M3) ──
-  { pattern: /^w-(.+)$/, apply: (m) => resolveSizing("width", m[1]) },
-  { pattern: /^h-(.+)$/, apply: (m) => resolveSizing("height", m[1]) },
-  { pattern: /^min-w-(.+)$/, apply: (m) => resolveSizing("minWidth", m[1]) },
-  { pattern: /^min-h-(.+)$/, apply: (m) => resolveSizing("minHeight", m[1]) },
-  { pattern: /^max-w-(.+)$/, apply: (m) => resolveSizing("maxWidth", m[1]) },
-  { pattern: /^max-h-(.+)$/, apply: (m) => resolveSizing("maxHeight", m[1]) },
+  { pattern: /^w-(.+)$/, apply: (m, cfg) => resolveSizing("width", m[1], cfg) },
+  { pattern: /^h-(.+)$/, apply: (m, cfg) => resolveSizing("height", m[1], cfg) },
+  { pattern: /^min-w-(.+)$/, apply: (m, cfg) => resolveSizing("minWidth", m[1], cfg) },
+  { pattern: /^min-h-(.+)$/, apply: (m, cfg) => resolveSizing("minHeight", m[1], cfg) },
+  { pattern: /^max-w-(.+)$/, apply: (m, cfg) => resolveSizing("maxWidth", m[1], cfg) },
+  { pattern: /^max-h-(.+)$/, apply: (m, cfg) => resolveSizing("maxHeight", m[1], cfg) },
 
   // ── Positioning (M4) ──
   { pattern: /^static$/, apply: () => ({ position: "static" }) },
@@ -197,6 +212,21 @@ const MAPPING_TABLE: MapperEntry[] = [
   { pattern: /^rounded-full$/, apply: () => ({ borderRadius: "9999px" }) },
   { pattern: /^border$/, apply: () => ({ borderWidth: "1px" }) },
   { pattern: /^border-(\d+)$/, apply: (m) => ({ borderWidth: `${m[1]}px` }) },
+  // Side-specific borders: border-t-2 → borderTopWidth: 2px
+  { pattern: /^border-t-(\d+)$/, apply: (m) => ({ borderTopWidth: `${m[1]}px` }) },
+  { pattern: /^border-t$/, apply: () => ({ borderTopWidth: "1px" }) },
+  { pattern: /^border-r-(\d+)$/, apply: (m) => ({ borderRightWidth: `${m[1]}px` }) },
+  { pattern: /^border-r$/, apply: () => ({ borderRightWidth: "1px" }) },
+  { pattern: /^border-b-(\d+)$/, apply: (m) => ({ borderBottomWidth: `${m[1]}px` }) },
+  { pattern: /^border-b$/, apply: () => ({ borderBottomWidth: "1px" }) },
+  { pattern: /^border-l-(\d+)$/, apply: (m) => ({ borderLeftWidth: `${m[1]}px` }) },
+  { pattern: /^border-l$/, apply: () => ({ borderLeftWidth: "1px" }) },
+  // border-style: border-dashed → borderStyle: dashed
+  { pattern: /^border-solid$/, apply: () => ({ borderStyle: "solid" }) },
+  { pattern: /^border-dashed$/, apply: () => ({ borderStyle: "dashed" }) },
+  { pattern: /^border-dotted$/, apply: () => ({ borderStyle: "dotted" }) },
+  { pattern: /^border-double$/, apply: () => ({ borderStyle: "double" }) },
+  { pattern: /^border-none$/, apply: () => ({ borderStyle: "none" }) },
 
   // ── Typography (M6) ──
   // text-align
@@ -204,6 +234,12 @@ const MAPPING_TABLE: MapperEntry[] = [
   { pattern: /^text-center$/, apply: () => ({ textAlign: "center" }) },
   { pattern: /^text-right$/, apply: () => ({ textAlign: "right" }) },
   { pattern: /^text-justify$/, apply: () => ({ textAlign: "justify" }) },
+  // font-style + text-decoration
+  { pattern: /^italic$/, apply: () => ({ fontStyle: "italic" }) },
+  { pattern: /^not-italic$/, apply: () => ({ fontStyle: "normal" }) },
+  { pattern: /^underline$/, apply: () => ({ textDecoration: "underline" }) },
+  { pattern: /^line-through$/, apply: () => ({ textDecoration: "line-through" }) },
+  { pattern: /^no-underline$/, apply: () => ({ textDecoration: "none" }) },
   // font-weight
   { pattern: /^font-thin$/, apply: () => ({ fontWeight: "100" }) },
   { pattern: /^font-extralight$/, apply: () => ({ fontWeight: "200" }) },
@@ -235,6 +271,11 @@ const MAPPING_TABLE: MapperEntry[] = [
   { pattern: /^tracking-wide$/, apply: () => ({ letterSpacing: "0.025em" }) },
   { pattern: /^tracking-wider$/, apply: () => ({ letterSpacing: "0.05em" }) },
   { pattern: /^tracking-widest$/, apply: () => ({ letterSpacing: "0.1em" }) },
+  // text-transform
+  { pattern: /^uppercase$/, apply: () => ({ textTransform: "uppercase" }) },
+  { pattern: /^lowercase$/, apply: () => ({ textTransform: "lowercase" }) },
+  { pattern: /^capitalize$/, apply: () => ({ textTransform: "capitalize" }) },
+  { pattern: /^normal-case$/, apply: () => ({ textTransform: "none" }) },
   // leading (line-height)
   { pattern: /^leading-none$/, apply: () => ({ lineHeight: "1" }) },
   { pattern: /^leading-tight$/, apply: () => ({ lineHeight: "1.25" }) },
@@ -242,6 +283,8 @@ const MAPPING_TABLE: MapperEntry[] = [
   { pattern: /^leading-normal$/, apply: () => ({ lineHeight: "1.5" }) },
   { pattern: /^leading-relaxed$/, apply: () => ({ lineHeight: "1.625" }) },
   { pattern: /^leading-loose$/, apply: () => ({ lineHeight: "2" }) },
+  // leading with arbitrary bracket value — leading-[0.9] → lineHeight: 0.9
+  { pattern: /^leading-\[(.+)\]$/, apply: (m) => ({ lineHeight: m[1] }) },
 
   // ── Effects (M8): shadows, filters, transforms ──
   // box-shadow
@@ -386,7 +429,7 @@ function parseBreakpointPrefix(token: string): { bp: string; rest: string } {
     : { bp: "", rest: token };
 }
 
-function mapTokens(tokens: string[]): { styles: Record<string, string>; leftover: string[] } {
+function mapTokens(tokens: string[], config?: TailwindLayoutConfig): { styles: Record<string, string>; leftover: string[] } {
   const styles: Record<string, string> = {};
   const leftover: string[] = [];
   const seen = new Set<string>();
@@ -397,7 +440,7 @@ function mapTokens(tokens: string[]): { styles: Record<string, string>; leftover
     for (const entry of MAPPING_TABLE) {
       const match = token.match(entry.pattern);
       if (!match) continue;
-      const result = entry.apply(match);
+      const result = entry.apply(match, config);
       if (result === null) continue;
       Object.assign(styles, result);
       matched = true;
@@ -606,6 +649,7 @@ function dedupe(arr: string[]): string[] { return [...new Set(arr)]; }
  */
 export function tailwindLayoutToGbAttributes(
   classString: string,
+  config?: TailwindLayoutConfig,
 ): { styles: GbStyles; leftoverClasses: string } {
   if (!classString || !classString.trim()) {
     return { styles: {}, leftoverClasses: "" };
@@ -630,7 +674,7 @@ export function tailwindLayoutToGbAttributes(
   for (const bp of BREAKPOINTS) {
     const bpTokens = byBp.get(bp)!;
     if (bpTokens.length === 0) continue;
-    const result = mapTokens(bpTokens);
+    const result = mapTokens(bpTokens, config);
     bpStyles.set(bp, result.styles);
     rawLeftover.push(...result.leftover);
   }
