@@ -22,7 +22,7 @@
     "url": "https://github.com/ivanoung/html-to-generateblocks"
   },
   "author": "Ivan Oung",
-  "license": "GPL-3.0",
+  "license": "MIT",
   "dependencies": {
     "cheerio": "^1.2.0",
     "css": "^3.0.0",
