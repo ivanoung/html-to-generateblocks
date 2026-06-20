@@ -362,3 +362,147 @@ describe("V2 — responsive breakpoints", () => {
     assert.strictEqual(t.flexDirection, "column");
   });
 });
+
+describe("V3 All-Screens cascade (downward max-width resets)", () => {
+  it("p-4 (default only) — All Screens only, no @media", () => {
+    const r = tailwindLayoutToGbAttributes("p-4");
+    assert.strictEqual((r.styles as any).paddingTop, "16px");
+    assert.strictEqual((r.styles as any).paddingRight, "16px");
+    assert.strictEqual((r.styles as any).paddingBottom, "16px");
+    assert.strictEqual((r.styles as any).paddingLeft, "16px");
+    const mediaKeys = Object.keys(r.styles).filter(k => k.startsWith("@media"));
+    assert.strictEqual(mediaKeys.length, 0);
+  });
+
+  it("p-4 md:p-8 (default + md) — AS=32, @767=16", () => {
+    const r = tailwindLayoutToGbAttributes("p-4 md:p-8");
+    assert.strictEqual((r.styles as any).paddingTop, "32px");
+    const m767 = (r.styles as any)["@media (max-width: 767px)"] as Record<string, string>;
+    assert.ok(m767, "expected @media (max-width: 767px) block");
+    assert.strictEqual(m767.paddingTop, "16px");
+  });
+
+  it("p-4 md:p-8 lg:p-12 (default+md+lg) — AS=48, @1023=32, @767=16", () => {
+    const r = tailwindLayoutToGbAttributes("p-4 md:p-8 lg:p-12");
+    assert.strictEqual((r.styles as any).paddingTop, "48px");
+    const m1023 = (r.styles as any)["@media (max-width: 1023px)"] as Record<string, string>;
+    assert.ok(m1023, "expected @media (max-width: 1023px)");
+    assert.strictEqual(m1023.paddingTop, "32px");
+    const m767 = (r.styles as any)["@media (max-width: 767px)"] as Record<string, string>;
+    assert.ok(m767, "expected @media (max-width: 767px)");
+    assert.strictEqual(m767.paddingTop, "16px");
+  });
+
+  it("p-4 sm:p-6 md:p-8 lg:p-12 (all 4 diff) — AS=48, @1023=32, @767=24, @639=16", () => {
+    const r = tailwindLayoutToGbAttributes("p-4 sm:p-6 md:p-8 lg:p-12");
+    assert.strictEqual((r.styles as any).paddingTop, "48px");
+    const m1023 = (r.styles as any)["@media (max-width: 1023px)"] as Record<string, string>;
+    assert.strictEqual(m1023.paddingTop, "32px");
+    const m767 = (r.styles as any)["@media (max-width: 767px)"] as Record<string, string>;
+    assert.strictEqual(m767.paddingTop, "24px");
+    const m639 = (r.styles as any)["@media (max-width: 639px)"] as Record<string, string>;
+    assert.strictEqual(m639.paddingTop, "16px");
+  });
+
+  it("md:col-span-7 (md only, no default) — AS=span 7, @767=auto reset", () => {
+    const r = tailwindLayoutToGbAttributes("md:col-span-7");
+    assert.strictEqual((r.styles as any).gridColumn, "span 7");
+    const m767 = (r.styles as any)["@media (max-width: 767px)"] as Record<string, string>;
+    assert.ok(m767, "expected @media (max-width: 767px) reset");
+    assert.strictEqual(m767.gridColumn, "auto");
+  });
+
+  it("lg:col-span-7 (lg only, no default) — AS=span 7, @1023=auto reset", () => {
+    const r = tailwindLayoutToGbAttributes("lg:col-span-7");
+    assert.strictEqual((r.styles as any).gridColumn, "span 7");
+    const m1023 = (r.styles as any)["@media (max-width: 1023px)"] as Record<string, string>;
+    assert.ok(m1023, "expected @media (max-width: 1023px) reset");
+    assert.strictEqual(m1023.gridColumn, "auto");
+  });
+
+  it("flex-col md:flex-row — AS=row, @767=column", () => {
+    const r = tailwindLayoutToGbAttributes("flex-col md:flex-row");
+    assert.strictEqual((r.styles as any).flexDirection, "row");
+    assert.strictEqual((r.styles as any).display, "flex");
+    const m767 = (r.styles as any)["@media (max-width: 767px)"] as Record<string, string>;
+    assert.strictEqual(m767.flexDirection, "column");
+  });
+
+  it("grid-cols-1 md:grid-cols-2 lg:grid-cols-4 — AS=4fr, @1023=2fr, @767=1fr", () => {
+    const r = tailwindLayoutToGbAttributes("grid-cols-1 md:grid-cols-2 lg:grid-cols-4");
+    assert.strictEqual((r.styles as any).gridTemplateColumns, "repeat(4, minmax(0, 1fr))");
+    const m1023 = (r.styles as any)["@media (max-width: 1023px)"] as Record<string, string>;
+    assert.strictEqual(m1023.gridTemplateColumns, "repeat(2, minmax(0, 1fr))");
+    const m767 = (r.styles as any)["@media (max-width: 767px)"] as Record<string, string>;
+    assert.strictEqual(m767.gridTemplateColumns, "repeat(1, minmax(0, 1fr))");
+  });
+
+  it("gap-2 md:gap-4 lg:gap-8 — AS=32, @1023=16, @767=8", () => {
+    const r = tailwindLayoutToGbAttributes("gap-2 md:gap-4 lg:gap-8");
+    assert.strictEqual((r.styles as any).columnGap, "32px");
+    assert.strictEqual((r.styles as any).rowGap, "32px");
+    const m1023 = (r.styles as any)["@media (max-width: 1023px)"] as Record<string, string>;
+    assert.strictEqual(m1023.columnGap, "16px");
+    const m767 = (r.styles as any)["@media (max-width: 767px)"] as Record<string, string>;
+    assert.strictEqual(m767.columnGap, "8px");
+  });
+
+  it("p-4 xl:p-12 (default + xl) — AS=48, @1279=16", () => {
+    const r = tailwindLayoutToGbAttributes("p-4 xl:p-12");
+    assert.strictEqual((r.styles as any).paddingTop, "48px");
+    const m1279 = (r.styles as any)["@media (max-width: 1279px)"] as Record<string, string>;
+    assert.strictEqual(m1279.paddingTop, "16px");
+  });
+
+  it("p-4 2xl:p-12 (default + 2xl) — AS=48, @1535=16", () => {
+    const r = tailwindLayoutToGbAttributes("p-4 2xl:p-12");
+    assert.strictEqual((r.styles as any).paddingTop, "48px");
+    const m1535 = (r.styles as any)["@media (max-width: 1535px)"] as Record<string, string>;
+    assert.strictEqual(m1535.paddingTop, "16px");
+  });
+
+  it("p-4 sm:p-6 (default + sm) — AS=24, @639=16", () => {
+    const r = tailwindLayoutToGbAttributes("p-4 sm:p-6");
+    assert.strictEqual((r.styles as any).paddingTop, "24px");
+    const m639 = (r.styles as any)["@media (max-width: 639px)"] as Record<string, string>;
+    assert.strictEqual(m639.paddingTop, "16px");
+  });
+
+  it("flex (no responsive) — AS only", () => {
+    const r = tailwindLayoutToGbAttributes("flex");
+    assert.strictEqual(Object.keys(r.styles).length, 1);
+    assert.strictEqual((r.styles as any).display, "flex");
+    const mediaKeys = Object.keys(r.styles).filter(k => k.startsWith("@media"));
+    assert.strictEqual(mediaKeys.length, 0);
+  });
+
+  it("p-4 md:p-8 xl:p-24 (default+md+xl, no lg) — AS=96, @1279=32, @767=16", () => {
+    const r = tailwindLayoutToGbAttributes("p-4 md:p-8 xl:p-24");
+    assert.strictEqual((r.styles as any).paddingTop, "96px");
+    const m1279 = (r.styles as any)["@media (max-width: 1279px)"] as Record<string, string>;
+    assert.strictEqual(m1279.paddingTop, "32px");
+    const m767 = (r.styles as any)["@media (max-width: 767px)"] as Record<string, string>;
+    assert.strictEqual(m767.paddingTop, "16px");
+  });
+
+  it("xl:col-span-7 (xl only, no default) — AS=span 7, @1279=auto", () => {
+    const r = tailwindLayoutToGbAttributes("xl:col-span-7");
+    assert.strictEqual((r.styles as any).gridColumn, "span 7");
+    const m1279 = (r.styles as any)["@media (max-width: 1279px)"] as Record<string, string>;
+    assert.strictEqual(m1279.gridColumn, "auto");
+  });
+
+  it("2xl:col-span-7 (2xl only, no default) — AS=span 7, @1535=auto", () => {
+    const r = tailwindLayoutToGbAttributes("2xl:col-span-7");
+    assert.strictEqual((r.styles as any).gridColumn, "span 7");
+    const m1535 = (r.styles as any)["@media (max-width: 1535px)"] as Record<string, string>;
+    assert.strictEqual(m1535.gridColumn, "auto");
+  });
+
+  it("items-center md:items-start — AS=flex-start, @767=center", () => {
+    const r = tailwindLayoutToGbAttributes("items-center md:items-start");
+    assert.strictEqual((r.styles as any).alignItems, "flex-start");
+    const m767 = (r.styles as any)["@media (max-width: 767px)"] as Record<string, string>;
+    assert.strictEqual(m767.alignItems, "center");
+  });
+});
