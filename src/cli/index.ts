@@ -31,6 +31,29 @@ import { prepareVerification } from "../core/verify-prepare.js";
 const FIXTURES_DIR = resolve(process.cwd(), "fixtures");
 const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
 
+// ── CSS Utility Filter ──────────────────────────────────────
+
+/**
+ * Remove CSS rules from utilityCss whose selectors match any class
+ * that was converted to GB inline styles (no longer needed as CSS).
+ */
+function filterUtilityCss(utilityCss: string, mappedClasses: Set<string>): string {
+  if (mappedClasses.size === 0) return utilityCss;
+  
+  // Split into individual rules — each starts with a selector on its own line
+  const rules = utilityCss.split(/\n(?=[.#@])/);
+  return rules.filter(rule => {
+    for (const cls of mappedClasses) {
+      const escaped = cls.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Match class selector: .flex{ or .flex, or .flex 
+      if (new RegExp(`\\.${escaped}([\\s,\\{:]|$)`).test(rule)) {
+        return false;
+      }
+    }
+    return true;
+  }).join("");
+}
+
 // ── Fixture listing ───────────────────────────────────────────
 
 function getAllFixtureFiles(): string[] {
@@ -478,6 +501,7 @@ async function main(): Promise<void> {
 
       // Stage 4: Convert each page with skipInliner=true
       let firstPage = true;
+      const allMappedClasses = new Set<string>();
       for (const pc of pageContents) {
         const output = await convert({
           rawHtml: pc.html,
@@ -500,6 +524,13 @@ async function main(): Promise<void> {
         console.log(`  ${output.report.overallStatus === "pass" ? "✓" : "✗"} ${pc.name}: ${output.report.blockCount} blocks, ${output.report.overallStatus}${lossFlag}`);
         if (lossCheck.warning) {
           console.log(`    [LOSS] ${lossCheck.warning}`);
+        }
+
+        // Collect layout classes that were mapped to GB styles (for CSS filter)
+        if (output.report.mappedClasses) {
+          for (const cls of output.report.mappedClasses) {
+            allMappedClasses.add(cls);
+          }
         }
 
         firstPage = false;
@@ -543,6 +574,13 @@ async function main(): Promise<void> {
         const fullCss = readFileSync(cssPath, "utf-8");
 
         const result = CssClassifier.classify(fullCss);
+
+        // Filter Tailwind utilities: remove CSS rules for classes mapped to GB inline styles
+        let utilityCss = result.utilityCss;
+        if (allMappedClasses.size > 0) {
+          utilityCss = filterUtilityCss(utilityCss, allMappedClasses);
+        }
+
         const structuredStyles = result.structuredStyles.map((s) => ({
           selector: s.selector,
           name: s.name,
@@ -562,13 +600,13 @@ async function main(): Promise<void> {
 
         const manifest = buildGlobalStylesManifest(structuredStyles, rawEntries, []);
         writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(manifest, null, 2) + "\n", "utf-8");
-        writeFileSync(resolve(setupDir, "tailwind-utilities.css"), result.utilityCss, "utf-8");
+        writeFileSync(resolve(setupDir, "tailwind-utilities.css"), utilityCss, "utf-8");
         writeFileSync(resolve(setupDir, "styles-unique.css"), result.uniqueCss, "utf-8");
 
         const totalRules =
           structuredStyles.length +
           rawEntries.length +
-          (result.utilityCss.match(/\{/g) || []).length;
+          (utilityCss.match(/\{/g) || []).length;
         writeFileSync(resolve(setupDir, "rejected.json"), result.rejectionLog.toJSON(totalRules), "utf-8");
 
         // GB-importable format: flat array of {selector, css, data}

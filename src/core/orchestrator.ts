@@ -143,6 +143,7 @@ export async function convert(
     strippedElements: prepResult.warnings
       .filter((w) => w.startsWith("Stripped"))
       .map((w) => w.replace("Stripped ", "").replace(" element(s)", "")),
+    mappedClasses: walkResult.mappedClasses,
   };
 
   // Write output files — use project subfolder if specified

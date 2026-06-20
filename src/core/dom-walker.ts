@@ -13,6 +13,7 @@ import type { Block, BlockStyles } from "./types.js";
 import { nextId } from "./id-generator.js";
 import { parseStyleString } from "./style-parser.js";
 import type { GlobalStylesCollector } from "./global-styles-collector.js";
+import { tailwindLayoutToGbAttributes } from "./tailwind-layout-mapper.js";
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ interface WalkerOptions {
   collector: GlobalStylesCollector;
   warnings: string[];
   hardFails: { code: string; message: string }[];
+  mappedClasses: string[];
 }
 
 // ── Core walker ────────────────────────────────────────────
@@ -235,7 +237,10 @@ function makeTextBlock(
   opts.warnings.push(...styleWarnings);
 
   const htmlAttributes = extractHtmlAttributes($el);
-  const globalClasses = extractGlobalClasses($el, opts);
+  const { globalClasses, styles: mappedStyles } = extractGlobalClasses($el, opts);
+  if (Object.keys(mappedStyles).length > 0) {
+    Object.assign(styles, mappedStyles);
+  }
 
   // Content is innerHTML (preserves inline formatting, strips comments)
   const content = stripHtmlComments($el.html()) || $el.text() || "";
@@ -265,7 +270,10 @@ function makeElementBlock(
   opts.warnings.push(...styleWarnings);
 
   const htmlAttributes = extractHtmlAttributes($el);
-  const globalClasses = extractGlobalClasses($el, opts);
+  const { globalClasses, styles: mappedStyles } = extractGlobalClasses($el, opts);
+  if (Object.keys(mappedStyles).length > 0) {
+    Object.assign(styles, mappedStyles);
+  }
 
   return {
     blockName: "generateblocks/element",
@@ -298,7 +306,10 @@ function makeMediaBlock(
   if (width) htmlAttributes.width = width;
   if (height) htmlAttributes.height = height;
 
-  const globalClasses = extractGlobalClasses($el, opts);
+  const { globalClasses, styles: mappedStyles } = extractGlobalClasses($el, opts);
+  if (Object.keys(mappedStyles).length > 0) {
+    Object.assign(styles, mappedStyles);
+  }
 
   return {
     blockName: "generateblocks/media",
@@ -448,23 +459,51 @@ function extractHtmlAttributes(
 function extractGlobalClasses(
   $el: cheerio.Cheerio<any>,
   opts: WalkerOptions,
-): string[] {
+): { globalClasses: string[]; styles: Record<string, any> } {
   const classAttr = ($el.attr("class") || "").trim();
-  if (!classAttr) return [];
+  if (!classAttr) return { globalClasses: [], styles: {} };
 
-  const classNames = classAttr.split(/\s+/).filter((c) => c.length > 0);
-  const result: string[] = [];
+  const resolveResult = resolveBlockClassAttribute($el);
 
-  classNames.forEach((className) => {
-    // Track reusable classes from <head> styles for global-styles manifest
-    if (opts.classNameToProperties.has(className)) {
-      opts.collector.recordUsage(className);
+  // Track mapped classes for CSS splitter filtering
+  opts.mappedClasses.push(...resolveResult.mappedClassNames);
+
+  // Track reusable classes from <head> styles for global-styles manifest
+  for (const gc of resolveResult.globalClasses) {
+    if (opts.classNameToProperties.has(gc)) {
+      opts.collector.recordUsage(gc);
     }
-    // Preserve ALL class tokens in globalClasses
-    result.push(className);
-  });
+  }
 
-  return result;
+  return { globalClasses: resolveResult.globalClasses, styles: resolveResult.styles };
+}
+
+/**
+ * Process a block's class attribute through the layout mapper.
+ * Returns styles to merge into block.styles, and remaining classes
+ * that should stay as globalClasses.
+ */
+function resolveBlockClassAttribute(
+  $el: cheerio.Cheerio<any>,
+): { styles: Record<string, any>; globalClasses: string[]; mappedClassNames: string[] } {
+  const classAttr = ($el.attr("class") || "").trim();
+  if (!classAttr) return { styles: {}, globalClasses: [], mappedClassNames: [] };
+
+  const originalClasses = classAttr.split(/\s+/).filter((c: string) => c.length > 0);
+
+  // Call the layout mapper — it converts Tailwind layout classes to GB styles
+  const { styles, leftoverClasses } = tailwindLayoutToGbAttributes(classAttr);
+
+  // leftoverClasses is a space-separated string
+  const globalClasses = leftoverClasses
+    ? leftoverClasses.trim().split(/\s+/).filter((c: string) => c.length > 0)
+    : [];
+
+  // Track which classes were mapped (present in original but not in leftovers)
+  const leftoverSet = new Set(globalClasses);
+  const mappedClassNames = originalClasses.filter(c => !leftoverSet.has(c));
+
+  return { styles, globalClasses, mappedClassNames };
 }
 
 // ── Entry point ────────────────────────────────────────────
@@ -473,6 +512,7 @@ export interface WalkResult {
   blocks: Block[];
   warnings: string[];
   hardFails: { code: string; message: string }[];
+  mappedClasses: string[];
 }
 
 export function walkDom(
@@ -485,7 +525,8 @@ export function walkDom(
   const hardFails: { code: string; message: string }[] = [];
   const $ = cheerio.load(`<div>${html}</div>`);
 
-  const opts: WalkerOptions = { classNameToProperties, collector, warnings, hardFails };
+  const mappedClasses: string[] = [];
+  const opts: WalkerOptions = { classNameToProperties, collector, warnings, hardFails, mappedClasses };
   const blocks: Block[] = [];
 
   // Walk top-level children of the wrapper div only
@@ -501,5 +542,5 @@ export function walkDom(
     });
   }
 
-  return { blocks, warnings, hardFails };
+  return { blocks, warnings, hardFails, mappedClasses };
 }
