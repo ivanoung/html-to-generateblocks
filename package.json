@@ -1,5 +1,5 @@
 {
-  "name": "gb-converter",
+  "name": "html-to-generateblocks",
   "version": "0.1.0",
   "description": "Convert HTML pages built with Tailwind CSS into GenerateBlocks WordPress block markup",
   "type": "module",
@@ -19,7 +19,7 @@
   "keywords": ["generateblocks", "tailwindcss", "wordpress", "converter", "blocks"],
   "repository": {
     "type": "git",
-    "url": "https://github.com/ivanoung/gb-converter"
+    "url": "https://github.com/ivanoung/html-to-generateblocks"
   },
   "author": "Ivan Oung",
   "license": "GPL-3.0",
