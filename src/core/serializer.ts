@@ -50,30 +50,46 @@ function formatCss(block: Block, rawCss: string): string {
 
 /**
  * Merge block.css properties into block.styles (camelCase).
- * GB ignores styles when css is non-empty — this ensures
- * ALL properties flow through styles where GB will render them.
+ * GB uses 'styles' for editor preview and 'css' for frontend.
+ * Both must be kept in sync — if one has properties the other doesn't,
+ * the editor and frontend will render differently.
+ * Returns merged styles and an equivalent kebab-case css string.
  */
 function mergeCssIntoLazyStyles(block: Block): { styles: BlockStyles; css: string } {
   const rawCss = (block.css || "").trim();
-  if (!rawCss) return { styles: block.styles ? { ...block.styles } : {}, css: "" };
 
+  // Start with existing styles
   const styles: BlockStyles = block.styles ? { ...block.styles } : {};
-  const cssLeftover: string[] = [];
 
-  // Parse CSS declarations: property:value;
-  const decls = rawCss.split(";").filter(d => d.trim());
-  for (const decl of decls) {
-    const colon = decl.indexOf(":");
-    if (colon < 0) { cssLeftover.push(decl); continue; }
-    const prop = decl.substring(0, colon).trim();
-    const val = decl.substring(colon + 1).trim();
-    if (!prop || !val) { cssLeftover.push(decl); continue; }
-    // Convert to camelCase and add to styles
-    const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-    styles[camel] = val;
+  // Parse CSS declarations from block.css and merge into styles
+  if (rawCss) {
+    const decls = rawCss.split(";").filter(d => d.trim());
+    for (const decl of decls) {
+      const colon = decl.indexOf(":");
+      if (colon < 0) continue;
+      const prop = decl.substring(0, colon).trim();
+      const val = decl.substring(colon + 1).trim();
+      if (!prop || !val) continue;
+      const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      // Only add if not already present (styles takes priority)
+      if (!(camel in styles)) {
+        styles[camel] = val;
+      }
+    }
   }
 
-  return { styles, css: cssLeftover.join(";") };
+  // Rebuild css from merged styles (keep both in sync)
+  const cssEntries: string[] = [];
+  for (const [camel, val] of Object.entries(styles)) {
+    // Skip @media keys (responsive)
+    if (camel.startsWith("@media")) continue;
+    const kebab = camel.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+    cssEntries.push(`${kebab}:${val}`);
+  }
+  cssEntries.sort();
+  const syncedCss = cssEntries.join(";") + (cssEntries.length > 0 ? ";" : "");
+
+  return { styles, css: syncedCss };
 }
 
 /**
@@ -86,12 +102,11 @@ function buildElementAttrs(block: Block): Record<string, unknown> {
   attrs.uniqueId = block.uniqueId;
   attrs.tagName = block.tagName ?? "div";
 
-  // Merge css properties into styles so GB renders them.
-  // GB ignores styles when css is non-empty.
+  // GB uses 'styles' for editor preview and 'css' for frontend.
+  // Both must be kept in sync via mergeCssIntoLazyStyles.
   const { styles, css } = mergeCssIntoLazyStyles(block);
-  const stylesEmpty = !styles || Object.keys(styles).length === 0;
-  attrs.styles = stylesEmpty ? {} : styles;
-  attrs.css = formatCss(block, stylesEmpty ? (css || "") : "");
+  attrs.styles = styles;
+  attrs.css = formatCss(block, css);
 
   if (block.globalClasses && block.globalClasses.length > 0) {
     attrs.globalClasses = block.globalClasses;
@@ -116,9 +131,8 @@ function buildTextAttrs(block: Block): Record<string, unknown> {
   // attrs.content = block.content ?? "";  // ← REMOVED per WP round-trip test
 
   const { styles, css } = mergeCssIntoLazyStyles(block);
-  const stylesEmpty = !styles || Object.keys(styles).length === 0;
-  attrs.styles = stylesEmpty ? {} : styles;
-  attrs.css = formatCss(block, stylesEmpty ? (css || "") : "");
+  attrs.styles = styles;
+  attrs.css = formatCss(block, css);
 
   if (block.globalClasses && block.globalClasses.length > 0) {
     attrs.globalClasses = block.globalClasses;
@@ -139,9 +153,8 @@ function buildMediaAttrs(block: Block): Record<string, unknown> {
   attrs.tagName = block.tagName ?? "img";
 
   const { styles, css } = mergeCssIntoLazyStyles(block);
-  const stylesEmpty = !styles || Object.keys(styles).length === 0;
-  attrs.styles = stylesEmpty ? {} : styles;
-  attrs.css = formatCss(block, stylesEmpty ? (css || "") : "");
+  attrs.styles = styles;
+  attrs.css = formatCss(block, css);
 
   if (block.globalClasses && block.globalClasses.length > 0) {
     attrs.globalClasses = block.globalClasses;
