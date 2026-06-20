@@ -185,6 +185,7 @@ async function main() {
   const outputDir = args.includes("--output") && args[args.indexOf("--output") + 1]
     ? args[args.indexOf("--output") + 1]
     : "output/mino";
+  const doCoverage = args.includes("--coverage");
 
   const fallbackDir = path.join(outputDir, "fallback", "pages");
   const processedDir = path.join(outputDir, "processed", "pages");
@@ -267,6 +268,55 @@ async function main() {
     const reportPath = path.join(outputDir, "verify-report.json");
     fs.writeFileSync(reportPath, JSON.stringify(reports, null, 2));
     console.log(`Report: ${reportPath}`);
+  }
+
+  // ── CSS Coverage Report (--coverage) ────────────────────
+  if (doCoverage) {
+    const twCssPath = path.join(outputDir, "processed", "setup", "tailwind-utilities.css");
+    if (!fs.existsSync(twCssPath)) {
+      console.log("\nCSS coverage: tailwind-utilities.css not found (run with --split first)");
+    } else {
+      const twCss = fs.readFileSync(twCssPath, "utf-8");
+      const cssClasses = new Set<string>();
+      const cssRe = /\.([a-zA-Z0-9_\-\\\/\[\]:]+)(?:[\s,\{]|$)/g;
+      let m: RegExpExecArray | null;
+      while ((m = cssRe.exec(twCss)) !== null) {
+        cssClasses.add(m[1]);
+      }
+
+      const domClasses = new Set<string>();
+      const processedDir2 = path.join(outputDir, "processed", "pages");
+      for (const f of fs.readdirSync(processedDir2)) {
+        if (!f.endsWith(".html")) continue;
+        const html = fs.readFileSync(path.join(processedDir2, f), "utf-8");
+        const classRe = /class="([^"]*)"/g;
+        let cm: RegExpExecArray | null;
+        while ((cm = classRe.exec(html)) !== null) {
+          for (const cls of cm[1].split(/\s+/)) {
+            if (cls.length > 0) domClasses.add(cls);
+          }
+        }
+      }
+
+      const missing = [...domClasses].filter(c => !cssClasses.has(c) && !c.startsWith("gb-") && !c.startsWith("wp-"));
+      const coverage = domClasses.size > 0
+        ? ((domClasses.size - missing.length) / domClasses.size * 100).toFixed(1)
+        : "0";
+
+      console.log(`\n=== CSS Coverage Report ===`);
+      console.log(`DOM classes (excluding gb-/wp-): ${domClasses.size}`);
+      console.log(`With CSS in tailwind-utilities.css: ${domClasses.size - missing.length} (${coverage}%)`);
+      console.log(`Missing CSS: ${missing.length}`);
+      if (missing.length > 0) {
+        console.log(`\nMissing classes (first 30):`);
+        for (const cls of missing.slice(0, 30)) {
+          console.log(`  ${cls}`);
+        }
+        const covPath = path.join(outputDir, "verify-coverage.json");
+        fs.writeFileSync(covPath, JSON.stringify({ coverage: parseFloat(coverage), missing, total: domClasses.size }, null, 2));
+        console.log(`\nCoverage report: ${covPath}`);
+      }
+    }
   }
 
   process.exit(totalIssues > 0 ? 1 : 0);

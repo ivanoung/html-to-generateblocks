@@ -431,10 +431,10 @@ If recovery fires:
 
 ## Known Limitations
 
-- **display:initial reset:** When a Tailwind class sets `display` only at a responsive breakpoint (e.g., `md:flex`) with no base display class, the downward reset uses `display: initial` which resolves to `inline` in CSS. In practice, Tailwind developers always set a base display class (`flex md:flex`), making this edge case rare.
-- **GB Grid initialization:** Grid blocks with pre-populated `styles` + `css` attributes may require a manual "touch" in the WordPress block editor (toggle display grid→flex→grid) to fully initialize frontend CSS. This is a GenerateBlocks behavior, not a converter bug.
-- **xl/2xl breakpoints:** xl and 2xl values are collapsed into the nearest breakpoint when using GB's native tiers. For full precision, the converter uses custom `@media` queries.
-- **CSS splitter:** The `--split` flag separates Tailwind preflight/utility CSS from design component classes. Some edge-case utility classes may not be classified correctly.
+- **Color classes (background, text, border colors):** Tailwind color classes (`bg-primary`, `text-slate/80`, `border-seafoam/40`, `hover:bg-seafoam`) rely on `--tw-*` CSS custom properties and opacity modifiers (`/50`). These CANNOT be mapped to GenerateBlocks inline styles — GB's `styles` field doesn't support CSS variables or compound color values. Color classes remain as Tailwind utility classes requiring the accompanying `tailwind-utilities.css` stylesheet. This is by design.
+- **State modifiers (hover:, focus:, group-hover:, etc.):** Pseudo-class selectors have no GenerateBlocks inline equivalent. These classes remain in `globalClasses` and rely on `tailwind-utilities.css` for CSS support.
+- **Transition/animation classes:** `transition-colors`, `duration-300`, `animate-pulse` have no direct CSS property mapping in GB's inline styles system. They remain as utility classes.
+- **Font families from Tailwind config:** Custom font classes (`font-display`, `font-mono`) map to `font-family` values defined in the Tailwind config, which the mapper cannot access dynamically. These stay in `globalClasses`.
 
 ---
 
