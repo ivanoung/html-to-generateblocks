@@ -163,6 +163,17 @@ const SHADE_LIGHTNESS: Record<number, number> = {
  * Only expands user-defined colors that appear as single hex values in the
  * theme.extend.colors block. Built-in Tailwind colors are left untouched.
  */
+/** Tailwind v3 default color palette names — skip shade expansion for these. */
+const TW_DEFAULT_COLORS = new Set([
+  "slate", "gray", "zinc", "neutral", "stone",
+  "red", "orange", "amber", "yellow", "lime",
+  "green", "emerald", "teal", "cyan", "sky",
+  "blue", "indigo", "violet", "purple", "fuchsia",
+  "pink", "rose",
+  "white", "black",
+  "transparent", "current", "inherit",
+]);
+
 export function expandColorPalettes(configJson: string): string {
   // Find all single-value hex colors anywhere in the config.
   // Pattern: colorName: "#hex" or colorName: '#hex' 
@@ -180,6 +191,12 @@ export function expandColorPalettes(configJson: string): string {
   while ((match = singleHexRegex.exec(configJson)) !== null) {
     const colorName = match[1];
     const hexColor = match[2];
+    
+    // Skip Tailwind default colors — don't generate shades for them.
+    // If the original config set slate as a single value, respect that —
+    // the CDN will compile without shade classes. This matches the
+    // original page's behavior exactly.
+    if (TW_DEFAULT_COLORS.has(colorName)) continue;
     
     // Skip if already processed (regex can match overlapping entries)
     if (expanded.has(colorName)) continue;
@@ -231,8 +248,8 @@ export function validateTailwindConfig(
   for (const m of colorMatches) {
     const colorName = m[1];
 
-    // Skip well-known Tailwind colors that likely have full palettes
-    // (we're only checking user-defined single-value overrides)
+    // Skip Tailwind default colors — they have full palettes from the CDN
+    if (TW_DEFAULT_COLORS.has(colorName)) continue;
 
     // Check if any HTML class references a shade variant of this color
     const shadePattern = new RegExp(
