@@ -2,6 +2,8 @@
 
 Convert HTML pages into WordPress paste-ready GenerateBlocks & Core block markup.
 
+📺 **[Watch the demo →](https://www.boomshare.ai/shared/01KVJWQBK46FQYP698B0AC6MSM)** (3:54 showcase)
+
 > **Status:** Intent-based style transfer pipeline — GenerateBlocks Element/Text/Media/Shape
 > + WordPress Core fallbacks verified. Tailwind CSS resolution via headless Chromium,
 > with automatic class-to-style inlining and Global Styles generation.
