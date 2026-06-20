@@ -514,4 +514,42 @@ describe("V3 All-Screens cascade (downward max-width resets)", () => {
     const m767 = r.styles["@media (max-width: 767px)"] as GbStyles;
     assert.strictEqual(m767.alignItems, "center");
   });
+
+  // ── Edge cases ──
+
+  it("redundant skip: values same across breakpoints emit only AS", () => {
+    const r = tailwindLayoutToGbAttributes("gap-4 md:gap-4 lg:gap-4");
+    assert.strictEqual(Object.keys(r.styles).filter(k => k.startsWith("@media")).length, 0);
+    assert.strictEqual(r.styles.columnGap, "16px");
+  });
+
+  it("redundant skip: md equals lg, only emit @767 for default", () => {
+    const r = tailwindLayoutToGbAttributes("gap-4 md:gap-8 lg:gap-8");
+    assert.strictEqual(r.styles.columnGap, "32px");
+    const m767 = r.styles["@media (max-width: 767px)"] as Record<string, string>;
+    assert.strictEqual(m767.columnGap, "16px");
+    assert.strictEqual(r.styles["@media (max-width: 1023px)"], undefined);
+  });
+
+  it("emit order: max-width @media keys descending px", () => {
+    const r = tailwindLayoutToGbAttributes("gap-1 sm:gap-2 md:gap-4 lg:gap-6 xl:gap-8");
+    const mediaKeys = Object.keys(r.styles).filter(k => k.startsWith("@media"));
+    const pxVals = mediaKeys.map(k => parseInt(k.match(/(\d+)px/)![1], 10));
+    assert.deepStrictEqual(pxVals, [1279, 1023, 767, 639]);
+  });
+
+  it("leftoverClasses preserves non-mapped tokens", () => {
+    const r = tailwindLayoutToGbAttributes("gap-4 custom-class md:gap-8 foo-bar");
+    assert.ok(r.leftoverClasses.includes("custom-class"));
+    assert.ok(r.leftoverClasses.includes("foo-bar"));
+  });
+
+  it("multi-property non-responsive — flex items-start justify-between gap-4", () => {
+    const r = tailwindLayoutToGbAttributes("flex items-start justify-between gap-4");
+    assert.strictEqual(r.styles.display, "flex");
+    assert.strictEqual(r.styles.alignItems, "flex-start");
+    assert.strictEqual(r.styles.justifyContent, "space-between");
+    assert.strictEqual(r.styles.columnGap, "16px");
+    assert.strictEqual(Object.keys(r.styles).filter(k => k.startsWith("@media")).length, 0);
+  });
 });
