@@ -429,11 +429,10 @@ function parseBreakpointPrefix(token: string): { bp: string; rest: string } {
     : { bp: "", rest: token };
 }
 
-function mapTokens(tokens: string[], config?: TailwindLayoutConfig): { styles: Record<string, string>; leftover: string[]; families: Set<string> } {
+function mapTokens(tokens: string[], config?: TailwindLayoutConfig): { styles: Record<string, string>; leftover: string[] } {
   const styles: Record<string, string> = {};
   const leftover: string[] = [];
   const seen = new Set<string>();
-  const families = new Set<string>();
   for (const token of tokens) {
     if (seen.has(token)) continue;
     seen.add(token);
@@ -444,20 +443,12 @@ function mapTokens(tokens: string[], config?: TailwindLayoutConfig): { styles: R
       const result = entry.apply(match, config);
       if (result === null) continue;
       Object.assign(styles, result);
-      families.add(extractFamily(token));
       matched = true;
       break;
     }
     if (!matched) leftover.push(token);
   }
-  return { styles, leftover, families };
-}
-
-/** Extract class family from a token. E.g., "leading-[0.9]" → "leading", "text-8xl" → "text", "p-4" → "p". */
-function extractFamily(token: string): string {
-  // Strip leading '-' separated prefix before the first value character
-  const m = token.match(/^([a-z]+(?:-[a-z]+)*?)(?:-|\[|$)/);
-  return m ? m[1] : token;
+  return { styles, leftover };
 }
 
 function groupByProperty(bpStyles: Map<string, Record<string, string>>): Map<string, Map<string, string>> {
@@ -683,14 +674,12 @@ export function tailwindLayoutToGbAttributes(
   }
 
   const bpStyles = new Map<string, Record<string, string>>();
-  const bpFamilies = new Map<string, Set<string>>();
   const rawLeftover: string[] = [];
   for (const bp of BREAKPOINTS) {
     const bpTokens = byBp.get(bp)!;
     if (bpTokens.length === 0) continue;
     const result = mapTokens(bpTokens, config);
     bpStyles.set(bp, result.styles);
-    bpFamilies.set(bp, result.families);
     rawLeftover.push(...result.leftover);
   }
 
@@ -703,58 +692,9 @@ export function tailwindLayoutToGbAttributes(
   }
 
   const byProp = groupByProperty(bpStyles);
-
-  // ── Base-exclusive family detection ──────────────────────────
-  // Families that appear ONLY at base, never at bp-prefixed breakpoints.
-  // Properties set by these families at base win at all breakpoints.
-  const baseFamilies = bpFamilies.get("") || new Set<string>();
-  const nonBaseFamilies = new Set<string>();
-  for (const [bp, families] of bpFamilies) {
-    if (bp === "") continue;
-    for (const f of families) nonBaseFamilies.add(f);
-  }
-  const baseOnlyFamilies = new Set([...baseFamilies].filter(f => !nonBaseFamilies.has(f)));
-
-  // Properties set by base-only families — these win at all breakpoints
-  const baseOnlyProps = new Set<string>();
-  if (baseOnlyFamilies.size > 0) {
-    const baseStyles = bpStyles.get("") || {};
-    // Re-map base tokens to find which properties came from base-only families
-    const baseTokens = byBp.get("") || [];
-    const seen2 = new Set<string>();
-    for (const token of baseTokens) {
-      if (seen2.has(token)) continue;
-      seen2.add(token);
-      const family = extractFamily(token);
-      if (!baseOnlyFamilies.has(family)) continue;
-      // This token matches a pattern — find which properties it sets
-      for (const entry of MAPPING_TABLE) {
-        const m = token.match(entry.pattern);
-        if (!m) continue;
-        const result = entry.apply(m, config);
-        if (result === null) continue;
-        for (const prop of Object.keys(result)) {
-          baseOnlyProps.add(prop);
-        }
-        break;
-      }
-    }
-  }
-
   const finalStyles: GbStyles = {};
   for (const [prop, perBp] of byProp) {
     const resolved = resolveCascade(perBp);
-
-    // Base-exclusive override: base value wins at all breakpoints
-    if (baseOnlyProps.has(prop)) {
-      const baseVal = perBp.get("");
-      if (baseVal !== undefined) {
-        for (const bp of BREAKPOINTS) {
-          resolved.set(bp, baseVal);
-        }
-      }
-    }
-
     mergeGbStyles(finalStyles, collapseToAllScreensWithResets(prop, resolved));
   }
 
