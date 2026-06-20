@@ -51,14 +51,10 @@ function formatCss(block: Block, rawCss: string): string {
 /**
  * Merge block.css properties into block.styles (camelCase).
  * GB uses 'styles' for editor preview and 'css' for frontend.
- * Both must be kept in sync — if one has properties the other doesn't,
- * the editor and frontend will render differently.
- * Returns merged styles and an equivalent kebab-case css string.
+ * Both must be kept in sync via buildSyncedCss below.
  */
-function mergeCssIntoLazyStyles(block: Block): { styles: BlockStyles; css: string } {
+function mergeCssIntoLazyStyles(block: Block): BlockStyles {
   const rawCss = (block.css || "").trim();
-
-  // Start with existing styles
   const styles: BlockStyles = block.styles ? { ...block.styles } : {};
 
   // Parse CSS declarations from block.css and merge into styles
@@ -71,25 +67,72 @@ function mergeCssIntoLazyStyles(block: Block): { styles: BlockStyles; css: strin
       const val = decl.substring(colon + 1).trim();
       if (!prop || !val) continue;
       const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      // Only add if not already present (styles takes priority)
       if (!(camel in styles)) {
         styles[camel] = val;
       }
     }
   }
 
-  // Rebuild css from merged styles (keep both in sync)
-  const cssEntries: string[] = [];
-  for (const [camel, val] of Object.entries(styles)) {
-    // Skip @media keys (responsive)
-    if (camel.startsWith("@media")) continue;
-    const kebab = camel.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
-    cssEntries.push(`${kebab}:${val}`);
-  }
-  cssEntries.sort();
-  const syncedCss = cssEntries.join(";") + (cssEntries.length > 0 ? ";" : "");
+  return styles;
+}
 
-  return { styles, css: syncedCss };
+/**
+ * Build a complete CSS string from styles, including @media blocks.
+ * Returns a string starting with the selector so formatCss passes through.
+ *
+ * Format:
+ *   .gb-element-elem004{prop1:val1;prop2:val2;}
+ *   @media (max-width: 1023px) { .gb-element-elem004 { prop1:val1; } }
+ *
+ * @media blocks are sorted by px descending (largest breakpoint first).
+ */
+function buildSyncedCss(styles: BlockStyles, selector: string): string {
+  const flat: [string, string][] = [];
+  const mediaBlocks: [string, string][] = [];
+
+  for (const [key, val] of Object.entries(styles)) {
+    if (key.startsWith("@media")) {
+      if (typeof val !== "object" || val === null || Array.isArray(val)) continue;
+      const inner = val as Record<string, unknown>;
+      const innerEntries = Object.entries(inner);
+      if (innerEntries.length === 0) continue;
+      // Guard: skip deep nesting (unexpected)
+      const hasNested = innerEntries.some(([, v]) => typeof v === "object" && v !== null && !Array.isArray(v));
+      if (hasNested) continue;
+
+      const innerCss = innerEntries
+        .map(([k, v]) => `${k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}:${v}`)
+        .sort()
+        .join(";");
+      mediaBlocks.push([key, `${selector}{${innerCss}}`]);
+    } else {
+      const kebab = key.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+      flat.push([kebab, String(val)]);
+    }
+  }
+
+  // Sort flat properties alphabetically
+  flat.sort((a, b) => a[0].localeCompare(b[0]));
+  const flatCss = flat.length > 0
+    ? `${selector}{${flat.map(([k, v]) => `${k}:${v}`).join(";")}}`
+    : "";
+
+  // Sort @media blocks by px descending
+  mediaBlocks.sort((a, b) => {
+    const pxA = extractPx(a[0]);
+    const pxB = extractPx(b[0]);
+    if (pxA === pxB) return a[0].localeCompare(b[0]);
+    return pxB - pxA; // descending
+  });
+  const mediaCss = mediaBlocks.map(([query, body]) => `${query}{${body}}`).join("");
+
+  return flatCss + mediaCss;
+}
+
+/** Parse px value from @media query. Returns -1 if not parseable. */
+function extractPx(query: string): number {
+  const m = query.match(/(\d+)px/);
+  return m ? parseInt(m[1], 10) : -1;
 }
 
 /**
@@ -103,10 +146,11 @@ function buildElementAttrs(block: Block): Record<string, unknown> {
   attrs.tagName = block.tagName ?? "div";
 
   // GB uses 'styles' for editor preview and 'css' for frontend.
-  // Both must be kept in sync via mergeCssIntoLazyStyles.
-  const { styles, css } = mergeCssIntoLazyStyles(block);
+  // Both must be kept in sync via buildSyncedCss.
+  const styles = mergeCssIntoLazyStyles(block);
   attrs.styles = styles;
-  attrs.css = formatCss(block, css);
+  const selector = `.gb-element-${block.uniqueId}`;
+  attrs.css = formatCss(block, buildSyncedCss(styles, selector));
 
   if (block.globalClasses && block.globalClasses.length > 0) {
     attrs.globalClasses = block.globalClasses;
@@ -130,9 +174,10 @@ function buildTextAttrs(block: Block): Record<string, unknown> {
   // to strip it on save → string diff → recovery. Do NOT emit content here.
   // attrs.content = block.content ?? "";  // ← REMOVED per WP round-trip test
 
-  const { styles, css } = mergeCssIntoLazyStyles(block);
+  const styles = mergeCssIntoLazyStyles(block);
   attrs.styles = styles;
-  attrs.css = formatCss(block, css);
+  const selector = `.gb-text-${block.uniqueId}`;
+  attrs.css = formatCss(block, buildSyncedCss(styles, selector));
 
   if (block.globalClasses && block.globalClasses.length > 0) {
     attrs.globalClasses = block.globalClasses;
@@ -152,9 +197,10 @@ function buildMediaAttrs(block: Block): Record<string, unknown> {
   attrs.uniqueId = block.uniqueId;
   attrs.tagName = block.tagName ?? "img";
 
-  const { styles, css } = mergeCssIntoLazyStyles(block);
+  const styles = mergeCssIntoLazyStyles(block);
   attrs.styles = styles;
-  attrs.css = formatCss(block, css);
+  const selector = `.gb-media-${block.uniqueId}`;
+  attrs.css = formatCss(block, buildSyncedCss(styles, selector));
 
   if (block.globalClasses && block.globalClasses.length > 0) {
     attrs.globalClasses = block.globalClasses;
