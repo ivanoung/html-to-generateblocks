@@ -462,53 +462,6 @@ function groupByProperty(bpStyles: Map<string, Record<string, string>>): Map<str
   return byProp;
 }
 
-/**
- * Source-order cascade override: if a property's base value comes from
- * a token that appears AFTER all bp-prefixed tokens for the same property,
- * the base value wins at all breakpoints. This matches CSS source order
- * where later rules override earlier ones.
- *
- * Example: text-5xl md:text-7xl lg:text-8xl leading-[0.9]
- *   leading-[0.9] (pos 3) sets lineHeight at base.
- *   text-7xl (pos 1), text-8xl (pos 2) set lineHeight at md/lg.
- *   Base position (3) > all bp positions (1,2) → base wins: lineHeight=0.9 everywhere.
- *
- * Example: flex md:hidden
- *   flex (pos 0) sets display at base.
- *   hidden (pos 1) sets display at md.
- *   Base position (0) < bp position (1) → standard cascade: hidden wins at md+.
- */
-function applySourceOrderOverride(
-  prop: string,
-  resolved: Map<string, string>,
-  bpPropPositions: Map<string, number>,
-): Map<string, string> {
-  // Get latest (highest) position at each breakpoint
-  const basePos = bpPropPositions.get("") ?? -1;
-  if (basePos < 0) return resolved; // no base contribution
-
-  let baseWins = true;
-  for (const [bp, pos] of bpPropPositions) {
-    if (bp === "") continue;
-    if (pos > basePos) {
-      // A bp-specific token appears AFTER the base token → standard cascade
-      baseWins = false;
-      break;
-    }
-  }
-
-  if (!baseWins) return resolved;
-
-  // Base wins: override all breakpoints with base value
-  const baseVal = resolved.get("");
-  if (baseVal === undefined) return resolved;
-  const overridden = new Map<string, string>();
-  for (const bp of BREAKPOINTS) {
-    overridden.set(bp, baseVal);
-  }
-  return overridden;
-}
-
 function resolveCascade(perBp: Map<string, string>): Map<string, string> {
   const resolved = new Map<string, string>();
   let lastValue: string | undefined;
@@ -707,22 +660,17 @@ export function tailwindLayoutToGbAttributes(
   }
 
   const tokens = classString.trim().split(/\s+/);
-  // Assign global source-order positions to each token (stripped of bp prefix)
-  const tokenPos = new Map<string, number>();
   const seen = new Set<string>();
   const tokenOrigins = new Map<string, string>();
   const byBp = new Map<string, string[]>();
   for (const bp of BREAKPOINTS) byBp.set(bp, []);
 
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
+  for (const token of tokens) {
     if (seen.has(token)) continue;
     seen.add(token);
     const { bp, rest } = parseBreakpointPrefix(token);
     byBp.get(bp)!.push(rest);
     if (bp !== "") tokenOrigins.set(rest, token);
-    // Track latest position for this rest-token (if same class at multiple bps, keep latest)
-    tokenPos.set(rest, i);
   }
 
   const bpStyles = new Map<string, Record<string, string>>();
@@ -744,38 +692,9 @@ export function tailwindLayoutToGbAttributes(
   }
 
   const byProp = groupByProperty(bpStyles);
-
-  // Build per-property, per-breakpoint position map for source-order cascade
-  const propBpPositions = new Map<string, Map<string, number>>();
-  for (const [bp, bpTokens] of byBp) {
-    for (const token of bpTokens) {
-      // Find which properties this token sets
-      for (const entry of MAPPING_TABLE) {
-        const m = token.match(entry.pattern);
-        if (!m) continue;
-        const result = entry.apply(m, config);
-        if (result === null) continue;
-        const pos = tokenPos.get(token) ?? -1;
-        for (const prop of Object.keys(result)) {
-          if (!propBpPositions.has(prop)) propBpPositions.set(prop, new Map());
-          const current = propBpPositions.get(prop)!.get(bp) ?? -1;
-          if (pos > current) propBpPositions.get(prop)!.set(bp, pos);
-        }
-        break;
-      }
-    }
-  }
-
   const finalStyles: GbStyles = {};
   for (const [prop, perBp] of byProp) {
-    let resolved = resolveCascade(perBp);
-
-    // Apply source-order override: if base has a later position than all bp-specific values
-    const positions = propBpPositions.get(prop);
-    if (positions) {
-      resolved = applySourceOrderOverride(prop, resolved, positions);
-    }
-
+    const resolved = resolveCascade(perBp);
     mergeGbStyles(finalStyles, collapseToAllScreensWithResets(prop, resolved));
   }
 
