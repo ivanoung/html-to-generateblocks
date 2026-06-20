@@ -3,4 +3,21 @@ output/
 dist/
 .worktrees/
 *.Zone.Identifier
+plugin/
+.vscode/
+.vscode-blocked/
+.pi/
+skill-reference/
+fixtures/
+snapshots/
+snippets/
+config/
+MEMORY.md
+dump-dossier.ts
+spike-parse-config.ts
+spike-tailwind-config.ts
 inputs/
+
+# Keep folder structure visible
+!inputs/.gitkeep
+!output/.gitkeep
