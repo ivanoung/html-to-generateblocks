@@ -10,7 +10,6 @@
 
 import * as cheerio from "cheerio";
 import type { Block, BlockStyles } from "./types.js";
-import { tailwindLayoutToGbAttributes } from "./tailwind-layout-mapper.js";
 import { nextId } from "./id-generator.js";
 import { parseStyleString } from "./style-parser.js";
 import type { GlobalStylesCollector } from "./global-styles-collector.js";
@@ -237,23 +236,18 @@ function makeTextBlock(
 
   const htmlAttributes = extractHtmlAttributes($el);
   const globalClasses = extractGlobalClasses($el, opts);
-  const textId = nextId("text");
-  const layoutResult = applyLayoutMapper(globalClasses, styles, textId);
-
-  // Append mapper-generated CSS to the block's css field
-  const blockCss = css + layoutResult.cssAddition;
 
   // Content is innerHTML (preserves inline formatting, strips comments)
   const content = stripHtmlComments($el.html()) || $el.text() || "";
 
   return {
     blockName: "generateblocks/text",
-    uniqueId: textId,
+    uniqueId: nextId("text"),
     tagName: tag,
     content,
-    styles: layoutResult.styles,
-    css: blockCss,
-    globalClasses: layoutResult.filteredClasses.length > 0 ? layoutResult.filteredClasses : undefined,
+    styles,
+    css,
+    globalClasses: globalClasses.length > 0 ? globalClasses : undefined,
     htmlAttributes:
       Object.keys(htmlAttributes).length > 0 ? htmlAttributes : undefined,
     innerBlocks: [],
@@ -272,19 +266,14 @@ function makeElementBlock(
 
   const htmlAttributes = extractHtmlAttributes($el);
   const globalClasses = extractGlobalClasses($el, opts);
-  const elemId = nextId("elem");
-  const layoutResult = applyLayoutMapper(globalClasses, styles, elemId);
-
-  // Append mapper-generated CSS to the block's css field
-  const blockCss = css + layoutResult.cssAddition;
 
   return {
     blockName: "generateblocks/element",
-    uniqueId: elemId,
+    uniqueId: nextId("elem"),
     tagName: tag,
-    styles: layoutResult.styles,
-    css: blockCss,
-    globalClasses: layoutResult.filteredClasses.length > 0 ? layoutResult.filteredClasses : undefined,
+    styles,
+    css,
+    globalClasses: globalClasses.length > 0 ? globalClasses : undefined,
     htmlAttributes:
       Object.keys(htmlAttributes).length > 0 ? htmlAttributes : undefined,
     innerBlocks: [],
@@ -310,19 +299,14 @@ function makeMediaBlock(
   if (height) htmlAttributes.height = height;
 
   const globalClasses = extractGlobalClasses($el, opts);
-  const imgId = nextId("img");
-  const layoutResult = applyLayoutMapper(globalClasses, styles, imgId);
-
-  // Append mapper-generated CSS to the block's css field
-  const blockCss = css + layoutResult.cssAddition;
 
   return {
     blockName: "generateblocks/media",
-    uniqueId: imgId,
+    uniqueId: nextId("img"),
     tagName: "img",
-    styles: layoutResult.styles,
-    css: blockCss,
-    globalClasses: layoutResult.filteredClasses.length > 0 ? layoutResult.filteredClasses : undefined,
+    styles,
+    css,
+    globalClasses: globalClasses.length > 0 ? globalClasses : undefined,
     htmlAttributes,
     mediaId: 0,
     innerBlocks: [],
@@ -483,79 +467,6 @@ function extractGlobalClasses(
   return result;
 }
 
-/**
- * Apply the Tailwind layout mapper to extracted global classes.
- * Returns merged styles, filtered class list, and CSS string mirroring the new styles.
- */
-function applyLayoutMapper(
-  globalClasses: string[],
-  existingStyles: Record<string, unknown>,
-  uniqueId: string,
-): { styles: Record<string, unknown>; filteredClasses: string[]; cssAddition: string } {
-  if (globalClasses.length === 0) {
-    return { styles: { ...existingStyles }, filteredClasses: [], cssAddition: "" };
-  }
-
-  const classString = globalClasses.join(" ");
-  const result = tailwindLayoutToGbAttributes(classString);
-
-  const mergedStyles = { ...existingStyles, ...result.styles };
-  const cssAddition = mapperStylesToCss(result.styles as Record<string, unknown>, uniqueId);
-
-  const leftover = result.leftoverClasses
-    ? result.leftoverClasses.split(/\s+/).filter((c) => c.length > 0)
-    : [];
-
-  return { styles: mergedStyles, filteredClasses: leftover, cssAddition };
-}
-
-function mapperStylesToCss(styles: Record<string, unknown>, uniqueId: string): string {
-  const selector = `.gb-element-${uniqueId}`;
-  let css = "";
-
-  const flatProps: string[] = [];
-  for (const [key, value] of Object.entries(styles)) {
-    if (key.startsWith("@media")) continue;
-    if (typeof value !== "string") continue;
-    const prop = camelToDash(key);
-    const cleanValue = stripFunctionSpaces(value);
-    flatProps.push(`${prop}:${cleanValue}`);
-  }
-  // Sort alphabetically by property name (GB requirement)
-  flatProps.sort((a, b) => a.split(":")[0].localeCompare(b.split(":")[0]));
-  if (flatProps.length > 0) {
-    css = `${selector}{${flatProps.join(";")}}`;
-  }
-
-  for (const [key, value] of Object.entries(styles)) {
-    if (!key.startsWith("@media")) continue;
-    if (typeof value !== "object" || value === null) continue;
-    const innerProps: string[] = [];
-    for (const [ik, iv] of Object.entries(value as Record<string, unknown>)) {
-      if (typeof iv === "string") {
-        const prop = camelToDash(ik);
-        const cleanValue = stripFunctionSpaces(iv);
-        innerProps.push(`${prop}:${cleanValue}`);
-      }
-    }
-    innerProps.sort((a, b) => a.split(":")[0].localeCompare(b.split(":")[0]));
-    if (innerProps.length > 0) {
-      css += `${key}{${selector}{${innerProps.join(";")}}}}`;
-    }
-  }
-
-  return css;
-}
-
-/** Strip spaces after commas in CSS function values: "repeat(4, minmax(0, 1fr))" → "repeat(4,minmax(0,1fr))" */
-function stripFunctionSpaces(value: string): string {
-  return value.replace(/, /g, ",");
-}
-
-function camelToDash(str: string): string {
-  return str.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
-}
-
 // ── Entry point ────────────────────────────────────────────
 
 export interface WalkResult {
@@ -568,6 +479,7 @@ export function walkDom(
   html: string,
   classNameToProperties: Map<string, BlockStyles>,
   collector: GlobalStylesCollector,
+  _allowNavFooter?: boolean,
 ): WalkResult {
   const warnings: string[] = [];
   const hardFails: { code: string; message: string }[] = [];
