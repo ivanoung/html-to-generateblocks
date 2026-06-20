@@ -429,6 +429,15 @@ If recovery fires:
 
 ---
 
+## Known Limitations
+
+- **display:initial reset:** When a Tailwind class sets `display` only at a responsive breakpoint (e.g., `md:flex`) with no base display class, the downward reset uses `display: initial` which resolves to `inline` in CSS. In practice, Tailwind developers always set a base display class (`flex md:flex`), making this edge case rare.
+- **GB Grid initialization:** Grid blocks with pre-populated `styles` + `css` attributes may require a manual "touch" in the WordPress block editor (toggle display grid→flex→grid) to fully initialize frontend CSS. This is a GenerateBlocks behavior, not a converter bug.
+- **xl/2xl breakpoints:** xl and 2xl values are collapsed into the nearest breakpoint when using GB's native tiers. For full precision, the converter uses custom `@media` queries.
+- **CSS splitter:** The `--split` flag separates Tailwind preflight/utility CSS from design component classes. Some edge-case utility classes may not be classified correctly.
+
+---
+
 ## Updating This Document
 
 This is a **living document**. Update it whenever:
