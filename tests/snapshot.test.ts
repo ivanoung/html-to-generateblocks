@@ -8,7 +8,7 @@ import { CssClassifier } from "../src/core/css-classifier.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SNAPSHOTS = resolve(__dirname, "snapshots");
 
-const minoCss = readFileSync(resolve(process.cwd(), "output/mino/styles.css"), "utf-8");
+const minoCss = readFileSync(resolve(process.cwd(), "output/mino/fallback/styles.css"), "utf-8");
 
 describe("Golden Snapshots — mino", () => {
   it("Tailwind utility classes are filtered to raw CSS, not structured", () => {

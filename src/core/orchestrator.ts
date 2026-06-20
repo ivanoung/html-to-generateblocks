@@ -25,9 +25,11 @@ export interface ConversionInput {
   rawHtml: string;
   pageName: string;
   projectDir?: string;
-  isFirstPage?: boolean;  // write shared files (styles.css, customizer) only on first page
-  cssAlreadyCompiled?: boolean; // CSS compiled once for all pages via multi-page CDN
-  dossier?: DesignDossier; // pre-extracted design evidence (multi-page flow)
+  isFirstPage?: boolean;
+  cssAlreadyCompiled?: boolean;
+  dossier?: DesignDossier;
+  skipMapper?: boolean;
+  skipStylesCss?: boolean;  // don't write styles.css (for processed output)
 }
 
 export interface ConversionOutput {
@@ -95,6 +97,7 @@ export async function convert(
     prepResult.html,
     prepResult.classNameToProperties,
     collector,
+    input.skipMapper ?? false,
   );
 
   // Collect all warnings
@@ -173,7 +176,7 @@ export async function convert(
   // Single styles.css: compiled Tailwind CSS + custom CSS
   const combinedCss = [compiledCss, prepResult.customCss]
     .filter(Boolean).join("\n");
-  if (input.isFirstPage !== false) {
+  if (input.isFirstPage !== false && !input.skipStylesCss) {
     if (combinedCss.trim()) {
       writeFileSync(
         resolve(outDir, "styles.css"),

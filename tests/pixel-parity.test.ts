@@ -5,8 +5,8 @@ import { resolve } from "node:path";
 import { execSync } from "node:child_process";
 
 const PROJECT_ROOT = resolve(process.cwd());
-const STYLES_CSS = resolve(PROJECT_ROOT, "output/mino/styles.css");
-const MANUAL_STEPS = resolve(PROJECT_ROOT, "output/mino/manual-steps.md");
+const STYLES_CSS = resolve(PROJECT_ROOT, "output/mino/fallback/styles.css");
+const MANUAL_STEPS = resolve(PROJECT_ROOT, "output/mino/fallback/manual-steps.md");
 
 // Custom color classes that must appear in compiled CSS (fixed by expandColorPalettes DEFAULT key)
 const REQUIRED_CLASSES = [
@@ -90,7 +90,7 @@ describe("Pixel Parity Verification", { skip: !INPUT_EXISTS }, () => {
   });
 
   it("all 10 mino pages convert without hard fails", () => {
-    const pagesDir = resolve(PROJECT_ROOT, "output/mino/pages");
+    const pagesDir = resolve(PROJECT_ROOT, "output/mino/fallback/pages");
     const reports = [
       "ai-integrations", "bespoke-systems", "blog-wordpress", "blog",
       "care-plans", "case-featured", "case-studies", "contact",

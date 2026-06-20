@@ -60,6 +60,7 @@ interface WalkerOptions {
   warnings: string[];
   hardFails: { code: string; message: string }[];
   mappedClasses: string[];
+  skipMapper: boolean;
 }
 
 // ── Core walker ────────────────────────────────────────────
@@ -463,6 +464,17 @@ function extractGlobalClasses(
   const classAttr = ($el.attr("class") || "").trim();
   if (!classAttr) return { globalClasses: [], styles: {} };
 
+  // Fallback mode: keep ALL classes, no mapper
+  if (opts.skipMapper) {
+    const classNames = classAttr.split(/\s+/).filter((c: string) => c.length > 0);
+    for (const gc of classNames) {
+      if (opts.classNameToProperties.has(gc)) {
+        opts.collector.recordUsage(gc);
+      }
+    }
+    return { globalClasses: classNames, styles: {} };
+  }
+
   const resolveResult = resolveBlockClassAttribute($el);
 
   // Track mapped classes for CSS splitter filtering
@@ -519,14 +531,14 @@ export function walkDom(
   html: string,
   classNameToProperties: Map<string, BlockStyles>,
   collector: GlobalStylesCollector,
-  _allowNavFooter?: boolean,
+  skipMapper = false,
 ): WalkResult {
   const warnings: string[] = [];
   const hardFails: { code: string; message: string }[] = [];
   const $ = cheerio.load(`<div>${html}</div>`);
 
   const mappedClasses: string[] = [];
-  const opts: WalkerOptions = { classNameToProperties, collector, warnings, hardFails, mappedClasses };
+  const opts: WalkerOptions = { classNameToProperties, collector, warnings, hardFails, mappedClasses, skipMapper };
   const blocks: Block[] = [];
 
   // Walk top-level children of the wrapper div only

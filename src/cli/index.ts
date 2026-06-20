@@ -499,76 +499,83 @@ async function main(): Promise<void> {
         mkdirSync(outDir, { recursive: true });
       }
 
-      // Stage 4: Convert each page with skipInliner=true
-      let firstPage = true;
-      const allMappedClasses = new Set<string>();
-      for (const pc of pageContents) {
-        const output = await convert({
-          rawHtml: pc.html,
-          pageName: pc.name,
-          projectDir,
-          isFirstPage: firstPage,  // shared files only from first page
-          cssAlreadyCompiled: true, // CSS already compiled once for all pages
-          dossier: sharedDossier,
-        });
-
-        // On first page: prepend Tailwind CSS to styles.css
-        if (firstPage && inlinerCss) {
-          const cssPath = resolve(outDir, "styles.css");
-          const existing = existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "";
-          writeFileSync(cssPath, inlinerCss + "\n" + existing, "utf-8");
-        }
-
-        const lossCheck = checkContentLoss(pc.html, output.blockHtml);
-        const lossFlag = lossCheck.warning ? ` ⚠ LOSS ${Math.round(lossCheck.lossPercent)}%` : "";
-        console.log(`  ${output.report.overallStatus === "pass" ? "✓" : "✗"} ${pc.name}: ${output.report.blockCount} blocks, ${output.report.overallStatus}${lossFlag}`);
-        if (lossCheck.warning) {
-          console.log(`    [LOSS] ${lossCheck.warning}`);
-        }
-
-        // Collect layout classes that were mapped to GB styles (for CSS filter)
-        if (output.report.mappedClasses) {
-          for (const cls of output.report.mappedClasses) {
-            allMappedClasses.add(cls);
-          }
-        }
-
-        firstPage = false;
-      }
-
-      // Generate manual-steps.md with global selector inventory
-      const cssPath = resolve(outDir, "styles.css");
-      const { analyzeSource, generateManualStepsReport } = await import("../core/manual-steps.js");
-      const { inventoryGlobalSelectors } = await import("../core/global-selector-inventory.js");
-      const src = analyzeSource(pageContents[0].html);
-      const inventory = inventoryGlobalSelectors(
-        existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "",
-      );
-      const ctx = {
-        fonts: src.fonts,
-        externalImages: src.externalImages,
-        hasNav: src.hasNav,
-        hasIconify: src.hasIconify,
-        inventory: inventory.rules.length > 0 ? inventory : undefined,
-        customizerExists: existsSync(resolve(outDir, "customizer-import.json")),
-        appJsExists: uniqueScripts.length > 0,
-      };
-      writeFileSync(
-        resolve(outDir, "manual-steps.md"),
-        generateManualStepsReport(ctx) + "\n",
-        "utf-8",
-      );
-
-      // Phase 2: Split styles.css into three layers:
-      //   - global-styles.json / global-styles-import.json
-      //   - tailwind-utilities.css (static Tailwind utilities)
-      //   - styles-unique.css (non-utility raw CSS)
-      // Only runs when --split flag is passed. Monolithic styles.css at
-      // project root is always the canonical pixel-perfect fallback.
+      // Stage 4: Convert each page — two passes
+      //   Pass 1: fallback (no mapper — pixel-perfect reference)
+      //   Pass 2: processed (with mapper — editor-ready)
       const doSplit = args.includes("--split");
-      const setupDir = resolve(outDir, "setup");
+      const passes: Array<{ mode: string; skipMapper: boolean; runSplit: boolean }> = [
+        { mode: "fallback", skipMapper: true, runSplit: false },
+        { mode: "processed", skipMapper: false, runSplit: doSplit },
+      ];
 
-      if (existsSync(cssPath) && doSplit) {
+      for (const pass of passes) {
+        const modeDir = resolve(outDir, pass.mode);
+        mkdirSync(resolve(modeDir, "pages"), { recursive: true });
+
+        let firstPage = true;
+        const allMappedClasses = new Set<string>();
+        for (const pc of pageContents) {
+          const output = await convert({
+            rawHtml: pc.html,
+            pageName: pc.name,
+            projectDir: `${projectDir ? projectDir + "/" : ""}${pass.mode}`,
+            isFirstPage: firstPage,
+            cssAlreadyCompiled: true,
+            dossier: sharedDossier,
+            skipMapper: pass.skipMapper,
+            skipStylesCss: !pass.skipMapper, // skip styles.css for processed (only fallback gets it)
+          });
+
+          // On first page: prepend Tailwind CSS to styles.css (fallback pass only)
+          if (firstPage && inlinerCss && pass.skipMapper) {
+            const cssPath = resolve(modeDir, "styles.css");
+            const existing = existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "";
+            writeFileSync(cssPath, inlinerCss + "\n" + existing, "utf-8");
+          }
+
+          const lossCheck = checkContentLoss(pc.html, output.blockHtml);
+          const lossFlag = lossCheck.warning ? ` ⚠ LOSS ${Math.round(lossCheck.lossPercent)}%` : "";
+          console.log(`  ${pass.mode} ${output.report.overallStatus === "pass" ? "✓" : "✗"} ${pc.name}: ${output.report.blockCount} blocks, ${output.report.overallStatus}${lossFlag}`);
+          if (lossCheck.warning) {
+            console.log(`    [LOSS] ${lossCheck.warning}`);
+          }
+
+          if (output.report.mappedClasses) {
+            for (const cls of output.report.mappedClasses) {
+              allMappedClasses.add(cls);
+            }
+          }
+
+          firstPage = false;
+        }
+
+        // Generate manual-steps.md
+        const cssPath = resolve(modeDir, "styles.css");
+        const { analyzeSource, generateManualStepsReport } = await import("../core/manual-steps.js");
+        const { inventoryGlobalSelectors } = await import("../core/global-selector-inventory.js");
+        const src = analyzeSource(pageContents[0].html);
+        const inventory = inventoryGlobalSelectors(
+          existsSync(cssPath) ? readFileSync(cssPath, "utf-8") : "",
+        );
+        const ctx = {
+          fonts: src.fonts,
+          externalImages: src.externalImages,
+          hasNav: src.hasNav,
+          hasIconify: src.hasIconify,
+          inventory: inventory.rules.length > 0 ? inventory : undefined,
+          customizerExists: existsSync(resolve(outDir, "customizer-import.json")),
+          appJsExists: uniqueScripts.length > 0,
+        };
+        writeFileSync(
+          resolve(modeDir, "manual-steps.md"),
+          generateManualStepsReport(ctx) + "\n",
+          "utf-8",
+        );
+
+        // Phase 2: Split styles.css (only for processed pass when --split is set)
+        const setupDir = resolve(modeDir, "setup");
+
+        if (existsSync(cssPath) && pass.runSplit) {
         mkdirSync(setupDir, { recursive: true });
 
         const fullCss = readFileSync(cssPath, "utf-8");
@@ -617,12 +624,13 @@ async function main(): Promise<void> {
           "utf-8",
         );
 
-        console.log(`  Global Styles: ${structuredStyles.length} structured (editable), ${rawEntries.length} raw (CSS-only)`);
-        console.log(`  Tailwind CSS:  setup/tailwind-utilities.css`);
-        console.log(`  Unique CSS:    setup/styles-unique.css`);
-        console.log(`  Rejections:    setup/rejected.json`);
-        console.log(`  Import:        setup/global-styles-import.json`);
+        console.log(`  ${pass.mode} Global Styles: ${structuredStyles.length} structured (editable), ${rawEntries.length} raw (CSS-only)`);
+        console.log(`  ${pass.mode} Tailwind CSS:  ${pass.mode}/setup/tailwind-utilities.css`);
+        console.log(`  ${pass.mode} Unique CSS:    ${pass.mode}/setup/styles-unique.css`);
+        console.log(`  ${pass.mode} Rejections:    ${pass.mode}/setup/rejected.json`);
+        console.log(`  ${pass.mode} Import:        ${pass.mode}/setup/global-styles-import.json`);
       }
+      } // end for each pass
 
       // Write app.js at project root with all scripts
       if (uniqueScripts.length > 0) {
@@ -645,9 +653,10 @@ async function main(): Promise<void> {
       }
 
       console.log(`\n  Done. ${pageContents.length} page(s) converted.`);
-      console.log(`  Pages:       ${outputDir}pages/`);
+      console.log(`  Fallback:    ${outputDir}fallback/pages/ — pixel-perfect reference`);
+      console.log(`  Processed:   ${outputDir}processed/pages/ — editor-ready`);
       if (doSplit) {
-        console.log(`  Setup:       ${outputDir}setup/`);
+        console.log(`  Setup:       ${outputDir}processed/setup/`);
       }
       console.log("");
       return;
