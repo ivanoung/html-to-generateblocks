@@ -581,10 +581,13 @@ async function main(): Promise<void> {
         // Phase 2: Split styles.css (only for processed pass when --split is set)
         const setupDir = resolve(modeDir, "setup");
 
-        if (existsSync(cssPath) && pass.runSplit) {
+        if (pass.runSplit) {
         mkdirSync(setupDir, { recursive: true });
 
-        const fullCss = readFileSync(cssPath, "utf-8");
+        // Use full Tailwind CSS: from file if present, otherwise inlinerCss
+        const fullCss = existsSync(cssPath)
+          ? readFileSync(cssPath, "utf-8")
+          : inlinerCss;
 
         const result = CssClassifier.classify(fullCss);
 
