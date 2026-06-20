@@ -3,3 +3,4 @@ output/
 dist/
 .worktrees/
 *.Zone.Identifier
+inputs/
