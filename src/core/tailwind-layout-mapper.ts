@@ -198,6 +198,70 @@ const MAPPING_TABLE: MapperEntry[] = [
   { pattern: /^border$/, apply: () => ({ borderWidth: "1px" }) },
   { pattern: /^border-(\d+)$/, apply: (m) => ({ borderWidth: `${m[1]}px` }) },
 
+  // ── Typography (M6) ──
+  // text-align
+  { pattern: /^text-left$/, apply: () => ({ textAlign: "left" }) },
+  { pattern: /^text-center$/, apply: () => ({ textAlign: "center" }) },
+  { pattern: /^text-right$/, apply: () => ({ textAlign: "right" }) },
+  { pattern: /^text-justify$/, apply: () => ({ textAlign: "justify" }) },
+  // font-weight
+  { pattern: /^font-thin$/, apply: () => ({ fontWeight: "100" }) },
+  { pattern: /^font-extralight$/, apply: () => ({ fontWeight: "200" }) },
+  { pattern: /^font-light$/, apply: () => ({ fontWeight: "300" }) },
+  { pattern: /^font-normal$/, apply: () => ({ fontWeight: "400" }) },
+  { pattern: /^font-medium$/, apply: () => ({ fontWeight: "500" }) },
+  { pattern: /^font-semibold$/, apply: () => ({ fontWeight: "600" }) },
+  { pattern: /^font-bold$/, apply: () => ({ fontWeight: "700" }) },
+  { pattern: /^font-extrabold$/, apply: () => ({ fontWeight: "800" }) },
+  { pattern: /^font-black$/, apply: () => ({ fontWeight: "900" }) },
+  // font-size (TW default scale)
+  { pattern: /^text-xs$/, apply: () => ({ fontSize: "12px", lineHeight: "16px" }) },
+  { pattern: /^text-sm$/, apply: () => ({ fontSize: "14px", lineHeight: "20px" }) },
+  { pattern: /^text-base$/, apply: () => ({ fontSize: "16px", lineHeight: "24px" }) },
+  { pattern: /^text-lg$/, apply: () => ({ fontSize: "18px", lineHeight: "28px" }) },
+  { pattern: /^text-xl$/, apply: () => ({ fontSize: "20px", lineHeight: "28px" }) },
+  { pattern: /^text-2xl$/, apply: () => ({ fontSize: "24px", lineHeight: "32px" }) },
+  { pattern: /^text-3xl$/, apply: () => ({ fontSize: "30px", lineHeight: "36px" }) },
+  { pattern: /^text-4xl$/, apply: () => ({ fontSize: "36px", lineHeight: "40px" }) },
+  { pattern: /^text-5xl$/, apply: () => ({ fontSize: "48px", lineHeight: "48px" }) },
+  { pattern: /^text-6xl$/, apply: () => ({ fontSize: "60px", lineHeight: "60px" }) },
+  { pattern: /^text-7xl$/, apply: () => ({ fontSize: "72px", lineHeight: "72px" }) },
+  { pattern: /^text-8xl$/, apply: () => ({ fontSize: "96px", lineHeight: "96px" }) },
+  { pattern: /^text-9xl$/, apply: () => ({ fontSize: "128px", lineHeight: "128px" }) },
+  // tracking (letter-spacing)
+  { pattern: /^tracking-tighter$/, apply: () => ({ letterSpacing: "-0.05em" }) },
+  { pattern: /^tracking-tight$/, apply: () => ({ letterSpacing: "-0.025em" }) },
+  { pattern: /^tracking-normal$/, apply: () => ({ letterSpacing: "0em" }) },
+  { pattern: /^tracking-wide$/, apply: () => ({ letterSpacing: "0.025em" }) },
+  { pattern: /^tracking-wider$/, apply: () => ({ letterSpacing: "0.05em" }) },
+  { pattern: /^tracking-widest$/, apply: () => ({ letterSpacing: "0.1em" }) },
+  // leading (line-height)
+  { pattern: /^leading-none$/, apply: () => ({ lineHeight: "1" }) },
+  { pattern: /^leading-tight$/, apply: () => ({ lineHeight: "1.25" }) },
+  { pattern: /^leading-snug$/, apply: () => ({ lineHeight: "1.375" }) },
+  { pattern: /^leading-normal$/, apply: () => ({ lineHeight: "1.5" }) },
+  { pattern: /^leading-relaxed$/, apply: () => ({ lineHeight: "1.625" }) },
+  { pattern: /^leading-loose$/, apply: () => ({ lineHeight: "2" }) },
+
+  // ── Effects (M8): shadows, filters, transforms ──
+  // box-shadow
+  { pattern: /^shadow-sm$/, apply: () => ({ boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)" }) },
+  { pattern: /^shadow$/, apply: () => ({ boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)" }) },
+  { pattern: /^shadow-md$/, apply: () => ({ boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)" }) },
+  { pattern: /^shadow-lg$/, apply: () => ({ boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)" }) },
+  { pattern: /^shadow-xl$/, apply: () => ({ boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }) },
+  { pattern: /^shadow-2xl$/, apply: () => ({ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }) },
+  { pattern: /^shadow-none$/, apply: () => ({ boxShadow: "none" }) },
+  // backdrop-blur
+  { pattern: /^backdrop-blur-sm$/, apply: () => ({ backdropFilter: "blur(4px)" }) },
+  { pattern: /^backdrop-blur$/, apply: () => ({ backdropFilter: "blur(8px)" }) },
+  { pattern: /^backdrop-blur-md$/, apply: () => ({ backdropFilter: "blur(12px)" }) },
+  { pattern: /^backdrop-blur-lg$/, apply: () => ({ backdropFilter: "blur(16px)" }) },
+  { pattern: /^backdrop-blur-xl$/, apply: () => ({ backdropFilter: "blur(24px)" }) },
+  // transforms (GB supports transform via complex string, but these are common)
+  { pattern: /^rotate-(\d+)$/, apply: (m) => ({ transform: `rotate(${m[1]}deg)` }) },
+  { pattern: /^scale-(\d+)$/, apply: (m) => ({ transform: `scale(${parseInt(m[1]) / 100})` }) },
+
   // ── Aspect Ratio ──
   { pattern: /^aspect-auto$/, apply: () => ({ aspectRatio: "auto" }) },
   { pattern: /^aspect-square$/, apply: () => ({ aspectRatio: "1 / 1" }) },
