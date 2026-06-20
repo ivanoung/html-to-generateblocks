@@ -253,6 +253,91 @@ function resolveCascade(perBp: Map<string, string>): Map<string, string> {
   return resolved;
 }
 
+// ── V3 All-Screens-Centric Cascade ────────────────────────
+
+/** Breakpoints in cascade order (smallest → largest) */
+const TW_BP_ORDER: { prefix: string; px: number }[] = [
+  { prefix: "", px: 0 },
+  { prefix: "sm", px: 640 },
+  { prefix: "md", px: 768 },
+  { prefix: "lg", px: 1024 },
+  { prefix: "xl", px: 1280 },
+  { prefix: "2xl", px: 1536 },
+];
+
+/** Breakpoint px → N−1 px for max-width reset boundary */
+function maxWidthBoundary(px: number): number {
+  return px - 1;
+}
+
+/** CSS initial values for property resets when no breakpoint value exists below */
+const PROPERTY_RESETS: Record<string, string> = {
+  gridColumn: "auto",
+  gridColumnStart: "auto",
+  gridColumnEnd: "auto",
+  gridRow: "auto",
+  gridRowStart: "auto",
+  gridRowEnd: "auto",
+  gridTemplateColumns: "none",
+  gridTemplateRows: "none",
+  display: "initial",
+  flexDirection: "row",
+  flexWrap: "nowrap",
+  justifyContent: "flex-start",
+  alignItems: "stretch",
+  alignContent: "stretch",
+  alignSelf: "auto",
+  justifyItems: "stretch",
+  justifySelf: "auto",
+  placeContent: "stretch",
+  placeItems: "stretch",
+  placeSelf: "auto",
+  gap: "0px",
+  rowGap: "0px",
+  columnGap: "0px",
+  paddingTop: "0px",
+  paddingRight: "0px",
+  paddingBottom: "0px",
+  paddingLeft: "0px",
+  marginTop: "0px",
+  marginRight: "0px",
+  marginBottom: "0px",
+  marginLeft: "0px",
+  width: "auto",
+  height: "auto",
+  minWidth: "0px",
+  minHeight: "0px",
+  maxWidth: "none",
+  maxHeight: "none",
+  overflowX: "visible",
+  overflowY: "visible",
+  position: "static",
+  zIndex: "auto",
+  order: "0",
+  flexGrow: "0",
+  flexShrink: "1",
+  flexBasis: "auto",
+  flex: "0 1 auto",
+  fontSize: "inherit",
+  fontWeight: "400",
+  lineHeight: "inherit",
+  textAlign: "left",
+  borderRadius: "0px",
+  borderWidth: "0px",
+  opacity: "1",
+  visibility: "visible",
+  isolation: "auto",
+  aspectRatio: "auto",
+  gridAutoFlow: "row",
+  gridAutoColumns: "auto",
+  gridAutoRows: "auto",
+};
+
+function getResetValue(propKey: string): string {
+  if (propKey in PROPERTY_RESETS) return PROPERTY_RESETS[propKey];
+  return "initial";
+}
+
 const GB_DESKTOP = "(min-width: 1025px)";
 const GB_TABLET = "(max-width: 1024px)";
 const GB_MOBILE = "(max-width: 767px)";
