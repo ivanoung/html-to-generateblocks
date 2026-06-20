@@ -597,47 +597,29 @@ async function main(): Promise<void> {
           utilityCss = filterUtilityCss(utilityCss, allMappedClasses);
         }
 
-        const structuredStyles = result.structuredStyles.map((s) => ({
-          selector: s.selector,
-          name: s.name,
-          styles: s.styles,
-        }));
+        // Merge structured styles + unique CSS into one file for easy debugging.
+        // Structured styles: design component classes (e.g., .blueprint-bg, .clip-hex)
+        // Unique CSS: raw non-utility CSS selectors
+        let combinedCss = result.uniqueCss;
+        for (const s of result.structuredStyles) {
+          const props = Object.entries(s.styles)
+            .map(([k, v]) => `${k}:${String(v)}`)
+            .join(";");
+          if (props) combinedCss += `${s.selector}{${props}}\n`;
+        }
 
-        // Unique (non-utility) raw CSS only — utilities live in their own file
-        const rawSelectors = [...new Set(
-          [...result.uniqueCss.matchAll(/^([.#][^\s{]+)\s*\{/gm)].map((m) => m[1])
-        )];
-        const rawEntries = rawSelectors.map((sel) => ({
-          selector: sel,
-          name: sel.replace(/^\./, ""),
-          styles: {} as Record<string, unknown>,
-          raw: true,
-        }));
-
-        const manifest = buildGlobalStylesManifest(structuredStyles, rawEntries, []);
-        writeFileSync(resolve(setupDir, "global-styles.json"), JSON.stringify(manifest, null, 2) + "\n", "utf-8");
         writeFileSync(resolve(setupDir, "tailwind-utilities.css"), utilityCss, "utf-8");
-        writeFileSync(resolve(setupDir, "styles-unique.css"), result.uniqueCss, "utf-8");
+        writeFileSync(resolve(setupDir, "styles-unique.css"), combinedCss, "utf-8");
 
         const totalRules =
-          structuredStyles.length +
-          rawEntries.length +
+          result.structuredStyles.length +
           (utilityCss.match(/\{/g) || []).length;
         writeFileSync(resolve(setupDir, "rejected.json"), result.rejectionLog.toJSON(totalRules), "utf-8");
 
-        // GB-importable format: flat array of {selector, css, data}
-        const importFormat = generateGbImportFormat(result.structuredStyles);
-        writeFileSync(
-          resolve(setupDir, "global-styles-import.json"),
-          JSON.stringify(importFormat, null, 2) + "\n",
-          "utf-8",
-        );
-
-        console.log(`  ${pass.mode} Global Styles: ${structuredStyles.length} structured (editable), ${rawEntries.length} raw (CSS-only)`);
-        console.log(`  ${pass.mode} Tailwind CSS:  ${pass.mode}/setup/tailwind-utilities.css`);
-        console.log(`  ${pass.mode} Unique CSS:    ${pass.mode}/setup/styles-unique.css`);
-        console.log(`  ${pass.mode} Rejections:    ${pass.mode}/setup/rejected.json`);
-        console.log(`  ${pass.mode} Import:        ${pass.mode}/setup/global-styles-import.json`);
+        console.log(`  ${pass.mode} Structured: ${result.structuredStyles.length} classes merged into styles-unique.css`);
+        console.log(`  ${pass.mode} Tailwind:   ${pass.mode}/setup/tailwind-utilities.css`);
+        console.log(`  ${pass.mode} Unique:     ${pass.mode}/setup/styles-unique.css`);
+        console.log(`  ${pass.mode} Rejections: ${pass.mode}/setup/rejected.json`);
       }
 
       // Write app.js into this mode folder (fallback and processed both need scripts)

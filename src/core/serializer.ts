@@ -49,6 +49,34 @@ function formatCss(block: Block, rawCss: string): string {
 // ── Build canonical attribute objects ─────────────────────────
 
 /**
+ * Merge block.css properties into block.styles (camelCase).
+ * GB ignores styles when css is non-empty — this ensures
+ * ALL properties flow through styles where GB will render them.
+ */
+function mergeCssIntoLazyStyles(block: Block): { styles: BlockStyles; css: string } {
+  const rawCss = (block.css || "").trim();
+  if (!rawCss) return { styles: block.styles ? { ...block.styles } : {}, css: "" };
+
+  const styles: BlockStyles = block.styles ? { ...block.styles } : {};
+  const cssLeftover: string[] = [];
+
+  // Parse CSS declarations: property:value;
+  const decls = rawCss.split(";").filter(d => d.trim());
+  for (const decl of decls) {
+    const colon = decl.indexOf(":");
+    if (colon < 0) { cssLeftover.push(decl); continue; }
+    const prop = decl.substring(0, colon).trim();
+    const val = decl.substring(colon + 1).trim();
+    if (!prop || !val) { cssLeftover.push(decl); continue; }
+    // Convert to camelCase and add to styles
+    const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    styles[camel] = val;
+  }
+
+  return { styles, css: cssLeftover.join(";") };
+}
+
+/**
  * Build the attributes object in CANONICAL KEY ORDER for each block type.
  * Keys not present are omitted (unchanged from default).
  */
@@ -58,9 +86,12 @@ function buildElementAttrs(block: Block): Record<string, unknown> {
   attrs.uniqueId = block.uniqueId;
   attrs.tagName = block.tagName ?? "div";
 
-  const stylesEmpty = !block.styles || Object.keys(block.styles).length === 0;
-  attrs.styles = stylesEmpty ? {} : block.styles;
-  attrs.css = formatCss(block, block.css || "");
+  // Merge css properties into styles so GB renders them.
+  // GB ignores styles when css is non-empty.
+  const { styles, css } = mergeCssIntoLazyStyles(block);
+  const stylesEmpty = !styles || Object.keys(styles).length === 0;
+  attrs.styles = stylesEmpty ? {} : styles;
+  attrs.css = formatCss(block, stylesEmpty ? (css || "") : "");
 
   if (block.globalClasses && block.globalClasses.length > 0) {
     attrs.globalClasses = block.globalClasses;
@@ -84,9 +115,10 @@ function buildTextAttrs(block: Block): Record<string, unknown> {
   // to strip it on save → string diff → recovery. Do NOT emit content here.
   // attrs.content = block.content ?? "";  // ← REMOVED per WP round-trip test
 
-  const stylesEmpty = !block.styles || Object.keys(block.styles).length === 0;
-  attrs.styles = stylesEmpty ? {} : block.styles;
-  attrs.css = formatCss(block, block.css || "");
+  const { styles, css } = mergeCssIntoLazyStyles(block);
+  const stylesEmpty = !styles || Object.keys(styles).length === 0;
+  attrs.styles = stylesEmpty ? {} : styles;
+  attrs.css = formatCss(block, stylesEmpty ? (css || "") : "");
 
   if (block.globalClasses && block.globalClasses.length > 0) {
     attrs.globalClasses = block.globalClasses;
@@ -106,9 +138,10 @@ function buildMediaAttrs(block: Block): Record<string, unknown> {
   attrs.uniqueId = block.uniqueId;
   attrs.tagName = block.tagName ?? "img";
 
-  const stylesEmpty = !block.styles || Object.keys(block.styles).length === 0;
-  attrs.styles = stylesEmpty ? {} : block.styles;
-  attrs.css = formatCss(block, block.css || "");
+  const { styles, css } = mergeCssIntoLazyStyles(block);
+  const stylesEmpty = !styles || Object.keys(styles).length === 0;
+  attrs.styles = stylesEmpty ? {} : styles;
+  attrs.css = formatCss(block, stylesEmpty ? (css || "") : "");
 
   if (block.globalClasses && block.globalClasses.length > 0) {
     attrs.globalClasses = block.globalClasses;
