@@ -37,15 +37,13 @@ const SNAPSHOTS_DIR = resolve(process.cwd(), "snapshots/m1");
  * Remove CSS rules from utilityCss whose selectors match any class
  * that was converted to GB inline styles (no longer needed as CSS).
  */
-function filterUtilityCss(utilityCss: string, mappedClasses: Set<string>, domClasses?: Set<string>): string {
+function filterUtilityCss(utilityCss: string, mappedClasses: Set<string>): string {
   if (mappedClasses.size === 0) return utilityCss;
   
   // Split into individual rules — each starts with a selector on its own line
   const rules = utilityCss.split(/\n(?=[.#@])/);
   return rules.filter(rule => {
     for (const cls of mappedClasses) {
-      // Skip: if this class still appears in the DOM somewhere, keep its CSS
-      if (domClasses?.has(cls)) continue;
       const escaped = cls.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       // Match class selector: .flex{ or .flex, or .flex 
       if (new RegExp(`\\.${escaped}([\\s,\\{:]|$)`).test(rule)) {
@@ -54,20 +52,6 @@ function filterUtilityCss(utilityCss: string, mappedClasses: Set<string>, domCla
     }
     return true;
   }).join("");
-}
-
-/** Extract all Tailwind-like class names from assembled HTML. */
-function collectDomClasses(html: string): Set<string> {
-  const classes = new Set<string>();
-  // Match class="..." attributes
-  const re = /class="([^"]*)"/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    for (const cls of m[1].split(/\s+/)) {
-      if (cls.length > 0) classes.add(cls);
-    }
-  }
-  return classes;
 }
 
 // ── Fixture listing ───────────────────────────────────────────
@@ -600,21 +584,6 @@ async function main(): Promise<void> {
         if (pass.runSplit) {
         mkdirSync(setupDir, { recursive: true });
 
-        // Collect all class references from assembled HTML across all pages.
-        // This prevents stripping CSS for classes used in inner HTML
-        // (form children, browser mockup details, SVG wrappers, etc.).
-        const domClasses = new Set<string>();
-        const pagesDir = resolve(modeDir, "pages");
-        if (existsSync(pagesDir)) {
-          for (const f of readdirSync(pagesDir)) {
-            if (!f.endsWith(".html")) continue;
-            const pageHtml = readFileSync(resolve(pagesDir, f), "utf-8");
-            for (const cls of collectDomClasses(pageHtml)) {
-              domClasses.add(cls);
-            }
-          }
-        }
-
         // Use full Tailwind CSS: from file if present, otherwise inlinerCss
         const fullCss = existsSync(cssPath)
           ? readFileSync(cssPath, "utf-8")
@@ -623,10 +592,9 @@ async function main(): Promise<void> {
         const result = CssClassifier.classify(fullCss);
 
         // Filter Tailwind utilities: remove CSS rules for classes mapped to GB inline styles
-        // BUT preserve CSS for classes still referenced somewhere in the DOM
         let utilityCss = result.utilityCss;
         if (allMappedClasses.size > 0) {
-          utilityCss = filterUtilityCss(utilityCss, allMappedClasses, domClasses);
+          utilityCss = filterUtilityCss(utilityCss, allMappedClasses);
         }
 
         const structuredStyles = result.structuredStyles.map((s) => ({
