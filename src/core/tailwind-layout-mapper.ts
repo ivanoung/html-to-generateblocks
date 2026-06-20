@@ -14,6 +14,8 @@ const SPACING: Record<string, string> = {
 const SPACING_SUFFIX_MAP: Record<string, string> = {
   pt: "paddingTop", pr: "paddingRight", pb: "paddingBottom", pl: "paddingLeft",
   mt: "marginTop", mr: "marginRight", mb: "marginBottom", ml: "marginLeft",
+  top: "top", right: "right", bottom: "bottom", left: "left",
+  insetx: "left", insety: "right", // handled separately
 };
 
 function resolveSpacing(value: string, suffixes: string[]): Record<string, string> | null {
@@ -34,6 +36,36 @@ function resolveSpacing(value: string, suffixes: string[]): Record<string, strin
     if (prop) out[prop] = resolved;
   }
   return Object.keys(out).length > 0 ? out : null;
+}
+
+// ── M3 Sizing Helper ─────────────────────────────────────
+
+function resolveSizing(prop: string, value: string): Record<string, string> | null {
+  // Full/screen/auto
+  if (value === "full") return { [prop]: "100%" };
+  if (value === "screen") return { [prop]: prop.startsWith("min") ? "100vh" : prop.startsWith("max") ? "100vw" : "100vw" };
+  if (value === "auto") return { [prop]: "auto" };
+  if (value === "min") return { [prop]: "min-content" };
+  if (value === "max") return { [prop]: "max-content" };
+  if (value === "fit") return { [prop]: "fit-content" };
+  // Max-width specials
+  if (value === "none") return { [prop]: "none" };
+  if (value === "container" && prop === "maxWidth") return { [prop]: "1280px" }; // TW container default
+  // Fractions: w-1/2 → 50%
+  const fracMatch = value.match(/^(\d+)\/(\d+)$/);
+  if (fracMatch) return { [prop]: `${(parseInt(fracMatch[1]) / parseInt(fracMatch[2])) * 100}%` };
+  // SPACING table or numeric
+  if (SPACING[value]) return { [prop]: SPACING[value] };
+  if (/^\d+$/.test(value)) return { [prop]: `${parseInt(value) * 4}px` };
+  if (/^\d+px$/.test(value) || /^\d+%$/.test(value) || /^\d+rem$/.test(value) || /^\d+em$/.test(value)) {
+    return { [prop]: value };
+  }
+  // Arbitrary: w-[200px]
+  if (/^\[.+\]$/.test(value)) {
+    const inner = value.slice(1, -1);
+    return { [prop]: inner };
+  }
+  return null;
 }
 
 // ── V2 Responsive Types ──────────────────────────────────────
@@ -130,6 +162,41 @@ const MAPPING_TABLE: MapperEntry[] = [
   { pattern: /^mr-(.+)$/, apply: (m) => resolveSpacing(m[1], ["mr"]) },
   { pattern: /^mb-(.+)$/, apply: (m) => resolveSpacing(m[1], ["mb"]) },
   { pattern: /^ml-(.+)$/, apply: (m) => resolveSpacing(m[1], ["ml"]) },
+
+  // ── Sizing (M3) ──
+  { pattern: /^w-(.+)$/, apply: (m) => resolveSizing("width", m[1]) },
+  { pattern: /^h-(.+)$/, apply: (m) => resolveSizing("height", m[1]) },
+  { pattern: /^min-w-(.+)$/, apply: (m) => resolveSizing("minWidth", m[1]) },
+  { pattern: /^min-h-(.+)$/, apply: (m) => resolveSizing("minHeight", m[1]) },
+  { pattern: /^max-w-(.+)$/, apply: (m) => resolveSizing("maxWidth", m[1]) },
+  { pattern: /^max-h-(.+)$/, apply: (m) => resolveSizing("maxHeight", m[1]) },
+
+  // ── Positioning (M4) ──
+  { pattern: /^static$/, apply: () => ({ position: "static" }) },
+  { pattern: /^fixed$/, apply: () => ({ position: "fixed" }) },
+  { pattern: /^absolute$/, apply: () => ({ position: "absolute" }) },
+  { pattern: /^relative$/, apply: () => ({ position: "relative" }) },
+  { pattern: /^sticky$/, apply: () => ({ position: "sticky" }) },
+  { pattern: /^top-(.+)$/, apply: (m) => resolveSpacing(m[1], ["top"]) as any },
+  { pattern: /^right-(.+)$/, apply: (m) => resolveSpacing(m[1], ["right"]) as any },
+  { pattern: /^bottom-(.+)$/, apply: (m) => resolveSpacing(m[1], ["bottom"]) as any },
+  { pattern: /^left-(.+)$/, apply: (m) => resolveSpacing(m[1], ["left"]) as any },
+  { pattern: /^inset-(.+)$/, apply: (m) => resolveSpacing(m[1], ["top", "right", "bottom", "left"]) as any },
+
+  // ── Borders / Z-Index / Opacity (M5) ──
+  { pattern: /^z-(.+)$/, apply: (m) => /^[\d-]+$/.test(m[1]) ? { zIndex: m[1] } : null },
+  { pattern: /^opacity-(.+)$/, apply: (m) => { const v = parseFloat(m[1]); return !isNaN(v) ? { opacity: String(v / 100) } : null; } },
+  { pattern: /^rounded$/, apply: () => ({ borderRadius: "4px" }) },
+  { pattern: /^rounded-none$/, apply: () => ({ borderRadius: "0px" }) },
+  { pattern: /^rounded-sm$/, apply: () => ({ borderRadius: "2px" }) },
+  { pattern: /^rounded-md$/, apply: () => ({ borderRadius: "6px" }) },
+  { pattern: /^rounded-lg$/, apply: () => ({ borderRadius: "8px" }) },
+  { pattern: /^rounded-xl$/, apply: () => ({ borderRadius: "12px" }) },
+  { pattern: /^rounded-2xl$/, apply: () => ({ borderRadius: "16px" }) },
+  { pattern: /^rounded-3xl$/, apply: () => ({ borderRadius: "24px" }) },
+  { pattern: /^rounded-full$/, apply: () => ({ borderRadius: "9999px" }) },
+  { pattern: /^border$/, apply: () => ({ borderWidth: "1px" }) },
+  { pattern: /^border-(\d+)$/, apply: (m) => ({ borderWidth: `${m[1]}px` }) },
 
   // ── Aspect Ratio ──
   { pattern: /^aspect-auto$/, apply: () => ({ aspectRatio: "auto" }) },
