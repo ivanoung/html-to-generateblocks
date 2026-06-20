@@ -32,10 +32,10 @@ describe("tailwindLayoutToGbAttributes", () => {
 
   // ── Partial conversion ──
   it("leaves unmapped classes as leftover", () => {
-    const result = tailwindLayoutToGbAttributes("flex shadow-lg opacity-50");
+    const result = tailwindLayoutToGbAttributes("flex bg-blue-500 hover:text-white");
     assert.strictEqual(result.styles.display, "flex");
-    assert.ok(result.leftoverClasses.includes("shadow-lg"));
-    assert.ok(result.leftoverClasses.includes("opacity-50"));
+    assert.ok(result.leftoverClasses.includes("bg-blue-500"));
+    assert.ok(result.leftoverClasses.includes("hover:text-white"));
   });
 
   // ── Empty / whitespace ──
@@ -213,10 +213,10 @@ describe("V2 — responsive breakpoints", () => {
   });
 
   it("passes through responsive cosmetic classes", () => {
-    const r = tailwindLayoutToGbAttributes("flex md:shadow-lg lg:opacity-50");
+    const r = tailwindLayoutToGbAttributes("flex md:bg-blue-500 lg:hover:text-white");
     assert.strictEqual(r.styles.display, "flex");
-    assert.ok(r.leftoverClasses.includes("md:shadow-lg"));
-    assert.ok(r.leftoverClasses.includes("lg:opacity-50"));
+    assert.ok(r.leftoverClasses.includes("md:bg-blue-500"));
+    assert.ok(r.leftoverClasses.includes("lg:hover:text-white"));
   });
 
   it("multi-property responsive: display + gap", () => {
@@ -311,10 +311,10 @@ describe("V2 — responsive breakpoints", () => {
   });
 
   it("V1 flat path still works", () => {
-    const r = tailwindLayoutToGbAttributes("flex gap-4 items-center shadow-lg");
+    const r = tailwindLayoutToGbAttributes("flex gap-4 items-center bg-blue-500");
     assert.strictEqual(r.styles.display, "flex");
     assert.strictEqual(r.styles.columnGap, "16px");
-    assert.ok(r.leftoverClasses.includes("shadow-lg"));
+    assert.ok(r.leftoverClasses.includes("bg-blue-500"));
   });
 
   // ── Regression: downward-leak prevention ──
