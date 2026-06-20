@@ -34,7 +34,9 @@ const BODY_CLASSES = [
   "antialiased",
 ];
 
-describe("Pixel Parity Verification", () => {
+const INPUT_EXISTS = existsSync(resolve(PROJECT_ROOT, "inputs/mino/index.html"));
+
+describe("Pixel Parity Verification", { skip: !INPUT_EXISTS }, () => {
   before(() => {
     execSync("npx tsx src/cli/index.ts convert inputs/mino/", {
       cwd: PROJECT_ROOT,
