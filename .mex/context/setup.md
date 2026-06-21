@@ -69,7 +69,7 @@ node --import tsx --test tests/<file>.test.ts
 
 `fixtures:list` · `fixtures:run <name>` · `fixtures:run-all` · `convert <input.html|dir/> [--skip-shared] [--split]` · `validate <name>` · `report:update <name> --pasted true --saved true --notes "..."` · `regression`.
 
-Convert flags: `--skip-shared` (skip shared `styles.css`/manual-steps on subsequent pages of a project run), `--split` (also generate processed/setup/ with `global-styles.json`, `tailwind-utilities.css`, `styles-unique.css`, `rejected.json`).
+Convert flags: `--skip-shared` (skip shared `styles.css`/manual-steps on subsequent pages of a project run), `--split` (also generate a processed/setup/ directory with tailwind-utilities.css, styles-unique.css, and rejected.json). Note: the CLI help text in `src/cli/index.ts` still mentions global-styles.json, but the `--split` code path no longer writes it — only the three files listed here.
 
 ## Common Issues
 
