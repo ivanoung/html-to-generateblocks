@@ -73,9 +73,10 @@ Convert flags: `--skip-shared` (skip shared `styles.css`/manual-steps on subsequ
 
 ## Common Issues
 
-- **`npm run build` emits nothing** — by design (`tsconfig.json` `noEmit: true`); it is a typecheck, not a build.
+- **`npm run build` emits nothing** — by design (`tsconfig.json` `noEmit: true`); it is a typecheck, not a build. It currently reports pre-existing errors (`tailwind-inliner.ts` needs `dom` lib; `tailwind-layout-mapper.ts` has a circular `GbStyles` alias) that do not block the `tsx` runtime — see `ROUTER.md` Known issues.
 - **Tailwind v3 + v4 coinstall** — `tailwindcss3` is an npm alias to `tailwindcss@^3.4.19` so both versions resolve; do not remove either.
 - **Playwright Chromium missing** — the Tailwind inliner fails fast without it; run `npx playwright install chromium`.
-- **Tests** — CONTRIBUTING.md mentions Vitest for the layout mapper, but Vitest is not installed and every test file imports `node:test`. Use `node --import tsx --test tests/*.test.ts`.
+- **Tests** — CONTRIBUTING.md mentions Vitest for the layout mapper, but Vitest is not installed and every test file imports `node:test`. Use `node --import tsx --test tests/*.test.ts` (216 tests).
 - **`convert` on a project dir** compiles `styles.css` once from the union of all pages' classes, then converts each page. For subsequent single-page runs use `--skip-shared`.
 - **Squarespace / Wix / Webflow exports** — out of scope; clean the markup first (see README "Out of scope").
+- **Fixture-based commands broken** — `regression`, `fixtures:run`, `fixtures:run-all`, `validate`, `report:update` all read fixtures/*.json (and `regression` reads snapshots/m1/*.html), but both fixtures/ and snapshots/ are gitignored (`.gitignore` lines 11–12) and not in the repo, so these commands throw ENOENT. The reliable verification path is `convert` + `verify.ts` + `node --import tsx --test` (see `context/conventions.md` Verify Checklist).
