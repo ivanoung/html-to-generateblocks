@@ -11,12 +11,19 @@
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.0",
     "@types/node": "^25.9.1",
+    "mex-agent": "^0.6.1",
     "tailwindcss": "^4.3.0",
     "tailwindcss3": "npm:tailwindcss@^3.4.19",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   },
-  "keywords": ["generateblocks", "tailwindcss", "wordpress", "converter", "blocks"],
+  "keywords": [
+    "generateblocks",
+    "tailwindcss",
+    "wordpress",
+    "converter",
+    "blocks"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/ivanoung/html-to-generateblocks"
