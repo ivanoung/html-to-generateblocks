@@ -32,16 +32,10 @@ Mapping lives in `src/core/dom-walker.ts`; canonical key order comes from
 3. Add the tag → block mapping in `src/core/dom-walker.ts`, following the existing tag-rule style.
 4. Enforce canonical key order from `plugin/generateblocks/<block>/block.json`. Never invent an order.
 5. If the block exposes new style properties, gate them in `src/core/gb-whitelist.ts` (`isGbSupported`).
-6. Add a fixture in `fixtures/` (M1 `FixtureNode` or fidelity `inputHtml`) that exercises the tag, with an `expect` block (`shouldPass`, `hardFailCount`, `blockCount`).
-7. If M1, add a snapshot under `tests/snapshots/` (run once to generate, then commit).
-8. Run the fixture and regression:
+6. Add a test in `tests/` (e.g. `tests/<block-name>.test.ts`) that exercises the tag mapping using `node:test`.
+7. Run the test:
    ```bash
-   npx tsx src/cli/index.ts fixtures:run <name>
-   npx tsx src/cli/index.ts regression
-   ```
-9. Run the relevant tests:
-   ```bash
-   node --import tsx --test tests/<relevant>.test.ts
+   node --import tsx --test tests/<block-name>.test.ts
    ```
 
 ## Gotchas
@@ -54,8 +48,7 @@ Mapping lives in `src/core/dom-walker.ts`; canonical key order comes from
 
 ## Verify
 
-- [ ] Fixture output `blockCount` matches `expect`.
-- [ ] `npx tsx src/cli/index.ts regression` green (new snapshot committed).
+- [ ] Block count matches expectation.
 - [ ] `node --import tsx --test tests/*.test.ts` green.
 - [ ] `npm run build` (tsc) passes.
 - [ ] No recovery-rule violations: no `className` in JSON, four escapes applied, canonical key order, `styles`/`css` in sync.

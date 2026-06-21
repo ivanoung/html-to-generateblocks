@@ -4,7 +4,7 @@
 // Canonical key ordering, 4 JSON escapes, block delimiters,
 // rendered HTML with correct class patterns.
 
-import type { Block } from "./types.js";
+import type { Block, BlockStyles } from "./types.js";
 
 // ── CSS formatting ────────────────────────────────────────────
 

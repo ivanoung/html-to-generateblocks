@@ -23,7 +23,7 @@ last_updated: 2026-06-21
 
 Load `context/tailwind-mapping.md` (the mapping surface) and
 `context/conventions.md` (verify checklist). The mapping lives across:
-`src/core/mapper.ts` (M1 transfer), `src/core/tailwind-layout-mapper.ts`
+`src/core/tailwind-layout-mapper.ts`
 (`tailwindLayoutToGbAttributes`), `src/core/gb-whitelist.ts`
 (`isGbSupported(prop, value)`), and `src/core/token-mapper.ts` (token → value).
 
@@ -38,7 +38,6 @@ config font families are intentionally NOT mapped — do not add them.
    - layout utilities → `src/core/tailwind-layout-mapper.ts`
    - property support gating → `src/core/gb-whitelist.ts` (`isGbSupported`)
    - token → value resolution → `src/core/token-mapper.ts`
-   - M1 fixture transfer → `src/core/mapper.ts`
 3. Add the mapping. Mirror the existing patterns in that file (key order, value normalization: `rgb()`→`#hex`, `0px`→`0`).
 4. For responsive variants, respect the desktop-first inversion (largest breakpoint → base; smaller → `@media(max-width: N-1px)` resets) in both `styles` and `css`.
 5. Add a test in `tests/tailwind-layout-mapper.test.ts` (or the relevant tests/*.test.ts) covering the new class, including a responsive case if applicable.
@@ -66,7 +65,7 @@ config font families are intentionally NOT mapped — do not add them.
 - [ ] `npx tsx src/cli/verify.ts --output output/<site>` → zero discrepancies; the class now resolves to `styles`.
 - [ ] `npx tsx src/cli/verify.ts --output output/<site> --coverage` → CSS coverage reflects the change.
 - [ ] `npm run build` (tsc) passes.
-- [ ] `npx tsx src/cli/index.ts regression` green.
+- [ ] `node --import tsx --test tests/*.test.ts` green.
 
 ## Debug
 

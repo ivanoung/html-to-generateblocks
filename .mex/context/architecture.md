@@ -36,11 +36,10 @@ pixel-perfect reference) and a **processed** pass (mappable classes → inline
 `styles-unique.css` (structured + unique CSS). The serializer writes block
 markup with `styles` (editor) and `css` (frontend) kept in sync. The validator
 enforces WordPress "Attempt Recovery" rules. Output lands in
-`output/{project}/{fallback,processed}/`.
-
-M1/fidelity fixtures skip the inliner: `FixtureNode → mapper → Block[] →
-serialize → validate`; fidelity fixtures run `inputHtml → preprocess → DOM walk
-→ serialize → validate`.
+`output/{project}/{fallback,processed}/`. The `convert` command
+(preprocessor → inliner → verify-prepare → dom-walk → serialize → validate)
+is the only active pipeline; the legacy M1/fidelity fixture pipeline has been
+removed.
 
 ## Key Components
 
@@ -49,7 +48,6 @@ serialize → validate`; fidelity fixtures run `inputHtml → preprocess → DOM
 - **tailwind-inliner** (`src/core/tailwind-inliner.ts`) — convert-only: headless Chromium compiles Tailwind CDN → parse `document.styleSheets` → ClassRegistry → per-element assignment → CSS var resolution (`--tw-*`) → normalize (rgb→hex, 0px→0) → desktop-first conversion → consolidate shared sets into `.gb-s-{hash}` classes.
 - **verify-prepare** (`src/core/verify-prepare.ts`) — parses `styles.css` → `classNameToProperties` map consumed by the mapper.
 - **dom-walker** (`src/core/dom-walker.ts`) — walks DOM, maps tags → blocks (section/div/nav/header/footer/main/article/aside → generateblocks/element; h1–h6/p/span/a/strong/em/small/label → generateblocks/text; img → media/core image; svg → shape; iframe → core embed; ul/ol → core list; blockquote → core quote; form → core/html fallback).
-- **mapper** (`src/core/mapper.ts`) — M1 `FixtureNode → Block` conversion; class → inline style transfer.
 - **tailwind-layout-mapper** (`src/core/tailwind-layout-mapper.ts`) + **token-mapper** (`src/core/token-mapper.ts`) + **gb-whitelist** (`src/core/gb-whitelist.ts`) — the Tailwind utility → GB inline `styles` mapping surface (see `context/tailwind-mapping.md`).
 - **css-splitter** (`src/core/css-splitter.ts`) — splits `styles.css` into `tailwind-utilities.css` + `styles-unique.css` (processed pass, `--split`).
 - **serializer** (`src/core/serializer.ts`) — blocks → WordPress block markup; `styles` (camelCase) + `css` (kebab, sorted, minified) kept in sync.

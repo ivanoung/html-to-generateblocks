@@ -365,7 +365,7 @@ async function compileWithPlaywright(html: string): Promise<InlinerResult> {
     try {
       const designScript = buildExtractionScript();
       const designJson = await page.evaluate(designScript);
-      dossier = JSON.parse(designJson);
+      dossier = JSON.parse(designJson as string);
     } catch (extractErr: any) {
       warnings.push(`Design extraction failed: ${extractErr.message}`);
       dossier = emptyDossier();

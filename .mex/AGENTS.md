@@ -26,7 +26,6 @@ Converts clean HTML/CSS/JS sites (Tailwind or vanilla CSS) into WordPress paste-
 - Convert page: `npx tsx src/cli/index.ts convert inputs/<site>/index.html`
 - Verify fidelity: `npx tsx src/cli/verify.ts --output output/<site>`
 - CSS coverage: `npx tsx src/cli/verify.ts --output output/<site> --coverage`
-- Regression: `npx tsx src/cli/index.ts regression`
 - Tests: `node --import tsx --test tests/*.test.ts`
 - Typecheck: `npm run build`
 

@@ -55,7 +55,7 @@ last_updated: 2026-06-21
 
 **Alternatives considered:** Inline everything via raw CSS strings (rejected — GB editor rejects/loses editor-editability); drop unmappable classes entirely (rejected — loses fidelity).
 
-**Consequences:** The mapping surface (`mapper.ts`, `tailwind-layout-mapper.ts`, `gb-whitelist.ts`, `token-mapper.ts`) is the project's deepest domain — see `context/tailwind-mapping.md`.
+**Consequences:** The mapping surface (`tailwind-layout-mapper.ts`, `gb-whitelist.ts`, `token-mapper.ts`) is the project's deepest domain — see `context/tailwind-mapping.md`.
 
 ---
 

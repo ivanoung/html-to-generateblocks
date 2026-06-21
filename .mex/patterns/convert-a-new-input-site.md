@@ -47,7 +47,7 @@ Source HTML lives under `inputs/<site>/` (e.g. `inputs/mino/`). Output lands in
    ```bash
    npx tsx src/cli/verify.ts --output output/<site> --coverage
    ```
-8. Manual WordPress check: paste `output/<site>/processed/pages/<page>.html` into the WP code editor (Ctrl+Shift+Alt+M), save, reload, confirm no "Attempt Recovery". Then `npx tsx src/cli/index.ts report:update <name> --pasted true --saved true --notes "..."` (for fixture-style outputs).
+8. Manual WordPress check: paste `output/<site>/processed/pages/<page>.html` into the WP code editor (Ctrl+Shift+Alt+M), save, reload, confirm no "Attempt Recovery".
 
 ## Gotchas
 
@@ -61,7 +61,7 @@ Source HTML lives under `inputs/<site>/` (e.g. `inputs/mino/`). Output lands in
 
 - [ ] `output/<site>/processed/pages/*.report.json` shows `overallStatus: validator_pass` and `hardFails: 0`.
 - [ ] `npx tsx src/cli/verify.ts --output output/<site>` → zero discrepancies.
-- [ ] `npx tsx src/cli/index.ts regression` still green (no snapshot drift).
+- [ ] `node --import tsx --test tests/*.test.ts` green.
 - [ ] Paste/save/reload in WordPress → no "Attempt Recovery".
 
 ## Debug

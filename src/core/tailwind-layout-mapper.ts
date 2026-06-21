@@ -81,7 +81,9 @@ function resolveSizing(
 // ── V2 Responsive Types ──────────────────────────────────────
 
 /** GenerateBlocks supports nested @media keys in styles. */
-type GbStyles = Record<string, string | GbStyles>;
+interface GbStyles {
+  [key: string]: string | GbStyles;
+}
 
 /** Tailwind breakpoint prefixes in cascade order (smallest → largest). */
 const BREAKPOINTS: string[] = ["", "sm", "md", "lg", "xl", "2xl"];

@@ -30,11 +30,9 @@ last_updated: 2026-06-21
 
 ## Structure
 
-- `src/core/` — pipeline modules (one responsibility each: preprocessor, inliner, verify-prepare, dom-walker, mapper, css-splitter, serializer, validator, + the mapping surface + auxiliaries).
+- `src/core/` — pipeline modules (one responsibility each: preprocessor, inliner, verify-prepare, dom-walker, css-splitter, serializer, validator, + the mapping surface + auxiliaries).
 - `src/cli/` — `index.ts` (command surface) and `verify.ts` (self-verification).
-- `src/runner/` — `run-fixture.ts` (M1 + fidelity orchestration).
-- `tests/` — `*.test.ts` using `node:test`; `tests/snapshots/` holds M1 golden files.
-- fixtures/ — JSON fixtures (M1 + fidelity + DOM-walk + preprocess suites).
+- `tests/` — `*.test.ts` using `node:test`.
 - `inputs/` — raw HTML sites for the `convert` command (e.g. `inputs/mino/`).
 - `plugin/` — GenerateBlocks / GP-Premium plugin JSON, used as the canonical key-order reference.
 - `config/` — Tailwind config samples.
@@ -58,11 +56,9 @@ Run every item explicitly before claiming a change is done (this is ROUTER step 
 2. `npx tsx src/cli/index.ts convert inputs/<site>/ --split` — the site converts with `overallStatus: pass` and `hardFails: 0` on every page (re-run after any pipeline change).
 3. `npx tsx src/cli/verify.ts --output output/<site>` — zero discrepancies (layout fidelity: processed vs fallback).
 4. (Optional) `npx tsx src/cli/verify.ts --output output/<site> --coverage` — CSS coverage for used classes.
-5. `npm run build` — `tsc` typecheck. NOTE: this currently reports pre-existing errors in `src/core/tailwind-inliner.ts` (tsconfig `lib` lacks `dom`) and `src/core/tailwind-layout-mapper.ts` (circular `GbStyles` alias) — these do NOT block the `tsx` runtime workflow; see Known issues in `ROUTER.md`. Track them separately if you touch those files.
+5. `npm run build` — `tsc` typecheck, exits 0 cleanly.
 6. Block-level recovery rules hold: no `className` in block JSON (use `globalClasses`); no descendant selectors, no `transition`, no hover rules in `css`; four JSON escapes applied; canonical key order per block type.
 7. `styles` and `css` are in sync — editor preview and frontend render identically.
-
-> The `regression` / `fixtures:run*` / `validate` / `report:update` CLI commands exist but are **not runnable in the current repo** — they need fixtures/*.json and snapshots/m1/*.html, both of which are gitignored (`.gitignore` lines 11–12) and not checked in. Do not add them to the Verify Checklist.
 
 ## What Not To Do
 

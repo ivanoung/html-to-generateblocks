@@ -1,58 +1,3 @@
-// ── Fixture schema ────────────────────────────────────────────
-
-export interface FixtureExpect {
-  shouldPass: boolean;
-  hardFailCount: number;
-  warningCodes: string[];
-}
-
-export interface Fixture {
-  name: string;
-  description: string;
-  input: FixtureNode;
-  expect: FixtureExpect;
-}
-
-// ── Input node types (from fixture JSON) ──────────────────────
-
-export interface ElementNode {
-  nodeType: "element";
-  tagName: string;
-  attributes: Record<string, string>;
-  style?: string;
-  children: FixtureNode[];
-}
-
-export interface TextNode {
-  nodeType: "text";
-  tagName: string;
-  text: string;
-  style?: string;
-}
-
-export interface ImageNode {
-  nodeType: "image";
-  src: string;
-  alt: string;
-  width?: number;
-  height?: number;
-  caption?: string;
-  style?: string;
-}
-
-export interface EmbedNode {
-  nodeType: "embed";
-  provider: string;
-  url: string;
-}
-
-export interface HtmlNode {
-  nodeType: "html";
-  html: string;
-}
-
-export type FixtureNode = ElementNode | TextNode | ImageNode | EmbedNode | HtmlNode;
-
 // ── Intermediate block (after mapping, before serialization) ──
 
 export type BlockName =
@@ -133,31 +78,6 @@ export interface Warning {
 export interface ValidationResult {
   hardFails: HardFail[];
   warnings: Warning[];
-}
-
-// ── Output report ─────────────────────────────────────────────
-
-export type ReportStatus =
-  | "generated"
-  | "validator_pass"
-  | "validator_fail"
-  | "wordpress_verified_pass"
-  | "wordpress_verified_fail"
-  | "rejected_unsupported";
-
-export interface ManualVerification {
-  wordpressPasted: boolean;
-  savedWithoutRecovery: boolean | null;
-  notes: string;
-}
-
-export interface FixtureReport {
-  fixture: string;
-  status: ReportStatus;
-  blockCount: number;
-  hardFails: HardFail[];
-  warnings: Warning[];
-  manualVerification: ManualVerification;
 }
 
 // ── Style Transfer Pipeline ──────────────────────────────────

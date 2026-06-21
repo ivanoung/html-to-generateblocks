@@ -33,7 +33,6 @@ Then read this file fully before doing anything else in this session.
 - CSS split into `tailwind-utilities.css` (unmapped) + `styles-unique.css` (processed pass, `--split`).
 - GB blocks: `element`, `text`, `media`, `shape`; core blocks: `image`, `embed`, `list`, `quote`, `html`.
 - Self-verification (`src/cli/verify.ts`): layout fidelity + CSS coverage.
-- 17 fixtures + M1 snapshots passing regression.
 - Iconify `<iconify-icon>` → inline SVG resolution (with core/html fallback).
 - `data-gb-wrap="core-html"` marker to preserve raw HTML as a core/html block.
 
@@ -47,8 +46,6 @@ Then read this file fully before doing anything else in this session.
 **Known issues:**
 - `leading-*` combined with responsive `text-*` (which sets lineHeight as a side effect): the V3 cascade picks the largest breakpoint value. See `docs/superpowers/learnings/2025-06-21-v3-cascade-precedence.md`.
 - CONTRIBUTING.md's "Vitest" note is stale — all test files use `node:test`; run via `node --import tsx --test tests/*.test.ts`.
-- **Fixture-based CLI commands are broken** — `regression`, `fixtures:run`, `fixtures:run-all`, `validate`, `report:update` need fixtures/*.json and snapshots/m1/*.html, both gitignored (`.gitignore` lines 11–12) and not in the repo. They throw ENOENT. Use `convert` + `verify.ts` + the test suite instead.
-- **Pre-existing `tsc` errors** — `npm run build` fails on `src/core/tailwind-inliner.ts` (tsconfig `lib` lacks `dom`, so `document`/`Element` are undefined) and `src/core/tailwind-layout-mapper.ts` (circular `GbStyles` type alias). These pre-date the mex adoption and do not block the `tsx` runtime workflow.
 
 ## Routing Table
 

@@ -34,7 +34,7 @@ conversion by re-running the mapper on the class list.
    npx tsx src/cli/verify.ts --output output/<site>
    ```
 2. Triage by issue type:
-   - **`missing_property`** — the mapper produced a property for the class list but the processed block lacks it. Check `src/core/mapper.ts` / `tailwind-layout-mapper.ts` for the class; likely the mapping was skipped or the class was wrongly left in `globalClasses`.
+   - **`missing_property`** — the mapper produced a property for the class list but the processed block lacks it. Check `src/core/tailwind-layout-mapper.ts` for the class; likely the mapping was skipped or the class was wrongly left in `globalClasses`.
    - **`value_mismatch`** — same property, different value. Check value normalization (`rgb()`→`#hex`, `0px`→`0`), CSS variable resolution, and the desktop-first cascade inversion.
    - **`unused_property`** — the processed block has a property the mapper did not produce from the class list. Check whether a class was wrongly mapped, or a property was injected from the wrong source.
 3. If WordPress fires **"Attempt Recovery"** (not a verify.ts issue), check in order:
@@ -57,7 +57,6 @@ conversion by re-running the mapper on the class list.
 
 - [ ] `npx tsx src/cli/verify.ts --output output/<site>` → zero discrepancies.
 - [ ] `node --import tsx --test tests/*.test.ts` green (especially `tailwind-layout-mapper.test.ts` if the mapper changed).
-- [ ] `npx tsx src/cli/index.ts regression` green.
 - [ ] Paste/save/reload in WordPress → no "Attempt Recovery".
 
 ## Debug

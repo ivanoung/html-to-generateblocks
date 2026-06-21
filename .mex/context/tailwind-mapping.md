@@ -22,8 +22,7 @@ last_updated: 2026-06-21
 
 # Tailwind → GB Mapping
 
-This is the project's deepest domain. The mapping lives across four modules:
-`src/core/mapper.ts` (M1 class → inline style transfer),
+This is the project's deepest domain. The mapping lives across three modules:
 `src/core/tailwind-layout-mapper.ts` (layout utility → GB attributes,
 exposes `tailwindLayoutToGbAttributes`),
 `src/core/gb-whitelist.ts` (`isGbSupported(prop, value)` — can this property
