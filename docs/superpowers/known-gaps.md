@@ -1,44 +1,58 @@
-# Known Gaps — HTML-to-GB Pipeline
+# Known Gaps — html-to-generateblocks
 
-**Date:** 2026-06-05
-**Milestone:** M3 — First end-to-end conversion (MINO index page)
+**Last updated:** 2025-06-21
+**Milestone:** v0.2 (dual-output + self-verification + live WP audit)
 
-## Next Priorities
+---
 
-| # | Gap | Impact | Suggested Fix |
+## Current gaps (active)
+
+| # | Gap | Impact | Status |
 |---|---|---|---|
-| 1 | ~~**CSS variable chains not resolved**~~ — **FIXED** | ~~Colors render incorrectly~~ | Added `resolveCssVariables()` post-processor in style-resolver.ts. `var(--tw-text-opacity,1)` → `1`, `var(--tw-ring-offset-shadow,0 0 #0000)` → `0 0 #0000`. Variables with no fallback are stripped. |
-| 2 | ~~**Embed blocks produce empty containers**~~ — **FIXED** | ~~Complex sections lost~~ | Added `planCoreHtml()` in `ir-planner.ts`, exception processing in `html-to-ir.ts`. Code-diff, forms, iconify icons now produce `core/html` blocks with inline-styled content. |
-| 3 | **Logo-marquee not detected** — `<div id="client-logo-marquee">` isn't a `<section>`, so the structure parser misses it. Priority-2 heuristic (padding ≥ 64px) also misses it because it uses Tailwind classes, not inline styles. | Logo marquee section excluded from conversion | Run structure parser AFTER style resolution so inline styles exist for heuristic detection. Or detect by `id` attribute on non-section elements with significant child content. |
-| 4 | **`iconify-icon` web components** — These render via client-side JS and have no text content. Core/html wrapping needs the SVG string, which requires headless browser extraction. | Icons in feature cards and marquee lost | Either: (a) extract SVG via headless browser, or (b) mark iconify elements as `decoration` (strip) and replace with emoji/unicode icons |
-| 5 | ~~**SVG star ratings → `core/html`**~~ — **FIXED** | ~~Star ratings become raw SVG blobs~~ | Changed `star-rating` role mapping from `core/html` embed to `paragraph`. Star SVGs lost but review text ("from 20 reviews") preserved as clean text block. |
-| 6 | ~~**Section background styles**~~ — **FIXED** | ~~Sections look unstyled~~ | Fixed 3 issues: (1) DOM-based style merge in resolver preserves existing inline styles, (2) `styleIntentToString` converts camelCase→kebab for `parseStyleString`, (3) `html-to-ir` extracts ALL CSS properties including `background-image` and `background-size`. |
-| 7 | ~~**Responsive breakpoint inversion not implemented**~~ — **FIXED** | ~~Desktop-first values at all breakpoints~~ | `applyClassMap` now inverts Tailwind's mobile-first breakpoints to GB's desktop-first cascade. Multi-level (3+) breakpoints handled correctly. `data-gb-resp` attribute carries overrides to Phase 4 → `IRNode.responsiveIntent` → `@media(max-width:...)` in GB output. |
+| 1 | **`leading-*` + responsive `text-*` cascade** — `leading-[0.9]` at base is overridden by `lg:text-8xl`'s side-effect `lineHeight` at All Screens | Headings render with wrong line-height on desktop (96px instead of 0.9) | Reverted twice, learning documented. Future: hardcode side-effect properties OR post-process against `styles.css` |
+| 2 | **DOM-presence CSS filter** — classes used in inner HTML (form children, SVG wrappers) may lose CSS when globally filtered | Form inputs, browser mockup chrome lose styling | Reverted with Phase A. Future: re-apply alone once Phase A is solved |
+| 3 | **Color classes need CSS fallback** — `bg-primary`, `text-slate/80`, `border-seafoam/40` stay as utility classes | Colors only render if `tailwind-utilities.css` is loaded | By design. Future: GB Global Styles integration OR accept class-based fallback |
+| 4 | **Form/button styling depends on CSS** — forms and CTAs use color + state classes that can't be inlined | Forms render as plain text without CSS support | Depends on #3. May need GB-native form block support |
+| 5 | **Squarespace/Wix/Webflow exports** — proprietary component systems don't convert cleanly | TTN (Squarespace) produces unstyled output | Out of scope. Needs separate cleanup pass before conversion |
 
 ## Non-critical (can defer)
 
 | # | Gap |
 |---|---|
-| 8 | `clip-hex`, `clip-path`, `backdrop-filter` — unsupported CSS properties silently dropped |
-| 9 | `group-hover/*`, `peer-checked/*`, `::before`, `::after` — pseudo-classes stripped |
-| 10 | `@keyframes` animations — marquee animation stripped |
-| 11 | `hover-shadow-md` — complex box-shadow with rgba not mapped |
-| 12 | `blueprint-bg` — background-image patterns not mapped because they use CSS classes, not inline styles |
+| 6 | `clip-hex`, `clip-path`, `backdrop-filter` — unsupported CSS properties silently dropped |
+| 7 | `group-hover/*`, `peer-checked/*`, `::before`, `::after` — pseudo-classes stripped |
+| 8 | `@keyframes` animations — marquee animation stripped |
+| 9 | `hover-shadow-md` — complex box-shadow with rgba not mapped |
+| 10 | Font families from Tailwind config (`font-display`, `font-mono`) stay in `globalClasses` |
 
 ---
 
-## Proposed: Self-Verification Loop (future)
+## Fixed in v0.2
 
-**Problem:** Every conversion requires manual WordPress paste-and-verify, creating a slow human-in-the-loop feedback cycle.
+| # | Gap | Fix |
+|---|---|---|
+| ✅ | `max-w-container` hardcoded to 1280px | Now reads config's `maxWidth.container` (1600px for mino) |
+| ✅ | `uppercase`/`italic`/`underline` not mapped | Added `textTransform`, `fontStyle`, `textDecoration` entries |
+| ✅ | `leading-[N]` arbitrary values not mapped | Added bracket-value pattern |
+| ✅ | Side-specific borders (`border-t/r/b/l`) not mapped | Added `borderTopWidth`/etc entries + 0px resets |
+| ✅ | `border-dashed` not mapped | Added `borderStyle` entries |
+| ✅ | GB ignores `styles` when `css` is non-empty | `mergeCssIntoLazyStyles()` merges css into styles |
+| ✅ | `@media` blocks missing from `css` field | `buildSyncedCss()` emits `@media` blocks for frontend |
+| ✅ | `expandColorPalettes` too aggressive | Skip Tailwind default colors, keep custom color shade generation |
+| ✅ | CSS splitter produced too many files | Merged structured styles into `styles-unique.css` |
+| ✅ | No self-verification tool | `verify.ts` with default + `--coverage` modes |
+| ✅ | CSS variable chains not resolved | `resolveCssVariables()` post-processor |
+| ✅ | Embed blocks produce empty containers | `core/html` fallback for forms, SVGs, icons |
+| ✅ | Section background styles missing | DOM-based style merge preserves inline styles |
+| ✅ | Responsive breakpoint inversion | V3 All-Screens-centric cascade with 59-property reset table |
 
-**Proposed design:**
-1. Headless browser captures screenshot of source page (e.g., `https://minofound.com/`)
-2. Script extracts CSS from GB block output → builds standalone renderable HTML
-3. Headless browser captures screenshot of rendered GB output
-4. Agent compares screenshots visually, identifies issues, fixes, re-renders, re-compares — autonomously
-5. WordPress paste only as final confirmation gate
+---
 
-**Key components:**
-- `npx tsx src/cli/index.ts render <output.html>` — extracts GB block CSS, wraps in standalone HTML, renders via headless browser
-- Same browser engine for both source capture and output render (consistency)
-- Agent-driven comparison and fix loop
+## Self-verification loop (built)
+
+Previously a gap — now implemented:
+
+1. `verify.ts` default mode: compares mapper output against processed styles (0 discrepancies = faithful)
+2. `verify.ts --coverage` mode: reports DOM classes with/without CSS support
+3. Verified across mino (10 pages), hkvc (1 page), TTN (11 pages) — 0 issues
+4. Outputs `verify-report.json` and `verify-coverage.json`
